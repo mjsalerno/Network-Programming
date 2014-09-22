@@ -58,7 +58,7 @@ install_manifest.txt
 
 
 ### Clion ###
-.idea/
+#.idea/
 out/
 /*.iml
 *.ipr
@@ -66,3 +66,5 @@ out/
 idea_modules/
 atlassian-ide-plugin.xml
 
+
+build/

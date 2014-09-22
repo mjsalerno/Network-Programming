@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int maimn() {
+int main() {
     printf("yo\n");
     return 0;
 }
