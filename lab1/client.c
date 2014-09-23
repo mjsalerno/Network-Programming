@@ -1,10 +1,12 @@
-#include <stdio.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <unistd.h>
+#include <stdio.h>
 
 void print_ip_dns(const char *str);
 
@@ -17,9 +19,11 @@ int main(int argc, const char **argv) {
 
     print_ip_dns(argv[1]);
 
-    int loop = 1;
+    int loopout = 1;
+    int loopin = 1;
     char input[5];
     int choice = 0;
+    int pid;
     do {
 
         printf("\nPick a server type (echo/time/quit) : ");
@@ -29,20 +33,38 @@ int main(int argc, const char **argv) {
         while ( getchar() != '\n' );
 
         if(strcmp(input, "echo") == 0) {
-            loop = 1;
+            loopout = 1;
             choice = 1;
         } else if(strcmp(input, "time") == 0) {
-            loop = 1;
+            loopout = 1;
             choice = 2;
         } else if(strcmp(input, "quit") == 0) {
-            loop = 0;
+            loopout = 0;
             choice = 3;
         } else {
             printf("Not a valid input: %s\n", input);
             choice = 0;
         }
 
-    } while(loop);
+        if(choice == 0) {
+            continue;
+        }
+
+        pid = fork();
+
+        if(pid < 0) {
+            perror("There was an error forking\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if(pid == 0) {
+            do {
+                printf("im a child\n");
+                loopin = 0;
+            } while (loopin);
+        }
+
+    } while(loopout);
 
     exit (EXIT_SUCCESS);
 }
