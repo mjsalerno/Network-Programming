@@ -58,7 +58,7 @@ install_manifest.txt
 
 
 ### Clion ###
-#.idea/
+.idea/
 out/
 /*.iml
 *.ipr
