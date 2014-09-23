@@ -6,19 +6,28 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+void print_ip_dns(const char *str);
+
 int main(int argc, const char **argv) {
-    in_addr_t addr;
-    struct hostent *hp;
-    char **p;
-    int fromIp = -1;
 
     if (argc != 2) {
         (void) printf("usage: %s IP-address\n", argv[0]);
         exit (EXIT_FAILURE);
     }
 
-    if ((int)(addr = inet_addr(argv[1])) == -1) {
-        hp = gethostbyname(argv[1]);
+    print_ip_dns(argv[1]);
+
+    exit (EXIT_SUCCESS);
+}
+
+void print_ip_dns(const char *str) {
+    int fromIp = -1;
+    char **p;
+    in_addr_t addr;
+    struct hostent *hp;
+
+    if ((int)(addr = inet_addr(str)) == -1) {
+        hp = gethostbyname(str);
         fromIp = 0;
     } else {
         hp = gethostbyaddr((char *) &addr, 4, AF_INET);
@@ -26,7 +35,7 @@ int main(int argc, const char **argv) {
     }
 
     if (hp == NULL) {
-        printf("host information for %s not found\n", argv[1]);
+        printf("host information for %s not found\n", str);
         exit(EXIT_FAILURE);
     }
 
@@ -46,6 +55,4 @@ int main(int argc, const char **argv) {
             putchar('\n');
         }
     }
-
-    exit (EXIT_SUCCESS);
 }
