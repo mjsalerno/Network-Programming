@@ -17,6 +17,25 @@ int main(int argc, const char **argv) {
 
     print_ip_dns(argv[1]);
 
+    int loop = 1;
+    int choice = -1;
+    do {
+
+        printf("\nPick a server type.\n");
+        printf("1 - echo\n");
+        printf("2 - time\n\n");
+
+        scanf ("%d", &choice);
+        if(choice == 1) {
+            loop = 0;
+        } else if(choice == 2) {
+            loop = 0;
+        } else {
+            printf("Not a valid choice: %d\n", choice);
+        }
+
+    } while(loop);
+
     exit (EXIT_SUCCESS);
 }
 
@@ -40,10 +59,10 @@ void print_ip_dns(const char *str) {
     }
 
     for (p = hp->h_addr_list; *p != 0; p++) {
-        struct in_addr in;
         char **q;
 
         if(fromIp == 0) {
+            struct in_addr in;
             memcpy(&in.s_addr, *p, sizeof(in.s_addr));
             printf("IP: %s\n", inet_ntoa(in));
 
