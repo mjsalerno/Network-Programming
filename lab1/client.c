@@ -18,20 +18,28 @@ int main(int argc, const char **argv) {
     print_ip_dns(argv[1]);
 
     int loop = 1;
-    int choice = -1;
+    char input[5];
+    int choice = 0;
     do {
 
-        printf("\nPick a server type.\n");
-        printf("1 - echo\n");
-        printf("2 - time\n\n");
+        printf("\nPick a server type (echo/time/quit) : ");
 
-        scanf ("%d", &choice);
-        if(choice == 1) {
+        fgets(input, 5, stdin);
+        input[4] = 0;
+        while ( getchar() != '\n' );
+
+        if(strcmp(input, "echo") == 0) {
+            loop = 1;
+            choice = 1;
+        } else if(strcmp(input, "time") == 0) {
+            loop = 1;
+            choice = 2;
+        } else if(strcmp(input, "quit") == 0) {
             loop = 0;
-        } else if(choice == 2) {
-            loop = 0;
+            choice = 3;
         } else {
-            printf("Not a valid choice: %d\n", choice);
+            printf("Not a valid input: %s\n", input);
+            choice = 0;
         }
 
     } while(loop);
