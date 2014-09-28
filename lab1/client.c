@@ -85,6 +85,17 @@ int main(int argc, const char **argv) {
                     break;
 
                 case 2:          //time
+
+                    if(sprintf(fdStr, "%d", fd[1]) < 1) {
+                        perror("Cant convert fd to str");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (execlp("xterm", "xterm", "-e", "./timec", ipStr, fdStr, (char *) 0) < 0) {
+                        printf("Fork failed\n");
+                        exit(EXIT_FAILURE);
+                    }
+
                     break;
             }
         } else if(childpid < 0) {

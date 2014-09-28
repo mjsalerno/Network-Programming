@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define PORT 9877
+#define PORT 13
 #define BUFF_SIZE 1024
 
 int main(int argc, char**argv) {
@@ -47,21 +47,18 @@ int main(int argc, char**argv) {
 
     while(!feof(stdin)) {
 
-        while (fgets(sendline, BUFF_SIZE, stdin) != NULL) {
+        n = recv(sockfd, recvline, BUFF_SIZE, 0);
+        recvline[n] = 0;
+        fputs(recvline, stdout);
 
-            sendto(sockfd, sendline, strlen(sendline), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
-            n = recv(sockfd, recvline, BUFF_SIZE, 0);
-            recvline[n] = 0;
-            fputs(recvline, stdout);
-
-            if(fd > 0) {
-                if(sprintf(fdbuff, "Bytes recieved: %d\n", n) > 0) {
-                    write(fd, fdbuff, strlen(fdbuff));
-                } else {
-                    perror("Could not write to fdbuff\n");
-                }
+        if(fd > 0 && n > 0) {
+            if(sprintf(fdbuff, "Bytes recieved: %d\n", n) > 0) {
+                write(fd, fdbuff, strlen(fdbuff));
+            } else {
+                perror("Could not write to fdbuff\n");
             }
         }
+
     }
 
     close(sockfd);
