@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
-void print_ip_dns(const char *str);
+void print_ip_dns(const char *str, char *buff);
 
 int main(int argc, const char **argv) {
 
@@ -18,7 +18,6 @@ int main(int argc, const char **argv) {
         exit (EXIT_FAILURE);
     }
 
-    print_ip_dns(argv[1]);
 
     int loopout = 1;
     int loopin = 1;
@@ -29,6 +28,11 @@ int main(int argc, const char **argv) {
     int nbytes;
     char readbuffer[256];
     int fd[2];
+    char ipStr[16];
+    char fdStr[16];
+
+    print_ip_dns(argv[1], ipStr);
+    printf("got: %s", ipStr);
 
     do {
 
@@ -64,29 +68,23 @@ int main(int argc, const char **argv) {
             exit(EXIT_FAILURE);
         }
 
-        if ( (childpid = fork()) == 0) { //child
+        if ( (childpid = fork()) == 0 && choice != 3) { //child
 
             switch (choice) {
-                case 0:          //not valid
-                    continue;
                 case 1:          //echo
-                    //printf("i am client\n");
-//                    if (execlp("xterm", "xterm", "-e", "./tcpcli01", argv[1], (char *) 0) < 0) {
-//                        printf("Fork failed\n");
-//                        exit(EXIT_FAILURE);
-//                    }
-                    close(fd[0]);
-                    write(fd[1], "im a client\n", sizeof("im a client\n"));
-                    write(fd[1], "im a client\n", sizeof("im a client\n"));
-                    write(fd[1], "im a client\n", sizeof("im a client\n"));
-                    write(fd[1], "im a client\n", sizeof("im a client\n"));
-                    close(fd[1]);
-                    exit(EXIT_SUCCESS);
+
+                    if(sprintf(fdStr, "%d", fd[1]) < 1) {
+                        perror("Cant convert fd to str");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (execlp("xterm", "xterm", "-e", "./echoc", ipStr, fdStr, (char *) 0) < 0) {
+                        printf("Fork failed\n");
+                        exit(EXIT_FAILURE);
+                    }
                     break;
 
                 case 2:          //time
-                    break;
-                default:
                     break;
             }
         } else if(childpid < 0) {
@@ -96,16 +94,12 @@ int main(int argc, const char **argv) {
         } else { //parent
             close(fd[1]);
             char c;
-            printf("i am server\n");
             while (read(fd[0], &c, 1) > 0 ) {
                 //printf("things: \n");
                 write(STDOUT_FILENO, &c, 1);
             }
 
             pid = wait(&stat);
-            //while ( getchar() != '\n');
-
-            printf("child terminated\n");
         }
 
     } while(loopout);
@@ -113,7 +107,7 @@ int main(int argc, const char **argv) {
     exit (EXIT_SUCCESS);
 }
 
-void print_ip_dns(const char *str) {
+void print_ip_dns(const char *str, char *buff) {
     int fromIp = -1;
     char **p;
     in_addr_t addr;
@@ -125,6 +119,7 @@ void print_ip_dns(const char *str) {
         fromIp = 0;
     } else {
         hp = gethostbyaddr((char *) &addr, 4, AF_INET);
+        strcpy(buff, str);
         fromIp = 1;
     }
 
@@ -140,6 +135,7 @@ void print_ip_dns(const char *str) {
             struct in_addr in;
             memcpy(&in.s_addr, *p, sizeof(in.s_addr));
             printf("IP: %s\n", inet_ntoa(in));
+            strcpy(buff, inet_ntoa(in));
 
         } if(fromIp == 1) {
             printf("DNS: %s", hp->h_name);

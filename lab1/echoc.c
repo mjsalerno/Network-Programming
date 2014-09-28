@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 
 #define PORT 9877
 #define BUFF_SIZE 1024
@@ -13,6 +14,7 @@ int main(int argc, char**argv) {
     struct sockaddr_in servaddr, cliaddr;
     char sendline[BUFF_SIZE];
     char recvline[BUFF_SIZE];
+    char fdbuff[BUFF_SIZE];
     int fd = 0;
 
     if (argc < 2) {
@@ -44,8 +46,19 @@ int main(int argc, char**argv) {
             n = recvfrom(sockfd, recvline, BUFF_SIZE, 0, NULL, NULL);
             recvline[n] = 0;
             fputs(recvline, stdout);
+
+            if(fd > 0) {
+                if(sprintf(fdbuff, "Bytes recieved: %d\n", n) > 0) {
+                    write(fd, fdbuff, strlen(fdbuff));
+                } else {
+                    perror("Could not write to fdbuff\n");
+                }
+            }
         }
     }
+
+    close(sockfd);
+    close(fd);
 
     return EXIT_SUCCESS;
 }
