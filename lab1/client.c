@@ -20,13 +20,13 @@ int main(int argc, const char **argv) {
 
 
     int loopout = 1;
-    int loopin = 1;
+    //int loopin = 1;
     char input[5];
     int choice = 0;
-    pid_t childpid, pid;
+    pid_t childpid;//, pid;
     int   stat;
-    int nbytes;
-    char readbuffer[256];
+    //int nbytes;
+    //char readbuffer[256];
     int fd[2];
     char ipStr[16];
     char fdStr[16];
@@ -110,7 +110,7 @@ int main(int argc, const char **argv) {
                 write(STDOUT_FILENO, &c, 1);
             }
 
-            pid = wait(&stat);
+            wait(&stat);
         }
 
     } while(loopout);

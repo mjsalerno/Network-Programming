@@ -12,7 +12,7 @@
 
 int main(int argc, char**argv) {
     int sockfd,n;
-    struct sockaddr_in servaddr, cliaddr;
+    struct sockaddr_in servaddr;
     char sendline[BUFF_SIZE];
     char recvline[BUFF_SIZE];
     char fdbuff[BUFF_SIZE];
