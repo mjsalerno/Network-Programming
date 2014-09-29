@@ -1,9 +1,10 @@
 #include "server.h"
 
-int main(int argc, char**argv) {
+int main(void) {
 
     struct sockaddr_in timesrv;
     struct sockaddr_in echosrv;
+    struct thread_args targs;
     int echo_listen_fd;
     int time_listen_fd;
     int fds[MAX_FD] = {0};
@@ -48,7 +49,7 @@ int main(int argc, char**argv) {
     printf("this many: %d\n", fdrdy);
 
     if(FD_ISSET(echo_listen_fd, &fdset)) {
-        int iret1 = pthread_create(&thread, NULL, time_server, (void *)echosrv);
+        int iret1 = pthread_create(&thread, NULL, &time_server, (void *)&targs);
         if (iret1) {
             fprintf(stderr, "Error - pthread_create() return code: %d\n", iret1);
             exit(EXIT_FAILURE);
@@ -58,7 +59,7 @@ int main(int argc, char**argv) {
     return EXIT_SUCCESS;
 }
 
-void time_server(struct sockaddr_in echosrv) {
+void *time_server(struct sockaddr_in echosrv) {
 
 //    for(;;) {
 //        socklen_t clilen;
@@ -83,7 +84,7 @@ void time_server(struct sockaddr_in echosrv) {
 //        }
 //        close(connfd);
 //    }
-
+    return NULL;
 }
 
 int max(int a, int b) {
