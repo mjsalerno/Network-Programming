@@ -7,7 +7,6 @@ int main(void) {
     struct thread_args targs;
     int echo_listen_fd;
     int time_listen_fd;
-    int fds[MAX_FD] = {0};
     pthread_t thread;
 
     //zero out struct
@@ -58,7 +57,7 @@ int main(void) {
         newfd = accept(echo_listen_fd, (struct sockaddr *)&echosrv, &addrlen);
         targs.connfd = newfd;
 
-        int iret1 = pthread_create(&thread, NULL, &time_server, &targs);
+        int iret1 = pthread_create(&thread, NULL, (void*)&time_server, &targs);
         if (iret1) {
             fprintf(stderr, "Error - pthread_create() return code: %d\n", iret1);
             exit(EXIT_FAILURE);
@@ -86,7 +85,7 @@ void time_server(struct thread_args *targs) {
         send(targs->connfd, buffer, strlen(buffer), 0);
     }
 
-    close(targs);
+    close(targs->connfd);
 
 }
 
