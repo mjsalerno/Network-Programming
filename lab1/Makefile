@@ -6,10 +6,16 @@ all: client echoc timec
 %: %.c
 
 %: %.o
-	$(CC) $< -o $@ 
+	$(CC) $(FLAGS) $< -o $@
 
 %.o: %.c
-	$(CC) -c $< -o $@
+	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
-	rm -f client client.o server server.o echoc echoc.o timec timec.o
+	-rm -f client client.o server server.o echoc echoc.o timec timec.o
+
+touch:
+	touch *.c *.h
+
+.PHONY: clean all touch
+.SECONDARY:
