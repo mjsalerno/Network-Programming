@@ -16,12 +16,12 @@
 #define  BACKLOG 1024
 #define MAX_FD 256
 
-void *time_server(struct sockaddr_in echosrv);
+struct thread_args {
+    int connfd;
+};
+
+void time_server(struct thread_args *targs);
 int max(int a, int b);
 void my_fd_set(fd_set *fdset, int *arr, int size);
-
-struct thread_args {
-    int i;
-};
 
 #endif //_SERVER_H_

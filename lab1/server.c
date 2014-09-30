@@ -35,56 +35,59 @@ int main(void) {
     listen(echo_listen_fd, BACKLOG);
     listen(time_listen_fd, BACKLOG);
 
-    int maxfd = 2;
     int fdrdy = 0;
     fd_set fdset;
     struct timeval time;
+    int newfd;
+    socklen_t addrlen;
 
     time.tv_sec = 10;
     time.tv_usec = 0;
-    FD_ZERO(&fdset);
-    my_fd_set(&fdset, fds, MAX_FD);
 
-    fdrdy = select(maxfd, &fdset, NULL, NULL, &time);
-    printf("this many: %d\n", fdrdy);
+    FD_ZERO(&fdset);
+    FD_SET(STDIN_FILENO  , &fdset);
+    FD_SET(echo_listen_fd, &fdset);
+    FD_SET(time_listen_fd, &fdset);
+
+    fdrdy = select(2, &fdset, NULL, NULL, &time);
+    printf("this many fds are ready: %d\n", fdrdy);
 
     if(FD_ISSET(echo_listen_fd, &fdset)) {
-        int iret1 = pthread_create(&thread, NULL, &time_server, (void *)&targs);
+        printf("setting up a echo server\n");
+        addrlen = sizeof(echosrv);
+        newfd = accept(echo_listen_fd, (struct sockaddr *)&echosrv, &addrlen);
+        targs.connfd = newfd;
+
+        int iret1 = pthread_create(&thread, NULL, &time_server, &targs);
         if (iret1) {
             fprintf(stderr, "Error - pthread_create() return code: %d\n", iret1);
             exit(EXIT_FAILURE);
         }
     }
 
+    if(FD_ISSET(time_listen_fd, &fdset)) {
+        printf("setting up a time server\n");
+    }
+
+    if(FD_ISSET(STDIN_FILENO, &fdset)) {
+        printf("Don't type things here\n");
+    }
+
     return EXIT_SUCCESS;
 }
 
-void *time_server(struct sockaddr_in echosrv) {
+void time_server(struct thread_args *targs) {
+    int n = 1;
+    char buffer[BUFF_SIZE];
 
-//    for(;;) {
-//        socklen_t clilen;
-//        clilen=sizeof(echosrv);
-//        connfd = accept(listenfd,(struct sockaddr *)&cliaddr,&clilen);
-//
-//        if ((childpid = fork()) == 0)
-//        {
-//            close (listenfd);
-//
-//            for(;;)
-//            {
-//                n = recvfrom(connfd,mesg,1000,0,(struct sockaddr *)&cliaddr,&clilen);
-//                sendto(connfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-//                printf("-------------------------------------------------------\n");
-//                mesg[n] = 0;
-//                printf("Received the following:\n");
-//                printf("%s",mesg);
-//                printf("-------------------------------------------------------\n");
-//            }
-//
-//        }
-//        close(connfd);
-//    }
-    return NULL;
+    while(n > 0) {
+        n = recv(targs->connfd, buffer, BUFF_SIZE, 0);
+        buffer[n] = 0;
+        send(targs->connfd, buffer, strlen(buffer), 0);
+    }
+
+    close(targs);
+
 }
 
 int max(int a, int b) {
