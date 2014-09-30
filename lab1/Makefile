@@ -1,18 +1,19 @@
 CC=gcc
-FLAGS=-g
+FLAGS = -g -Wall -Werror -Wextra
+LIBS = -pthread
 
-all: client echoc timec
+all: client echoc timec server
 
 %: %.c
 
 %: %.o
-	$(CC) $(FLAGS) $< -o $@
+	$(CC) $(FLAGS) $(LIBS) $< -o $@
 
 %.o: %.c
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
-	-rm -f client client.o server server.o echoc echoc.o timec timec.o
+	-rm -f client server echoc timec *.o
 
 touch:
 	touch *.c *.h
