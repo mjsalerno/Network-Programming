@@ -1,6 +1,7 @@
 CC=gcc
 FLAGS = -g -Wall -Werror -Wextra
 LIBS = -pthread
+#-lnsl -lresolv -lsocket
 
 all: client echoc timec server
 
