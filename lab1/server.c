@@ -120,7 +120,7 @@ void echo_server(struct thread_args *targs) {
     while(n > 0) {
         n = recv(targs->connfd, buffer, BUFF_SIZE, 0);
         buffer[n] = 0;
-        send(targs->connfd, "hello\n", 7, 0);
+        send(targs->connfd, buffer, n, 0);
     }
     printf("closing the echo server\n");
     close(targs->connfd);
