@@ -124,16 +124,34 @@ void echo_server(struct thread_args *targs) {
     }
     printf("closing the echo server\n");
     close(targs->connfd);
-
 }
 
 void time_server(struct thread_args *targs) {
 
-    char *word = "hello\n";
+    char buff[BUFF_SIZE];
+    struct timeval timee;
+    fd_set fdset;
+    time_t ticks;
+    int n;
+    int err = 0;
 
-    while(1) {
-        send(targs->connfd, word, strlen(word), 0);
-        sleep(5);
+
+    while( err == 0) {
+        timee.tv_sec = 5;
+        timee.tv_usec = 0;
+
+        FD_ZERO(&fdset);
+        FD_SET(targs->connfd, &fdset);
+
+        ticks = time(NULL);
+        snprintf(buff, sizeof(buff), "%.24s\r\n", ctime(&ticks));
+        n = send(targs->connfd, buff, strlen(buff), 0);
+        if(n < 1) {
+            perror("send()");
+        }
+
+        err = select(targs->connfd + 1, &fdset, NULL, NULL, &timee);
+
     }
     printf("closing the time server\n");
     close(targs->connfd);
