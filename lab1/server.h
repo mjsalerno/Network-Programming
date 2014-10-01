@@ -12,9 +12,8 @@
 
 #define BUFF_SIZE 256
 #define TIME_PORT 13
-#define ECHO_PORT 14
+#define ECHO_PORT 9877
 #define  BACKLOG 1024
-#define MAX_FD 256
 
 struct thread_args {
     int connfd;
