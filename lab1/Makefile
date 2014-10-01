@@ -6,7 +6,7 @@ all: client echoc timec server
 
 %: %.c
 
-%: %.o
+%: %.o %.h
 	$(CC) $(FLAGS) $(LIBS) $< -o $@
 
 %.o: %.c
