@@ -20,7 +20,6 @@ struct thread_args {
 };
 
 void time_server(struct thread_args *targs);
-int max(int a, int b);
-void my_fd_set(fd_set *fdset, int *arr, int size);
+void echo_server(struct thread_args *targs);
 
 #endif //_SERVER_H_
