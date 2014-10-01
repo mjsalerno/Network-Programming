@@ -3,7 +3,7 @@
 int main(void) {
 
     fd_set fdset;
-    struct timeval time;
+    //struct timeval time;
     int newfd;
     socklen_t addrlen;
 
@@ -12,8 +12,8 @@ int main(void) {
     struct thread_args targs;
     int echo_listen_fd;
     int time_listen_fd;
-    int err;
     pthread_t thread;
+    int err;
 
     //zero out struct
     bzero(&timesrv,sizeof(timesrv));
@@ -28,7 +28,7 @@ int main(void) {
     echosrv.sin_addr.s_addr=htonl(INADDR_ANY);
     echosrv.sin_port=htons(ECHO_PORT);
 
-    //get a scket
+    //get a socket
     echo_listen_fd = socket(AF_INET,SOCK_STREAM,0);
     time_listen_fd = socket(AF_INET,SOCK_STREAM,0);
 
@@ -64,18 +64,18 @@ int main(void) {
     }
 
     for(;;) {
-        time.tv_sec = 10;
-        time.tv_usec = 0;
+        //time.tv_sec = 5;
+        //time.tv_usec = 0;
 
         FD_ZERO(&fdset);
         FD_SET(STDIN_FILENO, &fdset);
         FD_SET(echo_listen_fd, &fdset);
         FD_SET(time_listen_fd, &fdset);
 
-        err = select(time_listen_fd + 1, &fdset, NULL, NULL, &time);
+        //err = select(time_listen_fd + 1, &fdset, NULL, NULL, &time);
+        err = select(time_listen_fd + 1, &fdset, NULL, NULL, NULL);
         if(err < 0) {
             perror("select()");
-
         }
 
         if (FD_ISSET(echo_listen_fd, &fdset)) {
