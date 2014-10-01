@@ -32,7 +32,6 @@ int main(int argc, const char **argv) {
     char fdStr[16];
 
     print_ip_dns(argv[1], ipStr);
-    printf("got: %s", ipStr);
 
     do {
 
