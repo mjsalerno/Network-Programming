@@ -31,6 +31,16 @@ int main(int argc, char**argv) {
     }
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(sockfd < 2) {
+        perror("echoc.socket()");
+        if(fd > 0) {
+            char *error = strerror(errno);
+            if(sprintf(fdbuff, "echoc.socket(): %s\n", error) > 0) {
+                write(fd, fdbuff, strlen(fdbuff));
+            }
+        }
+        exit(EXIT_FAILURE);
+    }
 
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -38,10 +48,10 @@ int main(int argc, char**argv) {
     servaddr.sin_port=htons(PORT);
 
     if( connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) ) {
-        perror("Could not connect");
+        perror("echoc.connect()");
         if(fd > 0) {
             char *error = strerror(errno);
-            if(sprintf(fdbuff, "Could not connect: %s\n", error) > 0) {
+            if(sprintf(fdbuff, "echoc.connect(): %s\n", error) > 0) {
                 write(fd, fdbuff, strlen(fdbuff));
             }
         }
