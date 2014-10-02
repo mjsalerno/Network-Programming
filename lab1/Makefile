@@ -19,5 +19,8 @@ clean:
 touch:
 	touch *.c *.h
 
+handin:
+	 ~cse533/handin 1 Makefile client.c const.h echoc.c server.c server.h timec.c
+
 .PHONY: clean all touch
 .SECONDARY:
