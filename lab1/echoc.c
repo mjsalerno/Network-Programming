@@ -18,6 +18,9 @@ int main(int argc, char**argv) {
     char fdbuff[BUFF_SIZE];
     int fd = 0;
 
+    fd_set fdset;
+    int err = 0;
+
     if (argc < 2) {
         printf("usage:  client <IP address>\n");
         exit(EXIT_FAILURE);
@@ -43,14 +46,58 @@ int main(int argc, char**argv) {
             }
         }
         exit(EXIT_FAILURE);
+
     }
 
-    while(!feof(stdin)) {
+    int running = 1;
 
-        while (fgets(sendline, BUFF_SIZE, stdin) != NULL) {
+    while(running) {
 
-            sendto(sockfd, sendline, strlen(sendline), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
+        FD_ZERO(&fdset);
+        FD_SET(sockfd, &fdset);
+        FD_SET(STDIN_FILENO, &fdset);
+
+        err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
+        if(err < 0 ) {
+            perror("echoc.select()");
+        }
+
+        if(FD_ISSET(STDIN_FILENO, &fdset)) {
+            if(fgets(sendline, BUFF_SIZE, stdin) == NULL) {
+                if(fd > 0) {
+                    if(write(fd, "The servers connection was closed\n", 35) < 1) {
+                        perror("echoc.write()");
+                    }
+                }
+
+                running = 0;
+                close(fd);
+                close(sockfd);
+            }
+            n = send(sockfd, sendline, strlen(sendline), 0);
+            if(n < 0 ) {
+                perror("echoc.send()");
+            }
+        }
+
+        if(FD_ISSET(sockfd, &fdset)) {
             n = recv(sockfd, recvline, BUFF_SIZE, 0);
+
+            if(n < 1 && fd > 0) {
+                if(write(fd, "The servers connection was closed\n", 35) < 1) {
+                    perror("echoc.write()");
+                }
+                running = 0;
+                close(fd);
+                close(sockfd);
+            }
+
+            if(n < 1) {
+                running = 0;
+                close(fd);
+                close(sockfd);
+            }
+
             recvline[n] = 0;
             fputs(recvline, stdout);
 
@@ -62,7 +109,27 @@ int main(int argc, char**argv) {
                 }
             }
         }
+
     }
+
+//    while(!feof(stdin)) {
+//
+//        while (fgets(sendline, BUFF_SIZE, stdin) != NULL) {
+//
+//            sendto(sockfd, sendline, strlen(sendline), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
+//            n = recv(sockfd, recvline, BUFF_SIZE, 0);
+//            recvline[n] = 0;
+//            fputs(recvline, stdout);
+//
+//            if(fd > 0) {
+//                if(sprintf(fdbuff, "Bytes recieved: %d\n", n) > 0) {
+//                    write(fd, fdbuff, strlen(fdbuff));
+//                } else {
+//                    perror("Could not write to fdbuff\n");
+//                }
+//            }
+//        }
+//    }
 
     close(sockfd);
     close(fd);
