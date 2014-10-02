@@ -76,7 +76,7 @@ int main(int argc, char**argv) {
         if(FD_ISSET(STDIN_FILENO, &fdset)) {
             if(fgets(sendline, BUFF_SIZE, stdin) == NULL) {
                 if(fd > 0) {
-                    if(write(fd, "Connection was closed\n", 35) < 1) {
+                    if(write(fd, "Connection was closed\n", 22) < 1) {
                         perror("echoc.write()");
                     }
                 }
