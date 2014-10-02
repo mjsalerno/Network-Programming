@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <strings.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
 #include "const.h"
 
 int main(int argc, char**argv) {
