@@ -114,20 +114,22 @@ int main(void) {
 }
 
 void echo_server(struct thread_args *targs) {
+    int fd = targs->connfd;
     int n = 1;
     char buffer[BUFF_SIZE];
 
     while(n > 0) {
-        n = recv(targs->connfd, buffer, BUFF_SIZE, 0);
+        n = recv(fd, buffer, BUFF_SIZE, 0);
         buffer[n] = 0;
-        send(targs->connfd, buffer, n, 0);
+        send(fd, buffer, n, 0);
     }
     printf("closing the echo server\n");
     close(targs->connfd);
+    pthread_exit(NULL);
 }
 
 void time_server(struct thread_args *targs) {
-
+    int fd = targs->connfd;
     char buff[BUFF_SIZE];
     struct timeval timee;
     fd_set fdset;
@@ -135,25 +137,25 @@ void time_server(struct thread_args *targs) {
     int n;
     int err = 0;
 
-
     while( err == 0) {
         timee.tv_sec = 5;
         timee.tv_usec = 0;
 
         FD_ZERO(&fdset);
-        FD_SET(targs->connfd, &fdset);
+        FD_SET(fd, &fdset);
 
         ticks = time(NULL);
         snprintf(buff, sizeof(buff), "%.24s\r\n", ctime(&ticks));
-        n = send(targs->connfd, buff, strlen(buff), 0);
+        n = send(fd, buff, strlen(buff), 0);
         if(n < 1) {
             perror("send()");
         }
 
-        err = select(targs->connfd + 1, &fdset, NULL, NULL, &timee);
+        err = select(fd + 1, &fdset, NULL, NULL, &timee);
 
     }
     printf("closing the time server\n");
     close(targs->connfd);
+    pthread_exit(NULL);
 
 }
