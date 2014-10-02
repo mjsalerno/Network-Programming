@@ -68,6 +68,13 @@ int main(int argc, char**argv) {
         if(FD_ISSET(sockfd, &fdset)) {
             n = recv(sockfd, recvline, BUFF_SIZE, 0);
             if(n == 0) {
+
+                if(fd > 0) {
+                    if(write(fd, "The servers connection was closed\n", 35) < 1) {
+                        perror("timec.write()");
+                    }
+                }
+
                 running = 0;
 
             } else if (n < 0) {
