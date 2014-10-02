@@ -13,7 +13,7 @@
 int main(int argc, char**argv) {
     int sockfd,n;
     struct sockaddr_in servaddr;//, cliaddr;
-    //char sendline[BUFF_SIZE];
+    fd_set fdset;
     char recvline[BUFF_SIZE];
     char fdbuff[BUFF_SIZE];
     int fd = 0;
@@ -55,17 +55,39 @@ int main(int argc, char**argv) {
         exit(EXIT_FAILURE);
     }
 
-    while(!feof(stdin)) {
+    int running = 1;
 
-        n = recv(sockfd, recvline, BUFF_SIZE, 0);
-        recvline[n] = 0;
-        fputs(recvline, stdout);
+    while (running) {
 
-        if(fd > 0 && n > 0) {
-            if(sprintf(fdbuff, "Bytes recieved: %d\n", n) > 0) {
-                write(fd, fdbuff, strlen(fdbuff));
+        FD_ZERO(&fdset);
+        FD_SET(sockfd, &fdset);
+
+        n = select(sockfd + 1, &fdset, NULL, NULL, NULL);
+        if (n < 0) {
+            perror("timec.select()");
+        }
+
+        if(FD_ISSET(sockfd, &fdset)) {
+            n = recv(sockfd, recvline, BUFF_SIZE, 0);
+            if(n == 0) {
+                running = 0;
+
+            } else if (n < 0) {
+                perror("timec.recv()");
+
             } else {
-                perror("Could not write to fdbuff\n");
+                recvline[n] = 0;
+                fputs(recvline, stdout);
+
+                if(fd > 0) {
+                    if(sprintf(fdbuff, "Bytes recieved: %d\n", n) > 0) {
+                        write(fd, fdbuff, strlen(fdbuff));
+
+                    } else {
+                        perror("Could not write to fdbuff\n");
+
+                    }
+                }
             }
         }
 
