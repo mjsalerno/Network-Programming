@@ -3,7 +3,6 @@
 int main(void) {
 
     fd_set fdset;
-    //struct timeval time;
     int newfd;
     socklen_t addrlen;
 
@@ -33,53 +32,54 @@ int main(void) {
     time_listen_fd = socket(AF_INET,SOCK_STREAM,0);
 
     if(echo_listen_fd < 3 || time_listen_fd < 3) {
-        perror("socket()");
+        perror("server.socket()");
         exit(EXIT_FAILURE);
     }
 
     //bind
     err = bind(echo_listen_fd,(struct sockaddr *)&echosrv,sizeof(echosrv));
     if(err != 0) {
-        perror("bind()");
+        perror("server.bind(echo)");
         exit(EXIT_FAILURE);
+    } else {
+        printf("Echo Port: %4d\n", ECHO_PORT);
     }
 
     err = bind(time_listen_fd,(struct sockaddr *)&timesrv,sizeof(timesrv));
     if(err != 0) {
-        perror("bind()");
+        perror("server.bind(time)");
         exit(EXIT_FAILURE);
+    } else {
+        printf("Time Port: %4d\n", TIME_PORT);
     }
 
     //listen
     err = listen(echo_listen_fd, BACKLOG);
     if(err != 0) {
-        perror("listen()");
+        perror("server.listen(echo)");
         exit(EXIT_FAILURE);
     }
 
     err = listen(time_listen_fd, BACKLOG);
     if(err != 0) {
-        perror("listen()");
+        perror("server.listen(echo)");
         exit(EXIT_FAILURE);
     }
 
     for(;;) {
-        //time.tv_sec = 5;
-        //time.tv_usec = 0;
 
         FD_ZERO(&fdset);
         FD_SET(STDIN_FILENO, &fdset);
         FD_SET(echo_listen_fd, &fdset);
         FD_SET(time_listen_fd, &fdset);
 
-        //err = select(time_listen_fd + 1, &fdset, NULL, NULL, &time);
         err = select(time_listen_fd + 1, &fdset, NULL, NULL, NULL);
         if(err < 0) {
             perror("select()");
         }
 
         if (FD_ISSET(echo_listen_fd, &fdset)) {
-            printf("setting up a echo server\n");
+            printf("Echo: start\n");
             addrlen = sizeof(echosrv);
             newfd = accept(echo_listen_fd, (struct sockaddr *) &echosrv, &addrlen);
             targs.connfd = newfd;
@@ -92,7 +92,7 @@ int main(void) {
         }
 
         if (FD_ISSET(time_listen_fd, &fdset)) {
-            printf("setting up a time server\n");
+            printf("Time: start\n");
             addrlen = sizeof(timesrv);
             newfd = accept(time_listen_fd, (struct sockaddr *) &echosrv, &addrlen);
             targs.connfd = newfd;
@@ -120,11 +120,21 @@ void echo_server(struct thread_args *targs) {
 
     while(n > 0) {
         n = recv(fd, buffer, BUFF_SIZE, 0);
+        if(n < 0) {
+            perror("echos.recv()");
+            close(fd);
+            pthread_exit(NULL);
+        }
         buffer[n] = 0;
-        send(fd, buffer, n, 0);
+        n = send(fd, buffer, n, 0);
+        if(n < 0) {
+            perror("echos.send()");
+            close(fd);
+            pthread_exit(NULL);
+        }
     }
-    printf("closing the echo server\n");
-    close(targs->connfd);
+    printf("Echo: stop\n");
+    close(fd);
     pthread_exit(NULL);
 }
 
@@ -148,13 +158,16 @@ void time_server(struct thread_args *targs) {
         snprintf(buff, sizeof(buff), "%.24s\r\n", ctime(&ticks));
         n = send(fd, buff, strlen(buff), 0);
         if(n < 1) {
-            perror("send()");
+            perror("times.send()");
         }
 
         err = select(fd + 1, &fdset, NULL, NULL, &timee);
+        if(err < 0) {
+            perror("times.select()");
+        }
 
     }
-    printf("closing the time server\n");
+    printf("Time: stop\n");
     close(targs->connfd);
     pthread_exit(NULL);
 
