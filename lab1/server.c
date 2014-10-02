@@ -14,11 +14,11 @@ int main(void) {
     pthread_t thread;
     int err;
 
-    //zero out struct
+    /*zero out struct*/
     bzero(&timesrv,sizeof(timesrv));
     bzero(&echosrv,sizeof(echosrv));
 
-    //fill in struct
+    /*fill in struct*/
     timesrv.sin_family = AF_INET;
     timesrv.sin_addr.s_addr=htonl(INADDR_ANY);
     timesrv.sin_port=htons(TIME_PORT);
@@ -27,7 +27,7 @@ int main(void) {
     echosrv.sin_addr.s_addr=htonl(INADDR_ANY);
     echosrv.sin_port=htons(ECHO_PORT);
 
-    //get a socket
+    /*get a socket*/
     echo_listen_fd = socket(AF_INET,SOCK_STREAM,0);
     time_listen_fd = socket(AF_INET,SOCK_STREAM,0);
 
@@ -36,7 +36,7 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    //bind
+    /*bind*/
     err = bind(echo_listen_fd,(struct sockaddr *)&echosrv,sizeof(echosrv));
     if(err != 0) {
         perror("server.bind(echo)");
@@ -53,7 +53,7 @@ int main(void) {
         printf("Time Port: %4d\n", TIME_PORT);
     }
 
-    //listen
+    /*listen*/
     err = listen(echo_listen_fd, BACKLOG);
     if(err != 0) {
         perror("server.listen(echo)");
@@ -79,12 +79,13 @@ int main(void) {
         }
 
         if (FD_ISSET(echo_listen_fd, &fdset)) {
+            int iret1;
             printf("Echo: start\n");
             addrlen = sizeof(echosrv);
             newfd = accept(echo_listen_fd, (struct sockaddr *) &echosrv, &addrlen);
             targs.connfd = newfd;
 
-            int iret1 = pthread_create(&thread, NULL, (void *) &echo_server, &targs);
+            iret1 = pthread_create(&thread, NULL, (void *) &echo_server, &targs);
             if (iret1) {
                 fprintf(stderr, "Error - pthread_create() return code: %d\n", iret1);
                 exit(EXIT_FAILURE);
@@ -92,12 +93,13 @@ int main(void) {
         }
 
         if (FD_ISSET(time_listen_fd, &fdset)) {
+            int iret1;
             printf("Time: start\n");
             addrlen = sizeof(timesrv);
             newfd = accept(time_listen_fd, (struct sockaddr *) &echosrv, &addrlen);
             targs.connfd = newfd;
 
-            int iret1 = pthread_create(&thread, NULL, (void *) &time_server, &targs);
+            iret1 = pthread_create(&thread, NULL, (void *) &time_server, &targs);
             if (iret1) {
                 fprintf(stderr, "Error - pthread_create() return code: %d\n", iret1);
                 exit(EXIT_FAILURE);

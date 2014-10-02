@@ -19,4 +19,4 @@ struct thread_args {
 void time_server(struct thread_args *targs);
 void echo_server(struct thread_args *targs);
 
-#endif //_SERVER_H_
+#endif /*_SERVER_H_*/

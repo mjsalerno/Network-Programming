@@ -13,23 +13,19 @@ void print_ip_dns(const char *str, char *buff);
 
 int main(int argc, const char **argv) {
 
+    int loopout = 1;
+    char input[5];
+    int choice = 0;
+    pid_t childpid;
+    int   stat;
+    int fd[2];
+    char ipStr[16];
+    char fdStr[16];
+
     if (argc != 2) {
         (void) printf("usage: %s IP-address\n", argv[0]);
         exit (EXIT_FAILURE);
     }
-
-
-    int loopout = 1;
-    //int loopin = 1;
-    char input[5];
-    int choice = 0;
-    pid_t childpid;//, pid;
-    int   stat;
-    //int nbytes;
-    //char readbuffer[256];
-    int fd[2];
-    char ipStr[16];
-    char fdStr[16];
 
     print_ip_dns(argv[1], ipStr);
 
@@ -67,10 +63,10 @@ int main(int argc, const char **argv) {
             exit(EXIT_FAILURE);
         }
 
-        if ( (childpid = fork()) == 0 && choice != 3) { //child
+        if ( (childpid = fork()) == 0 && choice != 3) {
 
             switch (choice) {
-                case 1:          //echo
+                case 1:          /*echo*/
 
                     if(sprintf(fdStr, "%d", fd[1]) < 1) {
                         perror("Cant convert fd to str");
@@ -83,7 +79,7 @@ int main(int argc, const char **argv) {
                     }
                     break;
 
-                case 2:          //time
+                case 2:          /*time*/
 
                     if(sprintf(fdStr, "%d", fd[1]) < 1) {
                         perror("Cant convert fd to str");
@@ -101,11 +97,10 @@ int main(int argc, const char **argv) {
             perror("There was an error forking\n");
             exit(EXIT_FAILURE);
 
-        } else { //parent
-            close(fd[1]);
+        } else { /*parent*/
             char c;
+            close(fd[1]);
             while (read(fd[0], &c, 1) > 0 ) {
-                //printf("things: \n");
                 write(STDOUT_FILENO, &c, 1);
             }
 
@@ -123,7 +118,7 @@ void print_ip_dns(const char *str, char *buff) {
     in_addr_t addr;
     struct hostent *hp;
 
-    //todo: don't use this
+    /*todo: don't use this*/
     if ((int)(addr = inet_addr(str)) == -1) {
         hp = gethostbyname(str);
         fromIp = 0;

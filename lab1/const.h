@@ -6,4 +6,4 @@
 #define ECHO_PORT 7686
 #define  BACKLOG 1024
 
-#endif //_CONST_H_
+#endif /*_CONST_H_*/

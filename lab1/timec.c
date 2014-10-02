@@ -10,11 +10,12 @@
 
 int main(int argc, char**argv) {
     int sockfd,n;
-    struct sockaddr_in servaddr;//, cliaddr;
+    struct sockaddr_in servaddr;
     fd_set fdset;
     char recvline[BUFF_SIZE];
     char fdbuff[BUFF_SIZE];
     int fd = 0;
+    int running = 1;
 
     if (argc < 2) {
         printf("usage:  client <IP address>\n");
@@ -52,8 +53,6 @@ int main(int argc, char**argv) {
         }
         exit(EXIT_FAILURE);
     }
-
-    int running = 1;
 
     while (running) {
 

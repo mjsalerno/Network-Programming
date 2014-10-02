@@ -15,6 +15,7 @@ int main(int argc, char**argv) {
     char recvline[BUFF_SIZE];
     char fdbuff[BUFF_SIZE];
     int fd = 0;
+    int running = 1;
 
     fd_set fdset;
     int err = 0;
@@ -57,8 +58,6 @@ int main(int argc, char**argv) {
 
     }
 
-    int running = 1;
-
     while(running) {
 
         FD_ZERO(&fdset);
@@ -70,7 +69,7 @@ int main(int argc, char**argv) {
             perror("echoc.select()");
         }
 
-        //stdin
+        /*stdin*/
         if(FD_ISSET(STDIN_FILENO, &fdset)) {
             if(fgets(sendline, BUFF_SIZE, stdin) == NULL) {
                 if(fd > 0) {
@@ -88,7 +87,7 @@ int main(int argc, char**argv) {
             }
         }
 
-        //socket
+        /*socket*/
         if(FD_ISSET(sockfd, &fdset)) {
             n = recv(sockfd, recvline, BUFF_SIZE, 0);
 
