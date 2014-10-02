@@ -9,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <strings.h>
 #include "const.h"
 
 

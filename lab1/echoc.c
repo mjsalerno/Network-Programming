@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <strings.h>
 #include "const.h"
 
 int main(int argc, char**argv) {
