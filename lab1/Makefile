@@ -1,5 +1,5 @@
 CC=gcc
-FLAGS = -g -Wall -Werror -Wextra -pedantic
+FLAGS = -g -Wall -Werror -Wextra
 LIBS = -pthread
 LIBS = -lnsl -lresolv -lsocket
 
@@ -8,7 +8,7 @@ all: client echoc timec server
 %: %.c
 
 %: %.o %.h
-	$(CC) $(FLAGS) $(LIBS) $(LIBSS) $< -o $@
+	$(CC) $(FLAGS) $(LIBS) $< -o $@
 
 %.o: %.c
 	$(CC) $(FLAGS) -c $< -o $@
