@@ -9,11 +9,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "const.h"
 
-#define BUFF_SIZE 256
-#define TIME_PORT 13
-#define ECHO_PORT 9877
-#define  BACKLOG 1024
 
 struct thread_args {
     int connfd;
