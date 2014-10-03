@@ -29,7 +29,16 @@ int main(void) {
 
     /*get a socket*/
     echo_listen_fd = socket(AF_INET,SOCK_STREAM,0);
+    if(echo_listen_fd < 2) {
+	    perror("server.socket(echo)");
+	    exit(EXIT_FAILURE);
+    }
+
     time_listen_fd = socket(AF_INET,SOCK_STREAM,0);
+    if(time_listen_fd < 2) {
+	    perror("server.socket(time)");
+	    exit(EXIT_FAILURE);
+    }
 
     if(echo_listen_fd < 3 || time_listen_fd < 3) {
         perror("server.socket()");
