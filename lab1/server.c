@@ -29,21 +29,24 @@ int main(void) {
 
     /*get a socket*/
     echo_listen_fd = socket(AF_INET,SOCK_STREAM,0);
-    if(echo_listen_fd < 2) {
-	    perror("server.socket(echo)");
-	    exit(EXIT_FAILURE);
-    }
-
     time_listen_fd = socket(AF_INET,SOCK_STREAM,0);
-    if(time_listen_fd < 2) {
-	    perror("server.socket(time)");
-	    exit(EXIT_FAILURE);
-    }
 
     if(echo_listen_fd < 3 || time_listen_fd < 3) {
         perror("server.socket()");
         exit(EXIT_FAILURE);
     }
+
+    err = fcntl(echo_listen_fd, F_SETFL, O_NONBLOCK);
+    if(err < 0) {
+        perror("server.fcntl(echo)");
+        exit(EXIT_FAILURE);
+    }
+    err = fcntl(time_listen_fd, F_SETFL, O_NONBLOCK);
+    if(err < 0) {
+        perror("server.fcntl(echo)");
+        exit(EXIT_FAILURE);
+    }
+
 
     /*bind*/
     err = bind(echo_listen_fd,(struct sockaddr *)&echosrv,sizeof(echosrv));

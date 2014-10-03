@@ -11,6 +11,8 @@
 #include <pthread.h>
 #include <strings.h>
 #include "const.h"
+#include <unistd.h>
+#include <fcntl.h>
 
 
 struct thread_args {
