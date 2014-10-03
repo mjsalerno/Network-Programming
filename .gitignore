@@ -32,6 +32,14 @@
 *.hex
 
 
+### vim ###
+[._]*.s[a-w][a-z]
+[._]s[a-w][a-z]
+*.un~
+Session.vim
+.netrwhist
+*~
+
 ### SublimeText ###
 # cache files for sublime text
 *.tmlanguage.cache
