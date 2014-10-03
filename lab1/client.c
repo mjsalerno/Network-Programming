@@ -50,6 +50,12 @@ int main(int argc, const char **argv) {
             choice = 3;
             exit(EXIT_SUCCESS);
 
+        } else if(strcmp(input, "exit") == 0) {
+            printf("You typed exit but I will quit anyway :P");
+            loopout = 0;
+            choice = 3;
+            exit(EXIT_SUCCESS);
+
         } else {
             printf("Not a valid input: %s\n", input);
             choice = 0;
