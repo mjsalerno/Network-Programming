@@ -38,18 +38,28 @@ int main(void) {
     }
 
     flags = fcntl(echo_listen_fd, F_GETFD, 0);
+    if(flags < 0) {
+        perror("server.fcntl(get echo)");
+        exit(EXIT_FAILURE);
+    }
+
     flags |= O_NONBLOCK;
     err = fcntl(echo_listen_fd, F_SETFL, flags);
     if(err < 0) {
-        perror("server.fcntl(echo)");
+        perror("server.fcntl(set echo)");
         exit(EXIT_FAILURE);
     }
 
     flags = fcntl(time_listen_fd, F_GETFD, 0);
+    if(flags < 0) {
+        perror("server.fcntl(get time)");
+        exit(EXIT_FAILURE);
+    }
+
     flags |= O_NONBLOCK;
     err = fcntl(time_listen_fd, F_SETFL, flags);
     if(err < 0) {
-        perror("server.fcntl(time)");
+        perror("server.fcntl(set time)");
         exit(EXIT_FAILURE);
     }
 
@@ -140,10 +150,15 @@ void echo_server(struct thread_args *targs) {
     char buffer[BUFF_SIZE];
 
     flags = fcntl(fd, F_GETFD, 0);
+    if(flags < 0) {
+        perror("echos.fctl(get)");
+        exit(EXIT_FAILURE);
+    }
+
     flags &= ~O_NONBLOCK;
     err = fcntl(fd, F_SETFL, flags);
     if(err < 0) {
-        perror("server.fcntl(echo)");
+        perror("echos.fcntl(set)");
         exit(EXIT_FAILURE);
     }
 
@@ -178,10 +193,15 @@ void time_server(struct thread_args *targs) {
     int err = 0;
 
     flags = fcntl(fd, F_GETFD, 0);
+    if(flags < 0) {
+        perror("times.fctl(get)");
+        exit(EXIT_FAILURE);
+    }
+
     flags &= ~O_NONBLOCK;
     err = fcntl(fd, F_SETFL, flags);
     if(err < 0) {
-        perror("server.fcntl(echo)");
+        perror("times.fcntl(set)");
         exit(EXIT_FAILURE);
     }
 
