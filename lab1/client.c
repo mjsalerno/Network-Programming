@@ -51,7 +51,7 @@ int main(int argc, const char **argv) {
             exit(EXIT_SUCCESS);
 
         } else if(strcmp(input, "exit") == 0) {
-            printf("You typed exit but I will quit anyway :P");
+            printf("You typed exit but I will quit anyway :P\n");
             loopout = 0;
             choice = 3;
             exit(EXIT_SUCCESS);
