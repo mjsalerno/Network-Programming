@@ -13,6 +13,7 @@ int main(void) {
     int time_listen_fd;
     pthread_t thread;
     int err;
+    int flags;
 
     /*zero out struct*/
     bzero(&timesrv,sizeof(timesrv));
@@ -36,14 +37,19 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    err = fcntl(echo_listen_fd, F_SETFL, O_NONBLOCK);
+    flags = fcntl(echo_listen_fd, F_GETFD, 0);
+    flags |= O_NONBLOCK;
+    err = fcntl(echo_listen_fd, F_SETFL, flags);
     if(err < 0) {
         perror("server.fcntl(echo)");
         exit(EXIT_FAILURE);
     }
-    err = fcntl(time_listen_fd, F_SETFL, O_NONBLOCK);
+
+    flags = fcntl(time_listen_fd, F_GETFD, 0);
+    flags |= O_NONBLOCK;
+    err = fcntl(time_listen_fd, F_SETFL, flags);
     if(err < 0) {
-        perror("server.fcntl(echo)");
+        perror("server.fcntl(time)");
         exit(EXIT_FAILURE);
     }
 
@@ -130,7 +136,16 @@ int main(void) {
 void echo_server(struct thread_args *targs) {
     int fd = targs->connfd;
     int n = 1;
+    int flags, err;
     char buffer[BUFF_SIZE];
+
+    flags = fcntl(fd, F_GETFD, 0);
+    flags &= ~O_NONBLOCK;
+    err = fcntl(fd, F_SETFL, flags);
+    if(err < 0) {
+        perror("server.fcntl(echo)");
+        exit(EXIT_FAILURE);
+    }
 
     while(n > 0) {
         n = recv(fd, buffer, BUFF_SIZE, 0);
@@ -156,10 +171,19 @@ void time_server(struct thread_args *targs) {
     int fd = targs->connfd;
     char buff[BUFF_SIZE];
     struct timeval timee;
+    int flags;
     fd_set fdset;
     time_t ticks;
     int n;
     int err = 0;
+
+    flags = fcntl(fd, F_GETFD, 0);
+    flags &= ~O_NONBLOCK;
+    err = fcntl(fd, F_SETFL, flags);
+    if(err < 0) {
+        perror("server.fcntl(echo)");
+        exit(EXIT_FAILURE);
+    }
 
     while( err == 0) {
         timee.tv_sec = 5;
