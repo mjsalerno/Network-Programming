@@ -2,6 +2,7 @@
 CC = gcc
 
 LIBS =  -lsocket
+LIBS =
 
 FLAGS =  -g -O2
 CFLAGS = ${FLAGS} 

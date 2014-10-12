@@ -1,4 +1,6 @@
 #include	"unpifiplus.h"
+#include <net/if.h>
+#include <linux/netlink.h>
 
 extern struct ifi_info *Get_ifi_info_plus(int family, int doaliases);
 extern        void      free_ifi_info_plus(struct ifi_info *ifihead);
@@ -12,8 +14,10 @@ main(int argc, char **argv)
 	u_char		*ptr;
 	int		i, family, doaliases;
 
-	if (argc != 3)
-		err_quit("usage: prifinfo_plus <inet4|inet6> <doaliases>");
+	if (argc != 3) {
+            printf("usage: prifinfo_plus <inet4|inet6> <doaliases>\n");
+            exit(EXIT_FAILURE);
+        }
 
 	if (strcmp(argv[1], "inet4") == 0)
 		family = AF_INET;
@@ -52,22 +56,22 @@ main(int argc, char **argv)
 
 		if ( (sa = ifi->ifi_addr) != NULL)
 			printf("  IP addr: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
+						sock_ntop_host(sa, sizeof(*sa)));
 
 /*=================== cse 533 Assignment 2 modifications ======================*/
 
 		if ( (sa = ifi->ifi_ntmaddr) != NULL)
 			printf("  network mask: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
+						sock_ntop_host(sa, sizeof(*sa)));
 
 /*=============================================================================*/
 
 		if ( (sa = ifi->ifi_brdaddr) != NULL)
 			printf("  broadcast addr: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
+						sock_ntop_host(sa, sizeof(*sa)));
 		if ( (sa = ifi->ifi_dstaddr) != NULL)
 			printf("  destination addr: %s\n",
-						Sock_ntop_host(sa, sizeof(*sa)));
+						sock_ntop_host(sa, sizeof(*sa)));
 	}
 	free_ifi_info_plus(ifihead);
 	exit(0);
