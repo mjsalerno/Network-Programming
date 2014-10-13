@@ -1,4 +1,5 @@
 CC=gcc
+CC=clang
 FLAGS = -g -Wall -Werror -Wextra
 LIBS = 
 #LIBS = -lnsl -lresolv -lsocket
