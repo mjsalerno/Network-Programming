@@ -1,8 +1,8 @@
-CC=gcc
 CC=clang
+CC=gcc
 FLAGS = -g -Wall -Werror -Wextra
+LIBS = -lnsl -lresolv -lsocket
 LIBS = 
-#LIBS = -lnsl -lresolv -lsocket
 
 all: client server
 
@@ -11,7 +11,7 @@ all: client server
 %: %.o
 	$(CC) $(FLAGS) $(LIBS) $< -o $@
 
-%.o: %.c
+%.o: %.c %.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
