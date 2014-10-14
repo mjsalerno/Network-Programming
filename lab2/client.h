@@ -5,5 +5,6 @@
 
 #define DEBUG
 #include "debug.h"
+#include "common.h"
 
 #endif
