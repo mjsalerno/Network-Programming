@@ -2,9 +2,8 @@
 
 int main(int argc, const char **argv) {
     const char *path;
-    ssize_t read;
-    size_t len = 0;
-    char *line = NULL; 
+    char *read;
+    char line[BUFF_SIZE];
 
     long port;
     long window;
@@ -25,8 +24,8 @@ int main(int argc, const char **argv) {
     }
 
     /*Get the port*/
-    read = getline(&line, &len, file);
-    if(read < 1) {
+    read = fgets(line, BUFF_SIZE, file);
+    if(read == NULL) {
         perror("there was an error getting the port number");
         return EXIT_FAILURE;
     }
@@ -38,28 +37,20 @@ int main(int argc, const char **argv) {
     }
     
     /*Get the window size*/
-    read = getline(&line, &len, file);
-    if(read < 1) {
+    read = fgets(line, BUFF_SIZE, file);
+    if(read == NULL) {
         perror("there was an error getting the window size number");
         return EXIT_FAILURE;
     }
     window = atol(line);
     printf("Window: %ld\n", window);
     if(port < 1) {
-        printf("The window size can not be less than 1\n");
+        printf("The window can not be less than 1\n");
         return EXIT_FAILURE;
-    }
-
-
-    read = getline(&line, &len, file);
-
-    while((read = getline(&line, &len, file)) > 0) {
-        _DEBUG("from config| read: %zd, len: %zu\n", read, len);   
     }
 
     printf("config: %s\n", path);
 
-    free(line);
     fclose(file);
     return EXIT_SUCCESS;
 }
