@@ -13,7 +13,11 @@ int main(void) {
     memset((void *)&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     /* fill in the well-known port num */
-    sa.sin_port = htons(SERV_PORT);
+    /* sa.sin_port = htons(SERV_PORT);*/
+
+    /*I have changed it to this because the server reads from a config file
+      we should make the client read from a config too.*/
+    sa.sin_port = htons(6758);
     /* fill in the server ip address */
     //inet_pton(AF_INET, serv_ip, &(sa.sin_addr));
 
