@@ -44,7 +44,6 @@ int main(int argc, const char **argv) {
     fclose(file);
 
 
-#if(0)
 
     int sockfd,n;
     struct sockaddr_in servaddr,cliaddr;
@@ -56,7 +55,7 @@ int main(int argc, const char **argv) {
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
-    servaddr.sin_port=htons();
+    servaddr.sin_port=htons(SERV_PORT);
     bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
 
     for (;;) {
@@ -69,7 +68,6 @@ int main(int argc, const char **argv) {
         printf("%s",mesg);
         printf("-------------------------------------------------------\n");
     }
-#endif
 
 
 
