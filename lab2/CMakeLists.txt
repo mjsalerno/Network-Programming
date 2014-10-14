@@ -5,11 +5,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 set(SERVER_SOURCE_FILES
     server.c
-    server.h)
+    server.h
+    util.c
+    util.h)
 
 set(CLIENT_SOURCE_FILES
    client.c
-   client.h)
+   client.h
+   util.c
+   util.h)
 
 add_executable(server ${SERVER_SOURCE_FILES})
 add_executable(client ${SERVER_SOURCE_FILES})
