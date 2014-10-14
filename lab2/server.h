@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #include "debug.h" 
-#include "util.h" 
+#include "common.h" 
 
 #define BUFF_SIZE 256
 #define DEBUG
