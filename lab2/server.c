@@ -24,17 +24,12 @@ int main(int argc, const char **argv) {
     }
 
     /*Get the port*/
-    read = fgets(line, BUFF_SIZE, file);
-    if(read == NULL) {
-        perror("there was an error getting the port number");
-        return EXIT_FAILURE;
-    }
-    port = atol(line);
-    printf("Port: %ld\n", port);
+    port = int_from_config(file, line, "There was an error getting the port number");
     if(port < 1) {
         printf("The port can not be less than 1\n");
         return EXIT_FAILURE;
-    }
+    } 
+    printf("Port: %ld\n", port);
     
     /*Get the window size*/
     read = fgets(line, BUFF_SIZE, file);
