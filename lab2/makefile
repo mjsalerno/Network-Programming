@@ -12,7 +12,7 @@ all: client server
 	$(CC) $(FLAGS) $(LIBS) $^ -o $@
 
 %.o: %.c %.h
-	$(CC) $(FLAGS) -c $^ -o $@
+	$(CC) $(FLAGS) -c $< -o $@
 
 util.o: util.c util.h
 	$(CC) $(FLAGS) -c $< -o $@

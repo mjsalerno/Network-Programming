@@ -8,6 +8,6 @@ int int_from_config(FILE* file, char *line, const char* err_str) {
         perror(err_str);
         return EXIT_FAILURE;
     }
-    rtn = atol(line);
+    rtn = atoi(line);
     return rtn;
 }
