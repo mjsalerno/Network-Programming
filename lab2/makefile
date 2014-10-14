@@ -8,10 +8,13 @@ all: client server
 
 %: %.c
 
-%: %.o
-	$(CC) $(FLAGS) $(LIBS) $< -o $@
+%: %.o util.o
+	$(CC) $(FLAGS) $(LIBS) $^ -o $@
 
 %.o: %.c %.h
+	$(CC) $(FLAGS) -c $^ -o $@
+
+util.o: util.c util.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
