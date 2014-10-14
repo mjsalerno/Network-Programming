@@ -44,7 +44,7 @@ int main(int argc, const char **argv) {
     fclose(file);
 
 
-
+#if(0)
 
     int sockfd,n;
     struct sockaddr_in servaddr,cliaddr;
@@ -69,7 +69,7 @@ int main(int argc, const char **argv) {
         printf("%s",mesg);
         printf("-------------------------------------------------------\n");
     }
-
+#endif
 
 
 
