@@ -55,17 +55,16 @@ int main(int argc, const char **argv) {
     bzero(&servaddr,sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
-    servaddr.sin_port=htons(SERV_PORT);
+    servaddr.sin_port=htons(port);
     bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
 
     for (;;) {
         len = sizeof(cliaddr);
         n = recvfrom(sockfd,mesg,1000,0,(struct sockaddr *)&cliaddr,&len);
         sendto(sockfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-        printf("-------------------------------------------------------\n");
         mesg[n] = 0;
-        printf("Received the following:\n");
-        printf("%s",mesg);
+        printf("-------------------------------------------------------\n");
+        printf("Received the following: '%s'\n", mesg);
         printf("-------------------------------------------------------\n");
     }
 
