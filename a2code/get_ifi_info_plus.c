@@ -1,28 +1,42 @@
 
 #include	"unpifiplus.h"
 
+/**
+* Returns NULL on error
+**/
 struct ifi_info *
 get_ifi_info_plus(int family, int doaliases)
 {
 	struct ifi_info		*ifi, *ifihead, **ifipnext;
 	int					sockfd, len, lastlen, flags, myflags, idx = 0, hlen = 0;
-	char				*ptr, *buf, lastname[IFNAMSIZ], *cptr, *haddr, *sdlname;
+	char				*ptr, *buf, lastname[IFNAMSIZ], *haddr, *sdlname;
+	/* char				*cptr; */
 	struct ifconf		ifc;
 	struct ifreq		*ifr, ifrcopy;
 	struct sockaddr_in	*sinptr;
 	struct sockaddr_in6	*sin6ptr;
 
-	sockfd = Socket(AF_INET, SOCK_DGRAM, 0);
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if(sockfd < 0){
+		perror("get_ifi_info_plus socket");
+		exit(EXIT_FAILURE);
+	}
 
 	lastlen = 0;
 	len = 100 * sizeof(struct ifreq);	/* initial buffer size guess */
 	for ( ; ; ) {
-		buf = Malloc(len);
+		buf = malloc(len);
+		if(buf == NULL){
+			perror("get_ifi_info_plus malloc");
+			exit(EXIT_FAILURE);
+		}
 		ifc.ifc_len = len;
 		ifc.ifc_buf = buf;
 		if (ioctl(sockfd, SIOCGIFCONF, &ifc) < 0) {
-			if (errno != EINVAL || lastlen != 0)
-				err_sys("ioctl error");
+			if (errno != EINVAL || lastlen != 0){
+				perror("get_ifi_info_plus ioctl");
+				exit(EXIT_FAILURE);
+			}
 		} else {
 			if (ifc.ifc_len == lastlen)
 				break;		/* success, len has not changed */
@@ -89,21 +103,31 @@ get_ifi_info_plus(int family, int doaliases)
 		memcpy(lastname, ifr->ifr_name, IFNAMSIZ);
 
 		ifrcopy = *ifr;
-		Ioctl(sockfd, SIOCGIFFLAGS, &ifrcopy);
+		if(ioctl(sockfd, SIOCGIFFLAGS, &ifrcopy) < 0){
+			perror("get_ifi_info_plus ioctl");
+			exit(EXIT_FAILURE);
+		}
 		flags = ifrcopy.ifr_flags;
 		if ((flags & IFF_UP) == 0)
 			continue;	/* ignore if interface not up */
 /* end get_ifi_info2 */
 
 /* include get_ifi_info3 */
-		ifi = Calloc(1, sizeof(struct ifi_info));
+		ifi = calloc(1, sizeof(struct ifi_info));
+		if(ifi == NULL){
+			perror("get_ifi_info_plus calloc");
+			exit(EXIT_FAILURE);
+		}
 		*ifipnext = ifi;			/* prev points to this new one */
 		ifipnext = &ifi->ifi_next;	/* pointer to next one goes here */
 
 		ifi->ifi_flags = flags;		/* IFF_xxx values */
 		ifi->ifi_myflags = myflags;	/* IFI_xxx values */
 #if defined(SIOCGIFMTU) && defined(HAVE_STRUCT_IFREQ_IFR_MTU)
-		Ioctl(sockfd, SIOCGIFMTU, &ifrcopy);
+		if(ioctl(sockfd, SIOCGIFMTU, &ifrcopy) < 0){ 
+			perror("get_ifi_info_plus ioctl");
+			exit(EXIT_FAILURE);
+		}
 		ifi->ifi_mtu = ifrcopy.ifr_mtu;
 #else
 		ifi->ifi_mtu = 0;
@@ -124,23 +148,41 @@ get_ifi_info_plus(int family, int doaliases)
 		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
 			sinptr = (struct sockaddr_in *) &ifr->ifr_addr;
-			ifi->ifi_addr = Calloc(1, sizeof(struct sockaddr_in));
+			ifi->ifi_addr = calloc(1, sizeof(struct sockaddr_in));
+			if(ifi->ifi_addr == NULL){
+				perror("get_ifi_info_plus calloc");
+				exit(EXIT_FAILURE);
+			}
 			memcpy(ifi->ifi_addr, sinptr, sizeof(struct sockaddr_in));
 
 #ifdef	SIOCGIFBRDADDR
 			if (flags & IFF_BROADCAST) {
-				Ioctl(sockfd, SIOCGIFBRDADDR, &ifrcopy);
+				if(ioctl(sockfd, SIOCGIFBRDADDR, &ifrcopy) < 0){
+					perror("get_ifi_info_plus ioctl");
+					exit(EXIT_FAILURE);
+				}
 				sinptr = (struct sockaddr_in *) &ifrcopy.ifr_broadaddr;
-				ifi->ifi_brdaddr = Calloc(1, sizeof(struct sockaddr_in));
+				ifi->ifi_brdaddr = calloc(1, sizeof(struct sockaddr_in));
+				if(ifi->ifi_brdaddr == NULL){
+					perror("get_ifi_info_plus calloc");
+					exit(EXIT_FAILURE);
+				}
 				memcpy(ifi->ifi_brdaddr, sinptr, sizeof(struct sockaddr_in));
 			}
 #endif
 
 #ifdef	SIOCGIFDSTADDR
 			if (flags & IFF_POINTOPOINT) {
-				Ioctl(sockfd, SIOCGIFDSTADDR, &ifrcopy);
+				if(ioctl(sockfd, SIOCGIFDSTADDR, &ifrcopy) < 0){ 
+					perror("get_ifi_info_plus ioctl");
+					exit(EXIT_FAILURE);
+				}
 				sinptr = (struct sockaddr_in *) &ifrcopy.ifr_dstaddr;
-				ifi->ifi_dstaddr = Calloc(1, sizeof(struct sockaddr_in));
+				ifi->ifi_dstaddr = calloc(1, sizeof(struct sockaddr_in));
+				if(ifi->ifi_dstaddr == NULL){
+					perror("get_ifi_info_plus calloc");
+					exit(EXIT_FAILURE);
+				}
 				memcpy(ifi->ifi_dstaddr, sinptr, sizeof(struct sockaddr_in));
 			}
 #endif
@@ -148,9 +190,16 @@ get_ifi_info_plus(int family, int doaliases)
 /*================== cse 533  Assignment 2 modifications ====================*/
 
 #ifdef  SIOCGIFNETMASK
-			Ioctl(sockfd, SIOCGIFNETMASK, &ifrcopy);
+			if(ioctl(sockfd, SIOCGIFNETMASK, &ifrcopy) < 0){ 
+				perror("get_ifi_info_plus ioctl");
+				exit(EXIT_FAILURE);
+			}
 			sinptr = (struct sockaddr_in *) &ifrcopy.ifr_addr;
-			ifi->ifi_ntmaddr = Calloc(1, sizeof(struct sockaddr_in));
+			ifi->ifi_ntmaddr = calloc(1, sizeof(struct sockaddr_in));
+			if(ifi->ifi_ntmaddr == NULL){
+				perror("get_ifi_info_plus calloc");
+				exit(EXIT_FAILURE);
+			}
 			memcpy(ifi->ifi_ntmaddr, sinptr, sizeof(struct sockaddr_in));
 #endif
 
@@ -161,16 +210,27 @@ get_ifi_info_plus(int family, int doaliases)
 #ifdef	IPV6
 		case AF_INET6:
 			sin6ptr = (struct sockaddr_in6 *) &ifr->ifr_addr;
-			ifi->ifi_addr = Calloc(1, sizeof(struct sockaddr_in6));
+			ifi->ifi_addr = calloc(1, sizeof(struct sockaddr_in6));
+			if(ifi->ifi_addr == NULL){
+				perror("get_ifi_info_plus calloc");
+				exit(EXIT_FAILURE);
+			}
 			memcpy(ifi->ifi_addr, sin6ptr, sizeof(struct sockaddr_in6));
 #endif
 
 #ifdef	SIOCGIFDSTADDR
 			if (flags & IFF_POINTOPOINT) {
-				Ioctl(sockfd, SIOCGIFDSTADDR, &ifrcopy);
+				if(ioctl(sockfd, SIOCGIFDSTADDR, &ifrcopy) < 0){ 
+					perror("get_ifi_info_plus ioctl");
+					exit(EXIT_FAILURE);
+				}
 				sin6ptr = (struct sockaddr_in6 *) &ifrcopy.ifr_dstaddr;
 #ifdef	IPV6
-				ifi->ifi_dstaddr = Calloc(1, sizeof(struct sockaddr_in6));
+				ifi->ifi_dstaddr = calloc(1, sizeof(struct sockaddr_in6));
+				if(ifi->ifi_dstaddr == NULL){
+					perror("get_ifi_info_plus calloc");
+					exit(EXIT_FAILURE);
+				}
 				memcpy(ifi->ifi_dstaddr, sin6ptr, sizeof(struct sockaddr_in6));
 #endif
 			}
@@ -210,15 +270,4 @@ free_ifi_info_plus(struct ifi_info *ifihead)
 		ifinext = ifi->ifi_next;	/* can't fetch ifi_next after free() */
 		free(ifi);					/* the ifi_info{} itself */
 	}
-}
-/* end free_ifi_info_plus */
-
-struct ifi_info *
-Get_ifi_info_plus(int family, int doaliases)
-{
-	struct ifi_info	*ifi;
-
-	if ( (ifi = get_ifi_info_plus(family, doaliases)) == NULL)
-		err_quit("get_ifi_info_plus error");
-	return(ifi);
 }

@@ -4,6 +4,7 @@
 
 extern struct ifi_info *Get_ifi_info_plus(int family, int doaliases);
 extern        void      free_ifi_info_plus(struct ifi_info *ifihead);
+char *sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
 
 
 int
@@ -25,12 +26,18 @@ main(int argc, char **argv)
 	else if (strcmp(argv[1], "inet6") == 0)
 		family = AF_INET6;
 #endif
-	else
-		err_quit("invalid <address-family>");
+	else{
+		fprintf(stderr, "invalid <address-family>\n");
+		exit(EXIT_FAILURE);
+	}
 	doaliases = atoi(argv[2]);
+	ifihead = ifi = get_ifi_info_plus(family, doaliases);
+	if(ifihead == NULL || ifi == NULL){
+		fprintf(stderr, "get_ifi_info_plus error: no interfaces found\n");
+		exit(EXIT_FAILURE);
+	}
 
-	for (ifihead = ifi = Get_ifi_info_plus(family, doaliases);
-		 ifi != NULL; ifi = ifi->ifi_next) {
+	for (; ifi != NULL; ifi = ifi->ifi_next) {
 		printf("%s: ", ifi->ifi_name);
 		if (ifi->ifi_index != 0)
 			printf("(%d) ", ifi->ifi_index);
@@ -54,9 +61,9 @@ main(int argc, char **argv)
 		if (ifi->ifi_mtu != 0)
 			printf("  MTU: %d\n", ifi->ifi_mtu);
 
-		if ( (sa = ifi->ifi_addr) != NULL)
-			printf("  IP addr: %s\n",
-						sock_ntop_host(sa, sizeof(*sa)));
+		if ( (sa = ifi->ifi_addr) != NULL){
+			printf("  IP addr: %s\n", sock_ntop_host(sa, sizeof(*sa)));
+		}
 
 /*=================== cse 533 Assignment 2 modifications ======================*/
 
@@ -75,4 +82,34 @@ main(int argc, char **argv)
 	}
 	free_ifi_info_plus(ifihead);
 	exit(0);
+}
+
+/* From Steven's unpv13e/lip/ */
+char *sock_ntop_host(const struct sockaddr *sa, socklen_t salen){
+    static char str[128];		/* Unix domain is largest */
+
+	switch (sa->sa_family) {
+	case AF_INET: {
+		struct sockaddr_in	*sin = (struct sockaddr_in *) sa;
+
+		if (inet_ntop(AF_INET, &sin->sin_addr, str, sizeof(str)) == NULL)
+			return(NULL);
+		return(str);
+	}
+
+#ifdef	IPV6
+	case AF_INET6: {
+		struct sockaddr_in6	*sin6 = (struct sockaddr_in6 *) sa;
+
+		if (inet_ntop(AF_INET6, &sin6->sin6_addr, str, sizeof(str)) == NULL)
+			return(NULL);
+		return(str);
+	}
+#endif
+	default:
+		snprintf(str, sizeof(str), "sock_ntop_host: unknown AF_xxx: %d, len %d",
+				 sa->sa_family, salen);
+		return(str);
+	}
+    return (NULL);
 }
