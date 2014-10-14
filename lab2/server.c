@@ -2,10 +2,9 @@
 
 int main(int argc, const char **argv) {
     const char *path;
-    char *read;
     char line[BUFF_SIZE];
 
-    long port;
+    unsigned short port;
     long window;
 
 
@@ -27,22 +26,18 @@ int main(int argc, const char **argv) {
     port = int_from_config(file, line, "There was an error getting the port number");
     if(port < 1) {
         printf("The port can not be less than 1\n");
+        printf("The port can not be less than 1\n");
         return EXIT_FAILURE;
     } 
-    printf("Port: %ld\n", port);
+    printf("Port: %hu\n", port);
     
     /*Get the window size*/
-    read = fgets(line, BUFF_SIZE, file);
-    if(read == NULL) {
-        perror("there was an error getting the window size number");
-        return EXIT_FAILURE;
-    }
-    window = atol(line);
-    printf("Window: %ld\n", window);
-    if(port < 1) {
+    window = int_from_config(file, line, "There was an error getting the window size number");
+    if(window < 1) {
         printf("The window can not be less than 1\n");
         return EXIT_FAILURE;
     }
+    printf("Window: %ld\n", window);
 
     printf("config: %s\n", path);
 
