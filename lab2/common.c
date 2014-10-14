@@ -1,4 +1,4 @@
-#include "util.h"
+#include "common.h"
 
 int int_from_config(FILE* file, char *line, const char* err_str) {
     char *read;
