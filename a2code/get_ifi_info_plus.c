@@ -1,4 +1,3 @@
-
 #include	"unpifiplus.h"
 
 /**
@@ -9,7 +8,7 @@ get_ifi_info_plus(int family, int doaliases)
 {
 	struct ifi_info		*ifi, *ifihead, **ifipnext;
 	int					sockfd, len, lastlen, flags, myflags, idx = 0, hlen = 0;
-	char				*ptr, *buf, lastname[IFNAMSIZ], *haddr, *sdlname;
+	char				*ptr, *buf, lastname[IFNAMSIZ], *haddr = NULL, *sdlname;
 	/* char				*cptr; */
 	struct ifconf		ifc;
 	struct ifreq		*ifr, ifrcopy;

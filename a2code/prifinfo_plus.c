@@ -1,6 +1,5 @@
 #include	"unpifiplus.h"
 #include <net/if.h>
-#include <linux/netlink.h>
 
 extern struct ifi_info *Get_ifi_info_plus(int family, int doaliases);
 extern        void      free_ifi_info_plus(struct ifi_info *ifihead);
