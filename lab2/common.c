@@ -17,13 +17,19 @@ float float_from_config(FILE* file, const char* err_str) {
     return rtn;
 }
 
-/* return and line are both the same after the call */
-char  *str_from_config(FILE* file, char *line, size_t len, const char* err_str) {
+/* fill in line */
+void str_from_config(FILE* file, char *line, size_t len, const char* err_str) {
     char *read;
     read = fgets(line, len, file);
     if(read == NULL) {
         perror(err_str);
         exit(EXIT_FAILURE);
     }
-    return line;
+    while(*read != 0){
+        if(*read == '\n'){
+            *read = 0;
+            break;
+        }
+        read++;
+    }
 }
