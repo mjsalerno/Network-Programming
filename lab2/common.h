@@ -14,6 +14,8 @@
 
 #define BUFF_SIZE 256
 
-int int_from_config(FILE* file, char *line, const char* err_str);
+int int_from_config(FILE* file, const char* err_str);
+float float_from_config(FILE* file, const char* err_str);
+char *str_from_config(FILE* file, char *line, size_t len, const char* err_str);
 
 #endif
