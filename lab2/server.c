@@ -21,14 +21,14 @@ int main(int argc, const char **argv) {
     FILE *file = fopen(path, "r");
     if(file == NULL) {
         perror("could not open server config file");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     /*Get the port*/
     port = int_from_config(file, "There was an error getting the port number");
     if(port < 1) {
         fprintf(stderr, "The port can not be less than 1\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     } 
     printf("Port: %hu\n", port);
     
@@ -36,7 +36,7 @@ int main(int argc, const char **argv) {
     window = int_from_config(file, "There was an error getting the window size number");
     if(window < 1) {
         fprintf(stderr, "The window can not be less than 1\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     _DEBUG("Window: %ld\n", window);
     _DEBUG("config: %s\n", path);
@@ -53,22 +53,26 @@ int main(int argc, const char **argv) {
 
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
 
-    bzero(&servaddr,sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
-    servaddr.sin_port=htons(port);
-    err = bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
-    if(err < 0) {
-       perror("server.bind()");
-    }
+    for(;;) {
 
-    FD_ZERO(&fdset);
-    FD_SET(sockfd, &fdset);
-    err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
-    if(err < 0) {
-        perror("server.select()");
-        exit(EXIT_FAILURE);
-    }
+        bzero(&servaddr, sizeof(servaddr));
+        servaddr.sin_family = AF_INET;
+        servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        servaddr.sin_port = htons(port);
+        err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+        if (err < 0) {
+            perror("server.bind()");
+        }
+
+        FD_ZERO(&fdset);
+        FD_SET(sockfd, &fdset);
+        err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
+        if (err < 0 || FD_ISSET(sockfd, &fdset)) {
+            perror("server.select()");
+            exit(EXIT_FAILURE);
+        }
+
+        _DEBUG("%s\n", "a client is connecting");
 
 
 //    for (;;) {
@@ -81,28 +85,29 @@ int main(int argc, const char **argv) {
 //        printf("-------------------------------------------------------\n");
 //    }
 
-    _DEBUG("%s\n", "server.fork()");
-    pid = fork();
-    _DEBUG("pid: %d\n", pid);
-    if(pid < 0) {
-        perror("Could not fork()");
-    }
-
-    /*in child*/
-    if(pid == 0) {
-        _DEBUG("%s", "In child");
-        bzero(&servaddr,sizeof(servaddr));
-        servaddr.sin_family = AF_INET;
-        servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
-        servaddr.sin_port=htons(0);
-        err = bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
-
-        /* TODO: err = clone();*/
-
-        if(err < 0) {
-            perror("child.bind()");
+        _DEBUG("%s\n", "server.fork()");
+        pid = fork();
+        _DEBUG("pid: %d\n", pid);
+        if (pid < 0) {
+            perror("Could not fork()");
         }
 
+        /*in child*/
+        if (pid == 0) {
+            _DEBUG("%s", "In child");
+            bzero(&servaddr, sizeof(servaddr));
+            servaddr.sin_family = AF_INET;
+            servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+            servaddr.sin_port = htons(0);
+            err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+
+            /* TODO: err = clone();*/
+
+            if (err < 0) {
+                perror("child.bind()");
+            }
+
+        }
     }
 
 

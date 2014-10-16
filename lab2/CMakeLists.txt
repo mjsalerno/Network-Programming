@@ -1,23 +1,28 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(lab2)
 
+SET (CMAKE_C_COMPILER             "/usr/bin/clang")
 set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-g -Wall -Werror -Wextra")
 
 set(COMMON_SOURCE_FILES
     common.c
-    common.h
+    common.h)
+
+set(XTCP_SOURCE_FILES
     xtcp.c
     xtcp.h)
 
 set(SERVER_SOURCE_FILES
     server.c
-    server.h
-    ${COMMON_SOURCE_FILES})
+    server.h)
 
 set(CLIENT_SOURCE_FILES
    client.c
-   client.h
-   ${COMMON_SOURCE_FILES})
+   client.h)
 
-add_executable(server ${SERVER_SOURCE_FILES})
-add_executable(client ${SERVER_SOURCE_FILES})
+add_library(common OBJECT ${COMMON_SOURCE_FILES})
+#add_library(xtcp OBJECT ${XTCP_SOURCE_FILES})
+
+add_executable(server ${SERVER_SOURCE_FILES} $<TARGET_OBJECTS:common>)
+add_executable(client ${CLIENT_SOURCE_FILES} $<TARGET_OBJECTS:common>)
+
