@@ -15,6 +15,6 @@
 
 int int_from_config(FILE* file, const char* err_str);
 float float_from_config(FILE* file, const char* err_str);
-char *str_from_config(FILE* file, char *line, size_t len, const char* err_str);
+void str_from_config(FILE* file, char *line, size_t len, const char* err_str);
 
 #endif
