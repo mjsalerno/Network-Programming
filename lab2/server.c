@@ -2,7 +2,6 @@
 
 int main(int argc, const char **argv) {
     const char *path;
-    char line[BUFF_SIZE];
 
     unsigned short port;
     long window;
@@ -23,7 +22,7 @@ int main(int argc, const char **argv) {
     }
 
     /*Get the port*/
-    port = int_from_config(file, line, "There was an error getting the port number");
+    port = int_from_config(file, "There was an error getting the port number");
     if(port < 1) {
         printf("The port can not be less than 1\n");
         printf("The port can not be less than 1\n");
@@ -32,7 +31,7 @@ int main(int argc, const char **argv) {
     printf("Port: %hu\n", port);
     
     /*Get the window size*/
-    window = int_from_config(file, line, "There was an error getting the window size number");
+    window = int_from_config(file, "There was an error getting the window size number");
     if(window < 1) {
         printf("The window can not be less than 1\n");
         return EXIT_FAILURE;

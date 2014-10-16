@@ -1,13 +1,29 @@
 #include "common.h"
+/* Because this is for the config these funcs exit() on failure*/
 
-int int_from_config(FILE* file, char *line, const char* err_str) {
-    char *read;
+int int_from_config(FILE* file, const char* err_str) {
+	char line[BUFF_SIZE];
     int rtn;
-    read = fgets(line, BUFF_SIZE, file);
-    if(read == NULL) {
-        perror(err_str);
-        return EXIT_FAILURE;
-    }
+    str_from_config(file, line, sizeof(line), err_str);
     rtn = atoi(line);
     return rtn;
+}
+
+float float_from_config(FILE* file, const char* err_str) {
+    char line[BUFF_SIZE];
+    float rtn;
+    str_from_config(file, line, sizeof(line), err_str);
+    rtn = atof(line);
+    return rtn;
+}
+
+/* return and line are both the same after the call */
+char  *str_from_config(FILE* file, char *line, size_t len, const char* err_str) {
+    char *read;
+    read = fgets(line, len, file);
+    if(read == NULL) {
+        perror(err_str);
+        exit(EXIT_FAILURE);
+    }
+    return line;
 }
