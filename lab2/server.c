@@ -5,6 +5,8 @@ int main(int argc, const char **argv) {
 
     unsigned short port;
     long window;
+    int pid;
+    int err;
 
 
     if(argc < 2) {
@@ -24,8 +26,7 @@ int main(int argc, const char **argv) {
     /*Get the port*/
     port = int_from_config(file, "There was an error getting the port number");
     if(port < 1) {
-        printf("The port can not be less than 1\n");
-        printf("The port can not be less than 1\n");
+        fprintf(stderr, "The port can not be less than 1\n");
         return EXIT_FAILURE;
     } 
     printf("Port: %hu\n", port);
@@ -33,21 +34,21 @@ int main(int argc, const char **argv) {
     /*Get the window size*/
     window = int_from_config(file, "There was an error getting the window size number");
     if(window < 1) {
-        printf("The window can not be less than 1\n");
+        fprintf(stderr, "The window can not be less than 1\n");
         return EXIT_FAILURE;
     }
-    printf("Window: %ld\n", window);
+    _DEBUG("Window: %ld\n", window);
+    _DEBUG("config: %s\n", path);
 
-    printf("config: %s\n", path);
+    err = fclose(file);
+    if(err < 0) {
+        perror("server.fclose()");
+    }
 
-    fclose(file);
-
-
-
-    int sockfd,n;
-    struct sockaddr_in servaddr,cliaddr;
-    socklen_t len;
-    char mesg[BUFF_SIZE];
+    int sockfd;
+    struct sockaddr_in servaddr;//,cliaddr;
+    //socklen_t len;
+    //char mesg[BUFF_SIZE];
 
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
 
@@ -55,18 +56,44 @@ int main(int argc, const char **argv) {
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
     servaddr.sin_port=htons(port);
-    bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
-
-    for (;;) {
-        len = sizeof(cliaddr);
-        n = recvfrom(sockfd,mesg,1000,0,(struct sockaddr *)&cliaddr,&len);
-        sendto(sockfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-        mesg[n] = 0;
-        printf("-------------------------------------------------------\n");
-        printf("Received the following: '%s'\n", mesg);
-        printf("-------------------------------------------------------\n");
+    err = bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
+    if(err < 0) {
+       perror("server.bind()");
     }
 
+//    for (;;) {
+//        len = sizeof(cliaddr);
+//        n = recvfrom(sockfd,mesg,1000,0,(struct sockaddr *)&cliaddr,&len);
+//        sendto(sockfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
+//        mesg[n] = 0;
+//        printf("-------------------------------------------------------\n");
+//        printf("Received the following: '%s'\n", mesg);
+//        printf("-------------------------------------------------------\n");
+//    }
+
+    _DEBUG("%s\n", "server.fork()");
+    pid = fork();
+    _DEBUG("pid: %d\n", pid);
+    if(pid < 0) {
+        perror("Could not fork()");
+    }
+
+    /*in child*/
+    if(pid == 0) {
+        _DEBUG("%s", "In child");
+        bzero(&servaddr,sizeof(servaddr));
+        servaddr.sin_family = AF_INET;
+        servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
+        servaddr.sin_port=htons(0);
+        err = bind(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
+
+        /* TODO: err = clone();*/
+
+        if(err < 0) {
+            perror("child.bind()");
+        }
+
+    }
 
 
     return EXIT_SUCCESS;
