@@ -1,8 +1,7 @@
 
 CC = gcc
 
-LIBS =  -lsocket
-LIBS =
+LIBS = -lsocket -lnsl -lresolv
 
 FLAGS =  -g -O2 -Wall -Wextra
 CFLAGS = $(FLAGS) 
@@ -20,5 +19,5 @@ prifinfo_plus.o: prifinfo_plus.c
 	$(CC) $(CFLAGS) -c prifinfo_plus.c
 
 clean:
-	rm prifinfo_plus prifinfo_plus.o get_ifi_info_plus.o
+	rm -f prifinfo_plus prifinfo_plus.o get_ifi_info_plus.o
 
