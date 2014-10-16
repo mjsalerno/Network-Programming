@@ -4,6 +4,7 @@ int main(int argc, const char **argv) {
     const char *path;
 
     unsigned short port;
+    fd_set fdset;
     long window;
     int pid;
     int err;
@@ -60,6 +61,15 @@ int main(int argc, const char **argv) {
     if(err < 0) {
        perror("server.bind()");
     }
+
+    FD_ZERO(&fdset);
+    FD_SET(sockfd, &fdset);
+    err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
+    if(err < 0) {
+        perror("server.select()");
+        exit(EXIT_FAILURE);
+    }
+
 
 //    for (;;) {
 //        len = sizeof(cliaddr);
