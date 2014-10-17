@@ -19,9 +19,14 @@ set(CLIENT_SOURCE_FILES
    client.c
    client.h)
 
-add_library(common OBJECT ${COMMON_SOURCE_FILES})
+add_library(commonlib OBJECT ${COMMON_SOURCE_FILES})
 #add_library(xtcp OBJECT ${XTCP_SOURCE_FILES})
 
-add_executable(server ${SERVER_SOURCE_FILES} $<TARGET_OBJECTS:common>)
-add_executable(client ${CLIENT_SOURCE_FILES} $<TARGET_OBJECTS:common>)
+add_executable(server
+	${SERVER_SOURCE_FILES}
+	$<TARGET_OBJECTS:commonlib>)
+
+add_executable(client
+	${CLIENT_SOURCE_FILES}
+	$<TARGET_OBJECTS:commonlib>)
 

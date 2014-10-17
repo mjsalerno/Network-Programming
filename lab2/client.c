@@ -8,9 +8,10 @@ int main(void) {
     char buf[BUFF_SIZE + 1];
     /* config/xtcp vars */
     uint16_t windsize;
+    ssize_t err;
     int seed;
     float pktloss;
-    int u; /* (!!in ms!!) mean of the expon dist func */
+    int u; /* (!!in ms!!) mean of the exponential dist func */
 
     /* connfd -- the main server connection socket */
     /* servfd -- the socket "accept" server socket */
@@ -26,21 +27,26 @@ int main(void) {
     /* read the config */
     file = fopen(path, "r");
     if(file == NULL) {
-        perror("could not open server config file");
+        perror("could not open client config file");
         exit(EXIT_FAILURE);
     }
     /* 1. fill in the server ip address */
     str_from_config(file, ip4_str, sizeof(ip4_str),
         "client.in:1: error getting IPv4 address");
-    inet_pton(AF_INET, ip4_str, &(myaddr.sin_addr));
+    err = inet_pton(AF_INET, ip4_str, &(myaddr.sin_addr));
+    if(err == 0){
+        fprintf(stderr, "client.inet_pton() invalid IPv4 address\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
     /* 2. fill in the server port */
-    knownport = int_from_config(file, "client.in:2: error getting port");
+    knownport = (uint16_t) int_from_config(file, "client.in:2: error getting port");
     myaddr.sin_port = htons(knownport);
     /* 3. fill in file to transfer */
-    str_from_config(file, transferpath, sizeof(transferpath), 
+    str_from_config(file, transferpath, sizeof(transferpath),
         "client.in:3: error getting transfer file name");
     /* 4. fill in file to transfer */
-    windsize = int_from_config(file, "client.in:4: error getting window size");
+    windsize = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
     /* 5. fill in seed */
     seed = int_from_config(file, "client.in:5: error getting seed");
     /* 6. fill in seed */
@@ -49,7 +55,11 @@ int main(void) {
     /* 7. fill in seed */
     u = int_from_config(file, "client.in:7: error getting seed");
 
-    _DEBUG("ipv4:%s port:%hu trans:%s wlen:%hu seed:%d pktloss:%5.4f u:%d\n",
+    /* close the config file */
+    fclose(file);
+
+    _DEBUG("config file args below:\nipv4:%s \nport:%hu \ntrans:%s \nwlen:%hu"
+        " \nseed:%d \npktloss:%5.4f \nu:%d\n\n",
         ip4_str, knownport, transferpath, windsize, seed, pktloss, u);
 
     /* get a socket to talk to the connection server port */ 
@@ -61,11 +71,19 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    strncpy(buf, "SENDMESTUFF", sizeof(buf));
+    strncpy(buf, "SEND ACK 1 SEQ 0", sizeof(buf));
     /* flags could be MSG_DONTROUTE */ 
-    sendto(connfd, buf, strlen(buf), 0, (struct sockaddr *)&myaddr, sizeof(myaddr));
+    err = sendto(connfd, buf, strlen(buf), 0,
+        (struct sockaddr *)&myaddr, sizeof(myaddr));
+    if(err < 0){
+        perror("client.sendto()");
+        close(connfd);
+        exit(EXIT_FAILURE);
+    }
 
     printf("Sent stuff to server\n");
+
+    close(connfd);
 
     return EXIT_SUCCESS;
 }
