@@ -1,28 +1,36 @@
+#include <assert.h>
 #include "client.h"
 
 int main(void) {
-    char *path = "./client.in";
-    char transferpath[BUFF_SIZE];
-    FILE *file;
+    ssize_t err; /* for error checking */
+    char *path = "./client.in"; /* config path */
+    char transferpath[BUFF_SIZE]; /* file to transfer */
+    FILE *file; /* config file */
     char ip4_str[INET_ADDRSTRLEN];
     char buf[BUFF_SIZE + 1];
     /* config/xtcp vars */
     uint16_t windsize;
-    ssize_t err;
     int seed;
     float pktloss;
     int u; /* (!!in ms!!) mean of the exponential dist func */
 
-    /* connfd -- the main server connection socket */
-    /* servfd -- the socket "accept" server socket */
-    int connfd, servfd;
-    uint16_t knownport; /* , serv_port; */
+    /* conn_fd -- the main server connection socket */
+    /* trans_fd -- the socket "accept" server socket */
+    int conn_fd, trans_fd;
+    /* select vars */
+    fd_set rset;
+    int maxfpd1 = 0;
 
+    uint16_t knownport; /* , trans_port; */
     /* main server connection address */
-    struct sockaddr_in myaddr;
-    /* zero the sockaddr_in */
-    memset((void *)&myaddr, 0, sizeof(myaddr));
-    myaddr.sin_family = AF_INET;
+    struct sockaddr_in conn_addr;
+    /* file transfer address */
+    struct sockaddr_in trans_addr;
+    /* zero the sockaddr_in's */
+    memset((void *)&conn_addr, 0, sizeof(conn_addr));
+    memset((void *)&trans_addr, 0, sizeof(trans_addr));
+    conn_addr.sin_family = AF_INET;
+    trans_addr.sin_family = AF_INET;
 
     /* read the config */
     file = fopen(path, "r");
@@ -33,7 +41,8 @@ int main(void) {
     /* 1. fill in the server ip address */
     str_from_config(file, ip4_str, sizeof(ip4_str),
         "client.in:1: error getting IPv4 address");
-    err = inet_pton(AF_INET, ip4_str, &(myaddr.sin_addr));
+    err = inet_pton(AF_INET, ip4_str, &(conn_addr.sin_addr));
+    err = inet_pton(AF_INET, ip4_str, &(trans_addr.sin_addr));
     if(err == 0){
         fprintf(stderr, "client.inet_pton() invalid IPv4 address\n");
         fclose(file);
@@ -41,7 +50,7 @@ int main(void) {
     }
     /* 2. fill in the server port */
     knownport = (uint16_t) int_from_config(file, "client.in:2: error getting port");
-    myaddr.sin_port = htons(knownport);
+    conn_addr.sin_port = htons(knownport);
     /* 3. fill in file to transfer */
     str_from_config(file, transferpath, sizeof(transferpath),
         "client.in:3: error getting transfer file name");
@@ -63,27 +72,34 @@ int main(void) {
         ip4_str, knownport, transferpath, windsize, seed, pktloss, u);
 
     /* get a socket to talk to the connection server port */ 
-    connfd = socket(AF_INET, SOCK_DGRAM, 0);
+    conn_fd = socket(AF_INET, SOCK_DGRAM, 0);
     /* get a socket to talk to the server */ 
-    servfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if(connfd < 0 || servfd < 0){
+    trans_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(conn_fd < 0 || trans_fd < 0){
         perror("client.socket()");
         exit(EXIT_FAILURE);
     }
 
-    strncpy(buf, "SEND ACK 1 SEQ 0", sizeof(buf));
-    /* flags could be MSG_DONTROUTE */ 
-    err = sendto(connfd, buf, strlen(buf), 0,
-        (struct sockaddr *)&myaddr, sizeof(myaddr));
-    if(err < 0){
-        perror("client.sendto()");
-        close(connfd);
-        exit(EXIT_FAILURE);
+    for(;;) {
+        FD_ZERO(&rset);
+        FD_ISSET(conn_fd, &rset);
+        maxfpd1 = conn_fd + 1;
+        assert(maxfpd1);
+
+        strncpy(buf, "SEND ACK 1 SEQ 0", sizeof(buf));
+        /* flags could be MSG_DONTROUTE */
+        err = sendto(conn_fd, buf, strlen(buf), 0,
+                (struct sockaddr *) &conn_addr, sizeof(conn_addr));
+        if (err < 0) {
+            perror("client.sendto()");
+            close(conn_fd);
+            exit(EXIT_FAILURE);
+        }
+        printf("Sent connection req to server\n");
+
     }
 
-    printf("Sent stuff to server\n");
-
-    close(connfd);
+    close(conn_fd);
 
     return EXIT_SUCCESS;
 }
