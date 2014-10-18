@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "server.h"
 
 int main(int argc, const char **argv) {
@@ -52,17 +53,20 @@ int main(int argc, const char **argv) {
     //char mesg[BUFF_SIZE];
 
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(port);
+    err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
 
-    for(;;) {
+    if (err < 0) {
+        perror("server.bind()");
+        exit(EXIT_FAILURE);
+    }
 
-        bzero(&servaddr, sizeof(servaddr));
-        servaddr.sin_family = AF_INET;
-        servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-        servaddr.sin_port = htons(port);
-        err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
-        if (err < 0) {
-            perror("server.bind()");
-        }
+    int i = 1;
+    while(i--) {
+
 
         FD_ZERO(&fdset);
         FD_SET(sockfd, &fdset);
@@ -95,22 +99,59 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            _DEBUG("%s", "In child");
-            bzero(&servaddr, sizeof(servaddr));
-            servaddr.sin_family = AF_INET;
-            servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-            servaddr.sin_port = htons(0);
-            err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
-
-            /* TODO: err = clone();*/
-
-            if (err < 0) {
-                perror("child.bind()");
-            }
-
+            child(sockfd);
+            /* we should never get here */
+            fprintf(stderr, "A child is trying to use the connection select\n");
+            assert(0);
         }
     }
 
 
     return EXIT_SUCCESS;
+}
+
+int child(int parent_sock) {
+    struct sockaddr_in servaddr,cliaddr;
+    int err;
+    int sockfd;
+    ssize_t n;
+    socklen_t len;
+    char msg[BUFF_SIZE];
+
+    _DEBUG("%s", "In child");
+    sockfd = socket(AF_INET,SOCK_DGRAM,0);
+
+    bzero(&servaddr, sizeof(servaddr));
+    bzero(&cliaddr, sizeof(cliaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(0);
+
+    /*TODO: pass in ip i want*/
+    err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    if (err < 0) {
+        perror("child.bind()");
+        exit(EXIT_FAILURE);
+    }
+
+    err = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    if (err < 0) {
+        perror("child.connect()");
+        exit(EXIT_FAILURE);
+    }
+
+    /* TODO: err = close();*/
+
+    n = recvfrom(parent_sock, msg, BUFF_SIZE, 0, (struct sockaddr *)&cliaddr,&len);
+    if(n < 0) {
+        perror("child.recvfrom()");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    msg[n] = 0;
+    printf("msg in child: %s\n", msg);
+    close(sockfd);
+    exit(EXIT_SUCCESS);
 }

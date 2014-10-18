@@ -6,4 +6,6 @@
 #define DEBUG
 #include "debug.h" 
 
+int child(int parent_sock);
+
 #endif
