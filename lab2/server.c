@@ -4,12 +4,18 @@
 int main(int argc, const char **argv) {
     const char *path;
 
+    FILE *file;
     unsigned short port;
     fd_set fdset;
     long window;
     int pid;
     int err;
+    int i = 1;
 
+    int sockfd;
+    struct sockaddr_in servaddr;/*,cliaddr;
+    socklen_t len;
+    char mesg[BUFF_SIZE];*/
 
     if(argc < 2) {
         path = "./server.in";
@@ -18,8 +24,9 @@ int main(int argc, const char **argv) {
         path = argv[1];
     }
 
+    file = fopen(path, "r");
+
     /*Read the config*/
-    FILE *file = fopen(path, "r");
     if(file == NULL) {
         perror("could not open server config file");
         exit(EXIT_FAILURE);
@@ -47,11 +54,6 @@ int main(int argc, const char **argv) {
         perror("server.fclose()");
     }
 
-    int sockfd;
-    struct sockaddr_in servaddr;//,cliaddr;
-    //socklen_t len;
-    //char mesg[BUFF_SIZE];
-
     sockfd=socket(AF_INET,SOCK_DGRAM,0);
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -64,7 +66,6 @@ int main(int argc, const char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    int i = 1;
     while(i--) {
 
 
@@ -79,15 +80,15 @@ int main(int argc, const char **argv) {
         _DEBUG("%s\n", "a client is connecting");
 
 
-//    for (;;) {
-//        len = sizeof(cliaddr);
-//        n = recvfrom(sockfd,mesg,1000,0,(struct sockaddr *)&cliaddr,&len);
-//        sendto(sockfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-//        mesg[n] = 0;
-//        printf("-------------------------------------------------------\n");
-//        printf("Received the following: '%s'\n", mesg);
-//        printf("-------------------------------------------------------\n");
-//    }
+/*    for (;;) {
+        len = sizeof(cliaddr);
+        n = recvfrom(sockfd,mesg,1000,0,(struct sockaddr *)&cliaddr,&len);
+        sendto(sockfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
+        mesg[n] = 0;
+        printf("-------------------------------------------------------\n");
+        printf("Received the following: '%s'\n", mesg);
+        printf("-------------------------------------------------------\n");
+    }*/
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();

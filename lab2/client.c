@@ -26,6 +26,10 @@ int main(void) {
     struct sockaddr_in conn_addr;
     /* file transfer address */
     struct sockaddr_in trans_addr;
+
+    /*for pedantic*/
+    if(windsize || seed || u || pktloss){}
+
     /* zero the sockaddr_in's */
     memset((void *)&conn_addr, 0, sizeof(conn_addr));
     memset((void *)&trans_addr, 0, sizeof(trans_addr));
