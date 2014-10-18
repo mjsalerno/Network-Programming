@@ -25,7 +25,7 @@ int main(int argc, const char **argv) {
     }
 
     /*Get the port*/
-    port = int_from_config(file, "There was an error getting the port number");
+    port = (uint16_t) int_from_config(file, "There was an error getting the port number");
     if(port < 1) {
         fprintf(stderr, "The port can not be less than 1\n");
         exit(EXIT_FAILURE);
@@ -67,7 +67,7 @@ int main(int argc, const char **argv) {
         FD_ZERO(&fdset);
         FD_SET(sockfd, &fdset);
         err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
-        if (err < 0 || FD_ISSET(sockfd, &fdset)) {
+        if (err < 0 || !FD_ISSET(sockfd, &fdset)) {
             perror("server.select()");
             exit(EXIT_FAILURE);
         }
@@ -90,6 +90,7 @@ int main(int argc, const char **argv) {
         _DEBUG("pid: %d\n", pid);
         if (pid < 0) {
             perror("Could not fork()");
+            exit(EXIT_FAILURE);
         }
 
         /*in child*/
