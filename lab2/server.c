@@ -12,12 +12,12 @@ int main(int argc, const char **argv) {
     int err;
     int i = 1;
 
-    struct client_list* cli_list = NULL;
+/*    struct client_list* cli_list = NULL; */
 
     int sockfd;
-    struct sockaddr_in servaddr;/*,cliaddr;
+    struct sockaddr_in servaddr, cliaddr, query;
     socklen_t len;
-    char mesg[BUFF_SIZE];*/
+    char mesg[BUFF_SIZE];
 
     if(argc < 2) {
         path = "./server.in";
@@ -74,12 +74,24 @@ int main(int argc, const char **argv) {
         FD_ZERO(&fdset);
         FD_SET(sockfd, &fdset);
         err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
+
         if (err < 0 || !FD_ISSET(sockfd, &fdset)) {
             perror("server.select()");
             exit(EXIT_FAILURE);
         }
+        _DEBUG("%s\n", "a client is trying to connect");
 
-        _DEBUG("%s\n", "a client is connecting");
+        len = sizeof(cliaddr);
+        recvfrom(sockfd, mesg, sizeof(mesg), 0, (struct sockaddr *)&cliaddr, &len);
+
+        len = sizeof(query);
+        err = getsockname(sockfd, (struct sockaddr *)&query, &len);
+        if (err == -1) {
+            perror("server.getsockname()");
+        }
+
+        printf("%s:%u\n", inet_ntoa(query.sin_addr), (unsigned)ntohs(query.sin_port));
+        exit(EXIT_SUCCESS);
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();
@@ -99,6 +111,36 @@ int main(int argc, const char **argv) {
     }
 
 
+    return EXIT_SUCCESS;
+}
+
+int testmain(void) {
+
+    struct client_list* list = NULL;
+    struct client_list cli;
+    struct client_list* p;
+
+    cli.pid = 7;
+    cli.next = NULL;
+    cli.ip = "hello";
+    cli.port = 9;
+
+    p = add_client(&list, cli);
+
+    printf("---\ncli.pid: %d\ncli.ip: %s\ncli.port: %d\n", cli.pid, cli.ip, cli.port);
+    printf("---\np.pid: %d\np.ip: %s\np.port: %d\n", p->pid, p->ip, p->port);
+    printf("---\nlst.pid: %d\nlst.ip: %s\nlst.port: %d\n\n", list->pid, list->ip, list->port);
+
+    cli.pid = 10;
+    cli.next = NULL;
+    cli.ip = "bye";
+    cli.port = 10;
+
+    p = add_client(&list, cli);
+
+    printf("---\ncli.pid: %d\ncli.ip: %s\ncli.port: %d\n", cli.pid, cli.ip, cli.port);
+    printf("---\np.pid: %d\np.ip: %s\np.port: %d\n", p->pid, p->ip, p->port);
+    printf("---\nlst.pid: %d\nlst.ip: %s\nlst.port: %d\n\n", list->pid, list->ip, list->port);
     return EXIT_SUCCESS;
 }
 
