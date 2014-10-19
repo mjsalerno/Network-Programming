@@ -12,6 +12,8 @@ int main(int argc, const char **argv) {
     int err;
     int i = 1;
 
+    struct client_list* cli_list = NULL;
+
     int sockfd;
     struct sockaddr_in servaddr;/*,cliaddr;
     socklen_t len;
@@ -155,4 +157,52 @@ int child(int parent_sock) {
     printf("msg in child: %s\n", msg);
     close(sockfd);
     exit(EXIT_SUCCESS);
+}
+
+/* adds a client to the client_list struct if it does not already exist
+* returns NULL if the client was already in the list
+* returns the pointer to the struct added
+*/
+struct client_list* add_client(struct client_list** cl, struct client_list new_cli) {
+
+    /*first client*/
+    if(*cl == NULL) {
+        _DEBUG("%s\n", "add_client: first client in the list");
+        *cl = malloc(sizeof(struct client_list));
+        if(*cl == NULL) {
+            perror("add_client.malloc()");
+        }
+
+        (*cl)->port = new_cli.port;
+        (*cl)->ip = new_cli.ip;
+        (*cl)->next = NULL;
+        (*cl)->pid = -1;
+        return *cl;
+    } else {
+        /*not the first client*/
+        struct client_list* p = *cl;
+        struct client_list* prev = NULL;
+
+        do {
+
+            if(strcmp(p->ip, new_cli.ip) && p->port == new_cli.port) {
+                /*found dup*/
+                _DEBUG("%s\n", "found duplicate client, not adding");
+                return NULL;
+            }
+            prev = p;
+            p = p->next;
+
+        } while(p != NULL);
+
+        _DEBUG("%s\n", "add_client: adding client to the list");
+        p = malloc(sizeof(struct client_list));
+        p->port = new_cli.port;
+        p->ip = new_cli.ip;
+        p->next = NULL;
+        p->pid = -1;
+        prev->next = p;
+        return p;
+    }
+
 }

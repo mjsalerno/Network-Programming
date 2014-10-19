@@ -14,5 +14,6 @@ struct client_list {
 };
 
 int child(int parent_sock);
+struct client_list* add_client(struct client_list** cl, struct client_list new_cli);
 
 #endif
