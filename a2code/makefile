@@ -2,6 +2,7 @@
 CC = gcc
 
 LIBS = -lsocket -lnsl -lresolv
+LIBS =
 
 FLAGS =  -g -O2 -Wall -Wextra
 CFLAGS = $(FLAGS) 

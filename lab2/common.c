@@ -9,11 +9,11 @@ int int_from_config(FILE* file, const char* err_str) {
     return rtn;
 }
 
-float float_from_config(FILE* file, const char* err_str) {
+double double_from_config(FILE* file, const char* err_str) {
     char line[BUFF_SIZE];
-    float rtn;
+    double rtn;
     str_from_config(file, line, sizeof(line), err_str);
-    rtn = (float) atof(line);
+    rtn = atof(line);
     return rtn;
 }
 
