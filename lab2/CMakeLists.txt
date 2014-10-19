@@ -9,11 +9,13 @@ set(COMMON_SOURCE_FILES
 
 set(XTCP_SOURCE_FILES
     xtcp.c
-    xtcp.h)
+    xtcp.h
+    debug.h)
 
 set(SERVER_SOURCE_FILES
     server.c
-    server.h)
+    server.h
+    debug.h)
 
 set(CLIENT_SOURCE_FILES
    client.c

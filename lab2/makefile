@@ -11,7 +11,7 @@ all: client server
 %: %.o common.o
 	$(CC) $(FLAGS) $(LIBS) $^ -o $@
 
-%.o: %.c %.h
+%.o: %.c %.h debug.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 common.o: common.c common.h
