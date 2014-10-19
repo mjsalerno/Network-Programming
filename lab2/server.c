@@ -61,8 +61,8 @@ int main(int argc, const char **argv) {
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(port);
-    err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
 
+    err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
     if (err < 0) {
         perror("server.bind()");
         exit(EXIT_FAILURE);
@@ -80,17 +80,6 @@ int main(int argc, const char **argv) {
         }
 
         _DEBUG("%s\n", "a client is connecting");
-
-
-/*    for (;;) {
-        len = sizeof(cliaddr);
-        n = recvfrom(sockfd,mesg,1000,0,(struct sockaddr *)&cliaddr,&len);
-        sendto(sockfd,mesg,n,0,(struct sockaddr *)&cliaddr,sizeof(cliaddr));
-        mesg[n] = 0;
-        printf("-------------------------------------------------------\n");
-        printf("Received the following: '%s'\n", mesg);
-        printf("-------------------------------------------------------\n");
-    }*/
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();
