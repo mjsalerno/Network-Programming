@@ -26,6 +26,7 @@ int main(void) {
     /* peer_addr -- for getpeername() on client socket after connect */
     struct sockaddr_in my_addr, serv_addr, bind_addr, peer_addr;
 
+    /* struct xtcphdr hdr;*/ /* header for the init conn request */
     /* for pedantic */
     /* if(windsize || seed || u || p){} */
 
@@ -91,7 +92,7 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    /* call on bind'ed socket getsockname(), i.e. printsockname */
+    /* call on bind'ed socket getsockname(), i.e. print_sock_name */
     printf("client bind()'ed to -- ");
     print_sock_name(serv_fd, &bind_addr);
 
@@ -101,17 +102,20 @@ int main(void) {
         perror("client.connect()");
         exit(EXIT_FAILURE);
     }
-    /* getpeername(), print */
+
+    /* call on connect'ed socket getpeername(), i.e. print_sock_peer */
     printf("client connect()'ed to -- ");
     print_sock_peer(serv_fd, &peer_addr);
 
     strncpy(buf, "SEND ACK 1 SEQ 0", sizeof(buf));
-    /* timeout  on oldest packet */
 
-    /* simulate packet loss on sends*/
+
+    /* print_xtxphdr(&hdr); */
+    /* todo: timeout  on oldest packet */
+
+    /* simulate packet loss on sends */
     if(drand48() > p) {
-        err = sendto(serv_fd, buf, strlen(buf), 0,
-                (struct sockaddr *) &serv_addr, sizeof(serv_addr));
+        err = send(serv_fd, buf, strlen(buf), 0);
         if (err < 0) {
             perror("client.sendto()");
             close(serv_fd);
@@ -128,7 +132,6 @@ int main(void) {
 
         /* todo: liveliness timer? */
         select(maxfpd1, &rset, NULL, NULL, NULL);
-
     }
 
     close(serv_fd);

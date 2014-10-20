@@ -11,6 +11,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include "xtcp.h"
 
 #define BUFF_SIZE 256
 
