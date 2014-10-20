@@ -132,6 +132,8 @@ int main(void) {
 
         /* todo: liveliness timer? */
         select(maxfpd1, &rset, NULL, NULL, NULL);
+        _DEBUG("%s\n", "got SYN or something");
+        break;
     }
 
     close(serv_fd);
