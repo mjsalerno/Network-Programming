@@ -1,6 +1,11 @@
 #include "client.h"
 
 int main(void) {
+    /*stuff mike added*/
+    socklen_t len;
+    ssize_t n;
+    /*stuff mike added*/
+
     ssize_t err; /* for error checking */
     char *path = "./client.in"; /* config path */
     char transferpath[BUFF_SIZE]; /* file to transfer */
@@ -132,8 +137,15 @@ int main(void) {
 
         /* todo: liveliness timer? */
         select(maxfpd1, &rset, NULL, NULL, NULL);
+
+        /*stuff mike added*/
         _DEBUG("%s\n", "got SYN or something");
+        len = sizeof(serv_addr);
+        n = recvfrom(serv_fd, buf, sizeof(buf), 0, (struct sockaddr *)&serv_addr, &len);
+        buf[n] = 0;
+        printf("new port: %s\n", buf);
         break;
+        /*stuff mike added*/
     }
 
     close(serv_fd);
