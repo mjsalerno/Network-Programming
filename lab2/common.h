@@ -17,6 +17,6 @@
 int int_from_config(FILE* file, const char* err_str);
 double double_from_config(FILE* file, const char* err_str);
 void str_from_config(FILE* file, char *line, int len, const char* err_str);
-void printsockname(int sockfd, struct sockaddr_in *addr, socklen_t *len);
+void print_sock_name(int sockfd, struct sockaddr_in *addr);
 
 #endif
