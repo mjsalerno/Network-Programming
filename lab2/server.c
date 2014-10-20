@@ -15,7 +15,7 @@ int main(int argc, const char **argv) {
 /*    struct client_list* cli_list = NULL; */
 
     int sockfd;
-    struct sockaddr_in servaddr, cliaddr, query;
+    struct sockaddr_in servaddr, cliaddr;
     socklen_t len;
     char mesg[BUFF_SIZE];
 
@@ -56,17 +56,25 @@ int main(int argc, const char **argv) {
         perror("server.fclose()");
     }
 
-    sockfd=socket(AF_INET,SOCK_DGRAM,0);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(port);
+    /*servaddr.sin_addr.s_addr = htonl(INADDR_ANY);*/
+    inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
 
     err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
     if (err < 0) {
         perror("server.bind()");
         exit(EXIT_FAILURE);
     }
+
+    len = sizeof(servaddr);
+    err = getsockname(sockfd, (struct sockaddr *)&servaddr, &len);
+    if(err < 0) {
+        perror("server.getsockname()");
+    }
+    printf("%s:%u\n", inet_ntoa(servaddr.sin_addr), (unsigned)ntohs(servaddr.sin_port));
 
     while(i--) {
 
@@ -83,14 +91,6 @@ int main(int argc, const char **argv) {
 
         len = sizeof(cliaddr);
         recvfrom(sockfd, mesg, sizeof(mesg), 0, (struct sockaddr *)&cliaddr, &len);
-
-        len = sizeof(query);
-        err = getsockname(sockfd, (struct sockaddr *)&query, &len);
-        if (err == -1) {
-            perror("server.getsockname()");
-        }
-
-        printf("%s:%u\n", inet_ntoa(query.sin_addr), (unsigned)ntohs(query.sin_port));
         exit(EXIT_SUCCESS);
 
         _DEBUG("%s\n", "server.fork()");
@@ -153,7 +153,7 @@ int child(int parent_sock) {
     char msg[BUFF_SIZE];
 
     _DEBUG("%s", "In child");
-    sockfd = socket(AF_INET,SOCK_DGRAM,0);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
     bzero(&servaddr, sizeof(servaddr));
     bzero(&cliaddr, sizeof(cliaddr));
