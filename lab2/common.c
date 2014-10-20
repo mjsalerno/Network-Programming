@@ -38,7 +38,7 @@ void str_from_config(FILE* file, char *line, int len, const char* err_str) {
 }
 
 /* pass a bind'ed socket and a pointer to sockaddr_in addr */
-void print_sock_name(int sockfd, struct sockaddr_in *addr){
+void print_sock_name(int sockfd, struct sockaddr_in *addr) {
     int err;
     socklen_t len;
     char ip4_str[INET_ADDRSTRLEN];
@@ -66,7 +66,7 @@ void print_sock_peer(int sockfd, struct sockaddr_in *addr){
     memset((void *)addr, 0, len);
     err = getpeername(sockfd, (struct sockaddr *)addr, &len);
     if(err < 0){
-        perror("common.print_sock_peer.getsockname()");
+        perror("common.print_sock_peer.getpeername()");
         exit(EXIT_FAILURE);
     }
     len = sizeof(ip4_str);
