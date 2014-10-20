@@ -1,4 +1,3 @@
-#include <assert.h>
 #include "client.h"
 
 int main(void) {
@@ -14,27 +13,30 @@ int main(void) {
     double p; /* packet loss percentage */
     double u; /* (!!in ms!!) mean of the exponential dist func */
 
-    /* conn_fd -- the main server connection socket */
-    /* trans_fd -- the socket "accept" server socket */
-    int conn_fd, trans_fd;
+    /* serv_fd -- the main server connection socket, reconnected later */
+    int serv_fd;
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
 
     uint16_t knownport; /* , trans_port; */
-    /* main server connection address */
-    struct sockaddr_in conn_addr;
-    /* file transfer address */
-    struct sockaddr_in trans_addr;
+    /* my_addr -- my (client) address */
+    /* serv_addr -- main server connection address */
+    /* bind_addr -- for getsockname() on client socket after bind */
+    /* peer_addr -- for getpeername() on client socket after connect */
+    struct sockaddr_in my_addr, serv_addr, bind_addr, peer_addr;
 
     /* for pedantic */
     /* if(windsize || seed || u || p){} */
 
     /* zero the sockaddr_in's */
-    memset((void *)&conn_addr, 0, sizeof(conn_addr));
-    memset((void *)&trans_addr, 0, sizeof(trans_addr));
-    conn_addr.sin_family = AF_INET;
-    trans_addr.sin_family = AF_INET;
+    memset((void *)&my_addr, 0, sizeof(my_addr));
+    memset((void *)&serv_addr, 0, sizeof(serv_addr));
+    my_addr.sin_family = AF_INET;
+    /* my IP defaults to "arbitrary" when server non_local */
+    my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    my_addr.sin_port = htons(0);
+    serv_addr.sin_family = AF_INET;
 
     /* read the config */
     file = fopen(path, "r");
@@ -45,13 +47,7 @@ int main(void) {
     /* 1. fill in the server ip address */
     str_from_config(file, ip4_str, sizeof(ip4_str),
         "client.in:1: error getting IPv4 address");
-    err = inet_pton(AF_INET, ip4_str, &(conn_addr.sin_addr));
-    if(err <= 0){
-        fprintf(stderr, "client.inet_pton() invalid IPv4 address\n");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-    err = inet_pton(AF_INET, ip4_str, &(trans_addr.sin_addr));
+    err = inet_pton(AF_INET, ip4_str, &(serv_addr.sin_addr));
     if(err <= 0){
         fprintf(stderr, "client.inet_pton() invalid IPv4 address\n");
         fclose(file);
@@ -59,7 +55,7 @@ int main(void) {
     }
     /* 2. fill in the server port */
     knownport = (uint16_t) int_from_config(file, "client.in:2: error getting port");
-    conn_addr.sin_port = htons(knownport);
+    serv_addr.sin_port = htons(knownport);
     /* 3. fill in file to transfer */
     str_from_config(file, transferpath, sizeof(transferpath),
         "client.in:3: error getting transfer file name");
@@ -82,40 +78,60 @@ int main(void) {
             "windsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
         ip4_str, knownport, transferpath, windsize, seed, p, u);
 
-    /* get a socket to talk to the connection server port */ 
-    conn_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    /* get a socket to talk to the server */ 
-    trans_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if(conn_fd < 0 || trans_fd < 0){
-        perror("client.socket()");
+    /* get a socket to talk to the server */
+    serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(serv_fd < 0){
+        perror("client.bind()");
+        exit(EXIT_FAILURE);
+    }
+    /* bind to my ip */
+    err = bind(serv_fd, (struct sockaddr *)&my_addr, sizeof(my_addr));
+    if(err < 0){
+        perror("client.bind()");
         exit(EXIT_FAILURE);
     }
 
+    /* call on bind'ed socket getsockname(), i.e. printsockname */
+    printf("client bind()'ed to -- ");
+    print_sock_name(serv_fd, &bind_addr);
+
+    /* connect to server ip */
+    err = connect(serv_fd, (const struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    if(err < 0){
+        perror("client.connect()");
+        exit(EXIT_FAILURE);
+    }
+    /* getpeername(), print */
+    printf("client connect()'ed to -- ");
+    print_sock_peer(serv_fd, &peer_addr);
+
+    strncpy(buf, "SEND ACK 1 SEQ 0", sizeof(buf));
+    /* timeout  on oldest packet */
+
+    /* simulate packet loss on sends*/
+    if(drand48() > p) {
+        err = sendto(serv_fd, buf, strlen(buf), 0,
+                (struct sockaddr *) &serv_addr, sizeof(serv_addr));
+        if (err < 0) {
+            perror("client.sendto()");
+            close(serv_fd);
+            exit(EXIT_FAILURE);
+        }
+        printf("Sent connection req to server\n");
+    }
+
+    /* select() for(ever) for SYN */
     for(;;) {
         FD_ZERO(&rset);
-        FD_SET(conn_fd, &rset);
-        maxfpd1 = conn_fd + 1;
-        assert(maxfpd1);
+        FD_SET(serv_fd, &rset);
+        maxfpd1 = serv_fd + 1;
 
-        strncpy(buf, "SEND ACK 1 SEQ 0", sizeof(buf));
-        /* flags could be MSG_DONTROUTE */
-        /* timeout  on oldest packet */
-
-        /* simulate packet loss on sends*/
-        if(drand48() > p) {
-            err = sendto(conn_fd, buf, strlen(buf), 0,
-                    (struct sockaddr *) &conn_addr, sizeof(conn_addr));
-            if (err < 0) {
-                perror("client.sendto()");
-                close(conn_fd);
-                exit(EXIT_FAILURE);
-            }
-            printf("Sent connection req to server\n");
-        }
+        /* todo: liveliness timer? */
+        select(maxfpd1, &rset, NULL, NULL, NULL);
 
     }
 
-    close(conn_fd);
+    close(serv_fd);
 
     return EXIT_SUCCESS;
 }
