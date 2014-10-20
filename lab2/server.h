@@ -13,7 +13,7 @@ struct client_list {
     struct client_list* next;
 };
 
-int child(int parent_sock, struct sockaddr_in par_addr);
+int child(int par_sock, struct sockaddr_in par_addr, struct sockaddr_in cli_addr);
 struct client_list* add_client(struct client_list** cl, struct client_list new_cli);
 
 #endif

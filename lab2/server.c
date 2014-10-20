@@ -104,7 +104,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(sockfd, servaddr);
+            child(sockfd, servaddr,cliaddr);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -145,8 +145,8 @@ int testmain(void) {
     return EXIT_SUCCESS;
 }
 
-int child(int par_sock, struct sockaddr_in par_addr) {
-    struct sockaddr_in servaddr,cliaddr;
+int child(int par_sock, struct sockaddr_in par_addr, struct sockaddr_in cli_addr) {
+    struct sockaddr_in childaddr, cliaddr;
     int err;
     int sockfd;
     ssize_t n;
@@ -156,21 +156,21 @@ int child(int par_sock, struct sockaddr_in par_addr) {
     _DEBUG("%s\n", "In child");
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-    bzero(&servaddr, sizeof(servaddr));
+    bzero(&childaddr, sizeof(childaddr));
     bzero(&cliaddr, sizeof(cliaddr));
 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(0);
+    childaddr.sin_family = AF_INET;
+    childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    childaddr.sin_port = htons(0);
 
     /*TODO: pass in ip i want*/
-    err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    err = bind(sockfd, (struct sockaddr *) &childaddr, sizeof(childaddr));
     if (err < 0) {
         perror("child.bind()");
         exit(EXIT_FAILURE);
     }
 
-    err = connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    err = connect(sockfd, (struct sockaddr *) &cli_addr, sizeof(cli_addr));
     if (err < 0) {
         perror("child.connect()");
         exit(EXIT_FAILURE);
@@ -179,7 +179,7 @@ int child(int par_sock, struct sockaddr_in par_addr) {
     /*TODO: send port number*/
     _DEBUG("%s\n", "sending port ...");
     len = sizeof(par_addr);
-    n = sendto(par_sock, "MAH POORT IS -4", 16, 0, (struct sockaddr const *)&par_addr, len);
+    n = sendto(par_sock, "MAH POORT IS -4", 16, 0, (struct sockaddr const *)&cli_addr, len);
     if (n < 1) {
         perror("child.send(port)");
     }
@@ -188,7 +188,8 @@ int child(int par_sock, struct sockaddr_in par_addr) {
     /* TODO: print out who i am connected to*/
 
     /*FIXME: not binding on the right thing*/
-    n = recvfrom(par_sock, msg, BUFF_SIZE, 0, (struct sockaddr *)&cliaddr,&len);
+    len = sizeof(childaddr);
+    n = recvfrom(sockfd, msg, sizeof(msg), 0, (struct sockaddr *)&childaddr,&len);
     if(n < 0) {
         perror("child.recvfrom()");
         close(sockfd);
