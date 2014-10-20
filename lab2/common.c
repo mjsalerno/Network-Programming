@@ -37,18 +37,20 @@ void str_from_config(FILE* file, char *line, int len, const char* err_str) {
     }
 }
 
-/* pass a bind'ed socket, pointer to sockaddr_in, and ptr to length of addr */
-void printsockname(int sockfd, struct sockaddr_in *addr, socklen_t *len){
+/* pass a bind'ed socket and a pointer to sockaddr_in addr*/
+void print_sock_name(int sockfd, struct sockaddr_in *addr){
     int err;
+    socklen_t len;
     char ip4_str[INET_ADDRSTRLEN];
-    memset((void *)addr, 0, *len);
-    err = getsockname(sockfd, (struct sockaddr *)addr, len);
+    len = sizeof(struct sockaddr_in);
+    memset((void *)addr, 0, len);
+    err = getsockname(sockfd, (struct sockaddr *)addr, &len);
     if(err < 0){
         perror("common.getsockname()");
         exit(EXIT_FAILURE);
     }
-    *len = sizeof(ip4_str);
-    if(NULL == inet_ntop(AF_INET, (void *)&(addr->sin_addr), ip4_str, *len)){
+    len = sizeof(ip4_str);
+    if(NULL == inet_ntop(AF_INET, (void *)&(addr->sin_addr), ip4_str, len)){
         perror("common.inet_ntop()");
         exit(EXIT_FAILURE);
     }
