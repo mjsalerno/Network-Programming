@@ -15,7 +15,7 @@ int main(int argc, const char **argv) {
 /*    struct client_list* cli_list = NULL; */
 
     int sockfd;
-    struct sockaddr_in servaddr, cliaddr;
+    struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
     socklen_t len;
     char mesg[BUFF_SIZE];
 
@@ -69,12 +69,7 @@ int main(int argc, const char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    len = sizeof(servaddr);
-    err = getsockname(sockfd, (struct sockaddr *)&servaddr, &len);
-    if(err < 0) {
-        perror("server.getsockname()");
-    }
-    printf("%s:%u\n", inet_ntoa(servaddr.sin_addr), (unsigned)ntohs(servaddr.sin_port));
+    print_sock_name(sockfd, &p_serveraddr);
 
     while(i--) {
 
@@ -91,7 +86,6 @@ int main(int argc, const char **argv) {
 
         len = sizeof(cliaddr);
         recvfrom(sockfd, mesg, sizeof(mesg), 0, (struct sockaddr *)&cliaddr, &len);
-        exit(EXIT_SUCCESS);
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();
@@ -122,7 +116,7 @@ int testmain(void) {
 
     cli.pid = 7;
     cli.next = NULL;
-    cli.ip = "hello";
+    strncpy(cli.ip, "hello", INET_ADDRSTRLEN);
     cli.port = 9;
 
     p = add_client(&list, cli);
@@ -133,7 +127,7 @@ int testmain(void) {
 
     cli.pid = 10;
     cli.next = NULL;
-    cli.ip = "bye";
+    strncpy(cli.ip, "bye", INET_ADDRSTRLEN);
     cli.port = 10;
 
     p = add_client(&list, cli);
@@ -205,7 +199,7 @@ struct client_list* add_client(struct client_list** cl, struct client_list new_c
         }
 
         (*cl)->port = new_cli.port;
-        (*cl)->ip = new_cli.ip;
+        strncpy(new_cli.ip, (*cl)->ip, INET_ADDRSTRLEN);
         (*cl)->next = NULL;
         (*cl)->pid = -1;
         return *cl;
@@ -229,7 +223,7 @@ struct client_list* add_client(struct client_list** cl, struct client_list new_c
         _DEBUG("%s\n", "add_client: adding client to the list");
         p = malloc(sizeof(struct client_list));
         p->port = new_cli.port;
-        p->ip = new_cli.ip;
+        strncpy(new_cli.ip, p->ip, INET_ADDRSTRLEN);
         p->next = NULL;
         p->pid = -1;
         prev->next = p;

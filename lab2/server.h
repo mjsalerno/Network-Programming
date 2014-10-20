@@ -7,7 +7,7 @@
 #include "debug.h"
 
 struct client_list {
-    char* ip;
+    char ip[INET_ADDRSTRLEN];
     uint16_t port;
     pid_t pid;
     struct client_list* next;
