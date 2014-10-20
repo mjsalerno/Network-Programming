@@ -93,7 +93,7 @@ int main(void) {
 
     for(;;) {
         FD_ZERO(&rset);
-        FD_ISSET(conn_fd, &rset);
+        FD_SET(conn_fd, &rset);
         maxfpd1 = conn_fd + 1;
         assert(maxfpd1);
 
