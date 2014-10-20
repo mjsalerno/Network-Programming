@@ -1,5 +1,3 @@
-#include "common.h"
-
 #define FIN 0x1
 #define SYN 0x2
 #define RST 0x4
@@ -13,3 +11,7 @@ struct xtcphdr {
     uint16_t win_size;
 
 };
+
+void print_xtxphdr(struct xtcphdr *hdr);
+
+
