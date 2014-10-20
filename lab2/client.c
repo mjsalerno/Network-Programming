@@ -141,9 +141,9 @@ int main(void) {
         /*stuff mike added*/
         _DEBUG("%s\n", "got SYN or something");
         len = sizeof(serv_addr);
-        n = recvfrom(serv_fd, buf, sizeof(buf), 0, (struct sockaddr *)&serv_addr, &len);
+        n = recvfrom(serv_fd, buf, 2, 0, (struct sockaddr *)&serv_addr, &len);
         buf[n] = 0;
-        printf("new port: %s\n", buf);
+        printf("new port: %hu\n", (unsigned short)*buf);
         break;
         /*stuff mike added*/
     }

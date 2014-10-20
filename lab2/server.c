@@ -104,7 +104,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(sockfd, servaddr,cliaddr);
+            child(sockfd, cliaddr);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -145,7 +145,7 @@ int testmain(void) {
     return EXIT_SUCCESS;
 }
 
-int child(int par_sock, struct sockaddr_in par_addr, struct sockaddr_in cli_addr) {
+int child(int par_sock, struct sockaddr_in cli_addr) {
     struct sockaddr_in childaddr, cliaddr;
     int err;
     int sockfd;
@@ -178,8 +178,21 @@ int child(int par_sock, struct sockaddr_in par_addr, struct sockaddr_in cli_addr
 
     /*TODO: send port number*/
     _DEBUG("%s\n", "sending port ...");
-    len = sizeof(par_addr);
-    n = sendto(par_sock, "MAH POORT IS -4", 16, 0, (struct sockaddr const *)&cli_addr, len);
+
+    len = sizeof(childaddr);
+    err = getsockname(sockfd, (struct sockaddr *)&childaddr, &len);
+    if(err < 0) {
+        perror("child.getsockname()");
+        exit(EXIT_FAILURE);
+    }
+    _DEBUG("port in netowrk format: %hu\n", childaddr.sin_port);
+
+    printf("child bound to: ");
+    print_sock_name(sockfd, &childaddr);
+    printf("\nchild connected to: ");
+    print_sock_peer(sockfd, &cli_addr);
+    printf("\n");
+    n = sendto(par_sock, &childaddr.sin_port, 2, 0, (struct sockaddr const *)&cli_addr, len);
     if (n < 1) {
         perror("child.send(port)");
     }

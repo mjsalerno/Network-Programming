@@ -45,7 +45,7 @@ void print_sock_name(int sockfd, struct sockaddr_in *addr) {
     len = sizeof(struct sockaddr_in);
     memset((void *)addr, 0, len);
     err = getsockname(sockfd, (struct sockaddr *)addr, &len);
-    if(err < 0){
+    if(err < 0) {
         perror("common.print_sock_name.getsockname()");
         exit(EXIT_FAILURE);
     }
@@ -65,7 +65,7 @@ void print_sock_peer(int sockfd, struct sockaddr_in *addr){
     len = sizeof(struct sockaddr_in);
     memset((void *)addr, 0, len);
     err = getpeername(sockfd, (struct sockaddr *)addr, &len);
-    if(err < 0){
+    if(err < 0) {
         perror("common.print_sock_peer.getpeername()");
         exit(EXIT_FAILURE);
     }
