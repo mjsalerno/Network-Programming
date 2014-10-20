@@ -10,7 +10,8 @@ int main(int argc, const char **argv) {
     long window;
     int pid;
     int err;
-    int i = 1;
+    ssize_t n;
+/*    int i = 1;*/
 
 /*    struct client_list* cli_list = NULL; */
 
@@ -71,8 +72,7 @@ int main(int argc, const char **argv) {
 
     print_sock_name(sockfd, &p_serveraddr);
 
-    while(i--) {
-
+    while(1) {
 
         FD_ZERO(&fdset);
         FD_SET(sockfd, &fdset);
@@ -83,9 +83,16 @@ int main(int argc, const char **argv) {
             exit(EXIT_FAILURE);
         }
         _DEBUG("%s\n", "a client is trying to connect");
+        /* TODO: figure out if I this is a client that is already connected */
 
+        /*get filename*/
         len = sizeof(cliaddr);
-        recvfrom(sockfd, mesg, sizeof(mesg), 0, (struct sockaddr *)&cliaddr, &len);
+        n = recvfrom(sockfd, mesg, sizeof(mesg), 0, (struct sockaddr *)&cliaddr, &len);
+        if(n < -1) {
+            perror("server.recvfrom()");
+        }
+        mesg[n] = 0;
+        _DEBUG("Got filename: %s\n", mesg);
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();
@@ -169,9 +176,19 @@ int child(int par_sock, struct sockaddr_in par_addr) {
         exit(EXIT_FAILURE);
     }
 
-    /* TODO: err = close();*/
+    /*TODO: send port number*/
+    _DEBUG("%s\n", "sending port ...");
+    len = sizeof(par_addr);
+    n = sendto(par_sock, "MAH POORT IS -4", 16, 0, (struct sockaddr const *)&par_addr, len);
+    if (n < 1) {
+        perror("child.send(port)");
+    }
 
-    n = recvfrom(parent_sock, msg, BUFF_SIZE, 0, (struct sockaddr *)&cliaddr,&len);
+    /* TODO: err = close(everything);*/
+    /* TODO: print out who i am connected to*/
+
+    /*FIXME: not binding on the right thing*/
+    n = recvfrom(par_sock, msg, BUFF_SIZE, 0, (struct sockaddr *)&cliaddr,&len);
     if(n < 0) {
         perror("child.recvfrom()");
         close(sockfd);
