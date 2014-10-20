@@ -97,7 +97,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(sockfd);
+            child(sockfd, servaddr);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -138,7 +138,7 @@ int testmain(void) {
     return EXIT_SUCCESS;
 }
 
-int child(int parent_sock) {
+int child(int par_sock, struct sockaddr_in par_addr) {
     struct sockaddr_in servaddr,cliaddr;
     int err;
     int sockfd;
@@ -146,7 +146,7 @@ int child(int parent_sock) {
     socklen_t len;
     char msg[BUFF_SIZE];
 
-    _DEBUG("%s", "In child");
+    _DEBUG("%s\n", "In child");
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
     bzero(&servaddr, sizeof(servaddr));
@@ -181,6 +181,7 @@ int child(int parent_sock) {
     msg[n] = 0;
     printf("msg in child: %s\n", msg);
     close(sockfd);
+    _DEBUG("%s\n", "Exiting child");
     exit(EXIT_SUCCESS);
 }
 
