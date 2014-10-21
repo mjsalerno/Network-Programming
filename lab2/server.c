@@ -1,6 +1,8 @@
 #include <assert.h>
 #include "server.h"
 
+struct client_list* cliList;
+
 int main(int argc, const char **argv) {
     const char *path;
 
@@ -11,14 +13,15 @@ int main(int argc, const char **argv) {
     int pid;
     int err;
     ssize_t n;
+    struct client_list* newCli;
 /*    int i = 1;*/
-
-/*    struct client_list* cli_list = NULL; */
 
     int sockfd;
     struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
     socklen_t len;
     char mesg[BUFF_SIZE];
+
+    cliList = NULL;
 
     if(argc < 2) {
         path = "./server.in";
@@ -83,7 +86,6 @@ int main(int argc, const char **argv) {
             exit(EXIT_FAILURE);
         }
         _DEBUG("%s\n", "a client is trying to connect");
-        /* TODO: figure out if I this is a client that is already connected */
 
         /*get filename*/
         len = sizeof(cliaddr);
@@ -91,6 +93,14 @@ int main(int argc, const char **argv) {
         if(n < -1) {
             perror("server.recvfrom()");
         }
+
+        /* TODO: figure out if I this is a client that is already connected */
+        newCli = add_client(cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
+        if(newCli == NULL) {
+            _DEBUG("%s\n", "Server: dup clinet, not doing anything");
+            continue;
+        }
+
         mesg[n] = 0;
         _DEBUG("Got filename: %s\n", mesg);
 
