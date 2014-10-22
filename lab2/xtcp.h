@@ -10,17 +10,23 @@
 #define RST 0x4
 #define ACK 0x8
 
+#define DATAOFFSET 12
+
 struct xtcphdr {
 
     uint32_t seq;
     uint32_t ack_seq;
     uint16_t flags;
     uint16_t advwin;
-    char data[500];
 };
 
 void print_xtxphdr(struct xtcphdr *hdr);
-void make_xtcphdr(struct xtcphdr *hdr, uint32_t seq, uint32_t ack_seq,
-        uint16_t flags, uint16_t advwin, char *data, size_t datalen);
+/*
+Example:
+void *segment = malloc(sizeof(struct xtcphdr) + datalen)
+make_xtcphdr(segment, .....)
+ */
+void make_xtcphdr(void *hdr, uint32_t seq, uint32_t ack_seq,
+        uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
 #endif /*XTCP_H*/

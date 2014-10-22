@@ -7,11 +7,12 @@ void print_xtxphdr(struct xtcphdr *hdr) {
     printf("advwin  : %u\n", hdr->advwin);
 }
 
-void make_xtcphdr(struct xtcphdr *hdr, uint32_t seq, uint32_t ack_seq,
-        uint16_t flags, uint16_t advwin, char *data, size_t datalen){
-    hdr->seq = seq;
-    hdr->flags = flags;
-    hdr->ack_seq = ack_seq;
-    hdr->advwin = advwin;
-    memcpy(( (char*)(hdr) + 12), data, datalen);
+void make_xtcphdr(void *hdr, uint32_t seq, uint32_t ack_seq,
+        uint16_t flags, uint16_t advwin, void *data, size_t datalen){
+    struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
+    realhdr->seq = seq;
+    realhdr->flags = flags;
+    realhdr->ack_seq = ack_seq;
+    realhdr->advwin = advwin;
+    memcpy(( (char*)(hdr) + DATAOFFSET), data, datalen);
 }
