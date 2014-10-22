@@ -1,3 +1,4 @@
+#include <geos_c.h>
 #include "client.h"
 
 int main(void) {
@@ -115,6 +116,12 @@ int main(void) {
         close(serv_fd);
         exit(EXIT_FAILURE);
     }
+    err = handshake_third(p, serv_fd);
+    if(err < 0){
+        /* todo: clean up, close?, free?*/
+        close(serv_fd);
+        exit(EXIT_FAILURE);
+    }
 
     close(serv_fd);
 
@@ -123,14 +130,13 @@ int main(void) {
 
 int handshake_first_sec(double p, int serv_fd, struct sockaddr_in *serv_addr){
     char buf[BUFF_SIZE + 1];
-    char ip4_str[INET_ADDRSTRLEN];
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
 
     ssize_t n, err;
 
-    strncpy(buf, "SEND ACK 1 SEQ 0", sizeof(buf));
+    strncpy(buf, "SYN SEQ 1", sizeof(buf));
 
 
     /* todo: print_xtxphdr(&hdr); */
@@ -144,10 +150,14 @@ int handshake_first_sec(double p, int serv_fd, struct sockaddr_in *serv_addr){
             close(serv_fd);
             exit(EXIT_FAILURE);
         }
-        printf("sent connection req to server\n");
+        printf("sent first handsake (SYN)\n");
+    }
+    else{
+        printf("dropped first handsake (SYN)\n");
     }
 
     /* select() for(ever) for SYN */
+    /* todo: timeout for dropped packets! */
     for(;;) {
         in_port_t newport;
         FD_ZERO(&rset);
@@ -170,16 +180,8 @@ int handshake_first_sec(double p, int serv_fd, struct sockaddr_in *serv_addr){
             serv_addr->sin_port = newport; /* set the new port */
             serv_addr->sin_family = AF_INET;
             /* re connect() with new port */
-            printf("serv_addr->sin_family: %d (AF_INET=%d)\n", serv_addr->sin_family, AF_INET);
-            /* fixme: disconnecting socket first doesn't help */
 
-            if(NULL == inet_ntop(AF_INET, (void *)&(serv_addr->sin_addr), ip4_str, sizeof(ip4_str))){
-                perror("inet_ntop()");
-                return -1;
-            }
-            printf("connect addr: %s:%hu\n", ip4_str, ntohs(serv_addr->sin_port));
-
-            err = connect(serv_fd, (const struct sockaddr*)&serv_addr, sizeof(struct sockaddr));
+            err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
             if (err < 0) {
                 perror("re connect()");
                 return -1;
@@ -190,8 +192,31 @@ int handshake_first_sec(double p, int serv_fd, struct sockaddr_in *serv_addr){
     }
 }
 
-/*
-int handshake_second(int serv_fd, struct sockaddr_in* serv_addr){
+int handshake_third(double p, int serv_fd){
+    char buf[BUFF_SIZE + 1];
+    ssize_t err;
+
+    strncpy(buf, "ACK ACK 2 SEQ 2", sizeof(buf));
+
+
+    /* todo: print_xtxphdr(&hdr); */
+    /* todo: timeout  on oldest packet */
+
+    /* simulate packet loss on sends */
+    if(drand48() > p) {
+        err = send(serv_fd, buf, strlen(buf), 0);
+        if (err < 0) {
+            perror("sendto()");
+            close(serv_fd);
+            exit(EXIT_FAILURE);
+        }
+        printf("sent third handsake (SYN)\n");
+    }
+    else{
+        printf("dropped third handsake (SYN)\n");
+    }
     return 0;
-}*/
+}
+
+
 
