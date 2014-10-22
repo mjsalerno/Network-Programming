@@ -22,13 +22,15 @@ set(CLIENT_SOURCE_FILES
    client.h)
 
 add_library(commonlib OBJECT ${COMMON_SOURCE_FILES})
-#add_library(xtcp OBJECT ${XTCP_SOURCE_FILES})
+add_library(xtcplib OBJECT ${XTCP_SOURCE_FILES})
 
 add_executable(server
 	${SERVER_SOURCE_FILES}
-	$<TARGET_OBJECTS:commonlib>)
+	$<TARGET_OBJECTS:commonlib>
+	$<TARGET_OBJECTS:xtcplib>)
 
 add_executable(client
 	${CLIENT_SOURCE_FILES}
-	$<TARGET_OBJECTS:commonlib>)
+	$<TARGET_OBJECTS:commonlib>
+	$<TARGET_OBJECTS:xtcplib>)
 

@@ -8,13 +8,16 @@ all: client server
 
 %: %.c
 
-%: %.o common.o
+%: %.o common.o xtcp.o
 	$(CC) $(FLAGS) $(LIBS) $^ -o $@
 
 %.o: %.c %.h debug.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 common.o: common.c common.h
+	$(CC) $(FLAGS) -c $< -o $@
+
+xtcp.o: xtcp.c xtcp.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
