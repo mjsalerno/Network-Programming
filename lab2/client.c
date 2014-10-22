@@ -1,4 +1,3 @@
-#include <geos_c.h>
 #include "client.h"
 
 int main(void) {
