@@ -95,7 +95,7 @@ int main(int argc, const char **argv) {
         }
 
         /* TODO: figure out if I this is a client that is already connected */
-        newCli = add_client(cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
+        newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
         if(newCli == NULL) {
             _DEBUG("%s\n", "Server: dup clinet, not doing anything");
             continue;
