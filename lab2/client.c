@@ -139,11 +139,11 @@ int main(void) {
         select(maxfpd1, &rset, NULL, NULL, NULL);
 
         /*stuff mike added*/
-        _DEBUG("%s\n", "got SYN or something");
+        _DEBUG("%s\n", "got SYN-ACK or something, next recvfrom ...");
         len = sizeof(serv_addr);
-        n = recvfrom(serv_fd, buf, 2, 0, (struct sockaddr *)&serv_addr, &len);
+        n = recvfrom(serv_fd, buf, sizeof(buf), 0, (struct sockaddr *)&serv_addr, &len);
         buf[n] = 0;
-        printf("new port: %hu\n", (unsigned short)*buf);
+        printf("new port: %hu\n", *((unsigned short *)buf));
         break;
         /*stuff mike added*/
     }
