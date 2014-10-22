@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #ifndef XTCP_H
 #define XTCP_H
@@ -14,10 +15,12 @@ struct xtcphdr {
     uint32_t seq;
     uint32_t ack_seq;
     uint16_t flags;
-    uint16_t win_size;
+    uint16_t advwin;
     char data[500];
 };
 
 void print_xtxphdr(struct xtcphdr *hdr);
+void make_xtcphdr(struct xtcphdr *hdr, uint32_t seq, uint32_t ack_seq,
+        uint16_t flags, uint16_t advwin, char *data, size_t datalen);
 
 #endif /*XTCP_H*/
