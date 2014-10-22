@@ -158,8 +158,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cli_addr) {
 
     childaddr.sin_family = AF_INET;
     childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    /*childaddr.sin_port = htons(0);*/
-    childaddr.sin_port = htons(10000);
+    childaddr.sin_port = htons(0);
 
     /*TODO: pass in ip i want*/
     err = bind(sockfd, (struct sockaddr *) &childaddr, sizeof(childaddr));
