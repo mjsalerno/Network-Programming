@@ -147,9 +147,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cli_addr) {
     struct sockaddr_in childaddr, cliaddr;
     int err;
     int sockfd;
-    ssize_t n;
     socklen_t len;
-    char msg[BUFF_SIZE];
 
     _DEBUG("%s\n", "In child");
     _DEBUG("child.filename: %s\n", fname);
@@ -182,7 +180,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cli_addr) {
         perror("child.getsockname()");
         exit(EXIT_FAILURE);
     }
-    _DEBUG("port in netowrk format: %hu\n", childaddr.sin_port);
+    _DEBUG("port in network format: %hu\n", childaddr.sin_port);
 
     printf("child bound to: ");
     print_sock_name(sockfd, &childaddr);
@@ -191,22 +189,16 @@ int child(char* fname, int par_sock, struct sockaddr_in cli_addr) {
     printf("\n");
 
     _DEBUG("%s\n", "doing hs2 ...");
-    hand_shake2(par_sock, cli_addr, sockfd, childaddr);
+    err = hand_shake2(par_sock, cli_addr, sockfd, childaddr);
+    if(err != EXIT_SUCCESS) {
+        printf("There was an error with the handshake");
+        exit(EXIT_FAILURE);
+    }
 
     /* TODO: err = close(everything);*/
     /* TODO: print out who i am connected to*/
 
-    _DEBUG("%s\n", "listening on the new port");
-    len = sizeof(childaddr);
-    n = recvfrom(sockfd, msg, sizeof(msg), 0, (struct sockaddr*)&childaddr,&len);
-    if(n < 0) {
-        perror("child.recvfrom()");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
 
-    msg[n] = 0;
-    printf("msg in child: %s\n", msg);
     close(sockfd);
     _DEBUG("%s\n", "Exiting child");
     exit(EXIT_SUCCESS);
