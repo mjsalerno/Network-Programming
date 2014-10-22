@@ -14,7 +14,6 @@ int main(int argc, const char **argv) {
     int err;
     ssize_t n;
     struct client_list* newCli;
-/*    int i = 1;*/
 
     int sockfd;
     struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
@@ -114,7 +113,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(sockfd, cliaddr);
+            child(mesg, sockfd, cliaddr);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -144,7 +143,7 @@ int testmain(void) {
     return EXIT_SUCCESS;
 }
 
-int child(int par_sock, struct sockaddr_in cli_addr) {
+int child(char* fname, int par_sock, struct sockaddr_in cli_addr) {
     struct sockaddr_in childaddr, cliaddr;
     int err;
     int sockfd;
@@ -153,6 +152,7 @@ int child(int par_sock, struct sockaddr_in cli_addr) {
     char msg[BUFF_SIZE];
 
     _DEBUG("%s\n", "In child");
+    _DEBUG("child.filename: %s\n", fname);
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
     bzero(&childaddr, sizeof(childaddr));
@@ -160,7 +160,8 @@ int child(int par_sock, struct sockaddr_in cli_addr) {
 
     childaddr.sin_family = AF_INET;
     childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    childaddr.sin_port = htons(0);
+    /*childaddr.sin_port = htons(0);*/
+    childaddr.sin_port = htons(10000);
 
     /*TODO: pass in ip i want*/
     err = bind(sockfd, (struct sockaddr *) &childaddr, sizeof(childaddr));
@@ -175,9 +176,6 @@ int child(int par_sock, struct sockaddr_in cli_addr) {
         exit(EXIT_FAILURE);
     }
 
-    /*TODO: send port number*/
-    _DEBUG("%s\n", "sending port ...");
-
     len = sizeof(childaddr);
     err = getsockname(sockfd, (struct sockaddr *)&childaddr, &len);
     if(err < 0) {
@@ -191,17 +189,16 @@ int child(int par_sock, struct sockaddr_in cli_addr) {
     printf("\nchild connected to: ");
     print_sock_peer(sockfd, &cli_addr);
     printf("\n");
-    n = sendto(par_sock, &childaddr.sin_port, 2, 0, (struct sockaddr const *)&cli_addr, len);
-    if (n < 1) {
-        perror("child.send(port)");
-    }
+
+    _DEBUG("%s\n", "doing hs2 ...");
+    hand_shake2(par_sock, cli_addr, sockfd, childaddr);
 
     /* TODO: err = close(everything);*/
     /* TODO: print out who i am connected to*/
 
-    /*FIXME: not binding on the right thing*/
+    _DEBUG("%s\n", "listening on the new port");
     len = sizeof(childaddr);
-    n = recvfrom(sockfd, msg, sizeof(msg), 0, (struct sockaddr *)&childaddr,&len);
+    n = recvfrom(sockfd, msg, sizeof(msg), 0, (struct sockaddr*)&childaddr,&len);
     if(n < 0) {
         perror("child.recvfrom()");
         close(sockfd);
@@ -261,4 +258,33 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
         return p;
     }
 
+}
+
+int hand_shake2(int oldSock, struct sockaddr_in oldAddr, int newSock, struct sockaddr_in newAddr) {
+    ssize_t n;
+    socklen_t len = newSock;
+    char msg[BUFF_SIZE];
+
+    len = sizeof(oldAddr);
+    n = sendto(oldSock, &newAddr.sin_port, 2, 0, (struct sockaddr const *)&oldAddr, len);
+    if (n < 1) {
+        perror("hs2.send(port)");
+        exit(EXIT_SUCCESS);
+    }
+
+    _DEBUG("%s\n", "waiting to get replay on other port ...");
+    /*todo: use timer*/
+    len = sizeof(newAddr);
+    n = recvfrom(newSock, msg, sizeof(msg), 0, (struct sockaddr*)&newAddr,&len);
+    if(n < 0) {
+        perror("child.recvfrom()");
+        close(newSock);
+        exit(EXIT_FAILURE);
+    }
+
+    /*todo: finish me*/
+    msg[n] = 0;
+    printf("msg in hs2: %s\n", msg);
+
+    return EXIT_SUCCESS;
 }
