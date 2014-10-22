@@ -1,6 +1,8 @@
 #include <assert.h>
 #include "server.h"
 
+struct client_list* cliList;
+
 int main(int argc, const char **argv) {
     const char *path;
 
@@ -11,14 +13,15 @@ int main(int argc, const char **argv) {
     int pid;
     int err;
     ssize_t n;
+    struct client_list* newCli;
 /*    int i = 1;*/
-
-/*    struct client_list* cli_list = NULL; */
 
     int sockfd;
     struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
     socklen_t len;
     char mesg[BUFF_SIZE];
+
+    cliList = NULL;
 
     if(argc < 2) {
         path = "./server.in";
@@ -83,7 +86,6 @@ int main(int argc, const char **argv) {
             exit(EXIT_FAILURE);
         }
         _DEBUG("%s\n", "a client is trying to connect");
-        /* TODO: figure out if I this is a client that is already connected */
 
         /*get filename*/
         len = sizeof(cliaddr);
@@ -91,6 +93,14 @@ int main(int argc, const char **argv) {
         if(n < -1) {
             perror("server.recvfrom()");
         }
+
+        /* TODO: figure out if I this is a client that is already connected */
+        newCli = add_client(cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
+        if(newCli == NULL) {
+            _DEBUG("%s\n", "Server: dup clinet, not doing anything");
+            continue;
+        }
+
         mesg[n] = 0;
         _DEBUG("Got filename: %s\n", mesg);
 
@@ -118,30 +128,19 @@ int main(int argc, const char **argv) {
 int testmain(void) {
 
     struct client_list* list = NULL;
-    struct client_list cli;
     struct client_list* p;
 
-    cli.pid = 7;
-    cli.next = NULL;
-    strncpy(cli.ip, "hello", INET_ADDRSTRLEN);
-    cli.port = 9;
+    p = add_client(&list, 1, 10);
 
-    p = add_client(&list, cli);
+    printf("---\nip: %d\ncli.port: %d\n", 1, 10);
+    printf("---\np.pid: %d\np.ip: %d\np.port: %d\n", p->pid, p->ip, p->port);
+    printf("---\nlst.pid: %d\nlst.ip: %d\nlst.port: %d\n\n", list->pid, list->ip, list->port);
 
-    printf("---\ncli.pid: %d\ncli.ip: %s\ncli.port: %d\n", cli.pid, cli.ip, cli.port);
-    printf("---\np.pid: %d\np.ip: %s\np.port: %d\n", p->pid, p->ip, p->port);
-    printf("---\nlst.pid: %d\nlst.ip: %s\nlst.port: %d\n\n", list->pid, list->ip, list->port);
+    p = add_client(&list, -1, 11);
 
-    cli.pid = 10;
-    cli.next = NULL;
-    strncpy(cli.ip, "bye", INET_ADDRSTRLEN);
-    cli.port = 10;
-
-    p = add_client(&list, cli);
-
-    printf("---\ncli.pid: %d\ncli.ip: %s\ncli.port: %d\n", cli.pid, cli.ip, cli.port);
-    printf("---\np.pid: %d\np.ip: %s\np.port: %d\n", p->pid, p->ip, p->port);
-    printf("---\nlst.pid: %d\nlst.ip: %s\nlst.port: %d\n\n", list->pid, list->ip, list->port);
+    printf("---\ncli.ip: %d\ncli.port: %d\n", -1, 11);
+    printf("---\np.pid: %d\np.ip: %d\np.port: %d\n", p->pid, p->ip, p->port);
+    printf("---\nlst.pid: %d\nlst.ip: %d\nlst.port: %d\n\n", list->pid, list->ip, list->port);
     return EXIT_SUCCESS;
 }
 
@@ -220,7 +219,7 @@ int child(int par_sock, struct sockaddr_in cli_addr) {
 * returns NULL if the client was already in the list
 * returns the pointer to the struct added
 */
-struct client_list* add_client(struct client_list** cl, struct client_list new_cli) {
+struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t port) {
 
     /*first client*/
     if(*cl == NULL) {
@@ -230,8 +229,8 @@ struct client_list* add_client(struct client_list** cl, struct client_list new_c
             perror("add_client.malloc()");
         }
 
-        (*cl)->port = new_cli.port;
-        strncpy(new_cli.ip, (*cl)->ip, INET_ADDRSTRLEN);
+        (*cl)->port = port;
+        (*cl)->ip = ip;
         (*cl)->next = NULL;
         (*cl)->pid = -1;
         return *cl;
@@ -242,7 +241,7 @@ struct client_list* add_client(struct client_list** cl, struct client_list new_c
 
         do {
 
-            if(strcmp(p->ip, new_cli.ip) && p->port == new_cli.port) {
+            if((*cl)->ip == ip && (*cl)->port == port) {
                 /*found dup*/
                 _DEBUG("%s\n", "found duplicate client, not adding");
                 return NULL;
@@ -254,8 +253,8 @@ struct client_list* add_client(struct client_list** cl, struct client_list new_c
 
         _DEBUG("%s\n", "add_client: adding client to the list");
         p = malloc(sizeof(struct client_list));
-        p->port = new_cli.port;
-        strncpy(new_cli.ip, p->ip, INET_ADDRSTRLEN);
+        p->port = port;
+        p->ip = ip;
         p->next = NULL;
         p->pid = -1;
         prev->next = p;
