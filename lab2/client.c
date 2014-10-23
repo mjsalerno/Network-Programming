@@ -1,5 +1,3 @@
-#include <netinet/in.h>
-#include <stdint.h>
 #include "client.h"
 
 int main(void) {
@@ -9,7 +7,7 @@ int main(void) {
     /*stuff mike added*/
 
     ssize_t err; /* for error checking */
-    char *path = "./client.in"; /* config path */
+    char *path = "/home/scott-harvey/git/cse533/lab2/client.in"; /* config path */
     char transferpath[BUFF_SIZE]; /* file to transfer */
     FILE *file; /* config file */
     char ip4_str[INET_ADDRSTRLEN];
@@ -132,46 +130,51 @@ int main(void) {
 
 
 int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *transferpath, uint16_t windsize) {
-    char buf[BUFF_SIZE];
+    char pktbuf[MAX_PKT_SIZE];
+    struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
     void *packet;
     size_t packetlen;
     uint32_t seq = (uint32_t)lrand48(), ack_seq = 0;
+    in_port_t newport;
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
+    double ran;
     ssize_t n, err;
-    /* todo: packt loss */
-    p++;
 
     packetlen = DATAOFFSET + strlen(transferpath);
     packet = malloc(packetlen);
-    make_pkt(packet, seq, ack_seq, SYN, windsize, transferpath, strlen(transferpath));
+    /* make the packet */
+    make_pkt(packet, ++seq, ack_seq, SYN, windsize, transferpath, strlen(transferpath));
+    /* convert to network order */
     htonpkt((struct xtcphdr*)packet);
 
     /* todo: print_xtxphdr(&hdr); */
     /* todo: timeout  on oldest packet */
 
     /* simulate packet loss on sends */
-    /*
-    if(drand48() > p) {*/
+    ran = drand48();
+    _DEBUG("drand48() = %f\n", ran);
+    _DEBUG("p = %f\n", p);
+    if(ran > p) {
         err = send(serv_fd, packet, packetlen, 0);
         if (err < 0) {
             perror("sendto()");
-            close(serv_fd);
-            exit(EXIT_FAILURE);
+            free(packet);
+            return -1;
         }
-        printf("sent first handsake (SYN)\n");
+        printf("sent 1st handshake (SYN)\n");
+        ntohpkt((struct xtcphdr*)packet);
         print_xtxphdr((struct xtcphdr*)packet);
-    /*
     }
     else{
-        printf("dropped first handsake (SYN)\n");
-    }*/
+        printf("dropped 1st handshake (SYN)\n");
+    }
+    _DEBUG("%s\n", "waiting for 2nd handshake...");
 
     /* select() for(ever) for SYN */
     /* todo: timeout for dropped packets! */
     for(;;) {
-        in_port_t newport;
         FD_ZERO(&rset);
         FD_SET(serv_fd, &rset);
         maxfpd1 = serv_fd + 1;
@@ -180,52 +183,77 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
         select(maxfpd1, &rset, NULL, NULL, NULL);
         /* check if the serv_fd is set */
         if(FD_ISSET(serv_fd, &rset)) {
-            _DEBUG("%s\n", "got SYN-ACK or something");
-            _DEBUG("%s\n", "waiting for second handshake...");
-            n = recv(serv_fd, buf, sizeof(buf), 0);
+            _DEBUG("%s\n", "recv()'ing something");
+            n = recv(serv_fd, pktbuf, sizeof(pktbuf), 0);
             if (n < 0) {
                 perror("recv()");
+                free(packet);
                 return -1;
             }
-            /* copy the passed port into a short to prevent SIGBUS */
-            memcpy(&newport, buf, sizeof(newport));
-            serv_addr->sin_port = newport; /* set the new port */
-            /* re connect() with new port */
-            err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
-            if (err < 0) {
-                perror("re connect()");
-                return -1;
-            }
-            printf("re-connect()'ed to -- ");
-            print_sock_peer(serv_fd, serv_addr);
-            /* move on to third handshake */
+            /* we recv()'ed something so break from select */
             break;
         }
     }
+    /* validate the something was a SYN-ACK */
+    hdr = (struct xtcphdr*)pktbuf;
+    ntohpkt(hdr);
+    if(hdr->flags != (SYN|ACK)){
+        fprintf(stderr, "2nd handshake not a SYN-ACK, flags: %d\n", hdr->flags);
+        /* todo: RST/ free */
+        free(packet);
+        return -1;
+    }
+    /* now validate the SEQ and ACK nums */
+    if(hdr->ack_seq != seq+1){
+        fprintf(stderr, "2nd handshake ack_seq num wrong, ack_seq: %d\n", hdr->ack_seq);
+        /* todo: RST/ free */
+        free(packet);
+        return -1;
+    }
+    if(n != DATAOFFSET + 2){
+        fprintf(stderr, "2nd handshake not %d bytes, size: %ld\n", DATAOFFSET + 2, n);
+        /* todo: RST/ free */
+        free(packet);
+        return -1;
+    }
+    printf("recv'd 2nd handshake\n");
+    print_xtxphdr(hdr);
+    ack_seq = hdr->seq;
+
+    /* copy the passed port into a short to prevent SIGBUS */
+    memcpy(&newport, pktbuf, sizeof(newport));
+    serv_addr->sin_port = newport; /* set the new port */
+    /* re connect() with new port */
+    err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
+    if (err < 0) {
+        perror("re connect()");
+        return -1;
+    }
+    printf("re-connect()'ed to -- ");
+    print_sock_peer(serv_fd, serv_addr);
+    /* move on to third handshake */
 
     /* third handshake */
-    make_pkt(packet, 1, 1, ACK, windsize, transferpath, strlen(transferpath));
-    strncpy(buf, "ACK ACK 2 SEQ 2", sizeof(buf));
+    make_pkt(packet, ++seq, ++ack_seq, ACK, windsize, NULL, 0);
+    htonpkt((struct xtcphdr*)packet);
 
     /* todo: print_xtxphdr(&hdr); */
     /* todo: timeout  on oldest packet */
 
     /* simulate packet loss on sends */
-    /*
-    if(drand48() > p) {*/
-    err = send(serv_fd, buf, strlen(buf), 0);
-    if (err < 0) {
-        perror("sendto()");
-        close(serv_fd);
-        exit(EXIT_FAILURE);
-    }
-    printf("sent third handsake (SYN)\n");
-    /*
+    if(drand48() > p) {
+        err = send(serv_fd, packet, DATAOFFSET, 0);
+        if (err < 0) {
+            perror("sendto()");
+            free(packet);
+            return -1;
+        }
+        printf("sent 3rd handshake (ACK)\n");
     }
     else{
-        printf("dropped third handsake (SYN)\n");
-    }*/
-
+        printf("dropped 3rd handshake (ACK)\n");
+    }
+    free(packet);
     return 0;
 
 }
