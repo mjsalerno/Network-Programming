@@ -1,6 +1,9 @@
+#include <time.h>
 #include "server.h"
 
 struct client_list* cliList;
+uint32_t seq;
+uint32_t ack;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -99,6 +102,8 @@ int main(int argc, const char **argv) {
         }
         ntohpkt((struct xtcphdr*)pkt);
 
+        seq = ((struct xtcphdr*)pkt)->ack_seq;
+
         pkt[n] = 0;
         if(((struct xtcphdr*)pkt)->flags != SYN) {
             printf("server.hs1(): client did not send SYN: %hu\n", ((struct xtcphdr*)pkt)->flags);
@@ -117,7 +122,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(pkt, sockfd, cliaddr, window);
+            child(pkt+ DATAOFFSET, sockfd, cliaddr, window);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -262,10 +267,15 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
     struct xtcphdr* hdr = malloc(sizeof(struct xtcphdr));
     uint16_t flags = 0;
 
-    make_pkt(hdr, 1, 1, flags, adv_win, &new_addr.sin_port, 2);
+    srand((unsigned int)time(NULL));
+    seq = (u_int32_t)rand();
+
+    flags = SYN|ACK;
+    make_pkt(hdr, ++seq, ++ack, flags, adv_win, &new_addr.sin_port, 2);
+    htonpkt(hdr);
 
     len = sizeof(old_addr);
-    n = sendto(old_sock, &new_addr.sin_port, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&old_addr, len);
+    n = sendto(old_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&old_addr, len);
     if (n < 1) {
         perror("hs2.send(port)");
         exit(EXIT_SUCCESS);
