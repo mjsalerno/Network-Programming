@@ -12,6 +12,7 @@
 #define ACK 0x8
 
 #define DATAOFFSET 12
+#define MAX_PKT_SIZE 512
 
 struct xtcphdr {
 
