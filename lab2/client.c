@@ -1,3 +1,6 @@
+#include <geos_c.h>
+#include <netinet/in.h>
+#include <stdint.h>
 #include "client.h"
 
 int main(void) {
@@ -16,7 +19,7 @@ int main(void) {
     uint16_t windsize;
     int seed;
     double p; /* packet loss percentage */
-    double u; /* (!!in ms!!) mean of the exponential dist func */
+    double u; /* (!!in ms!!) mean of the exponential distribution func */
 
     /* serv_fd -- the main server connection socket, reconnected later */
     int serv_fd;
@@ -84,13 +87,14 @@ int main(void) {
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(serv_fd < 0){
-        perror("bind()");
+        perror("socket()");
         exit(EXIT_FAILURE);
     }
     /* bind to my ip */
     err = bind(serv_fd, (struct sockaddr *)&my_addr, sizeof(my_addr));
     if(err < 0){
         perror("bind()");
+        close(serv_fd);
         exit(EXIT_FAILURE);
     }
 
@@ -102,6 +106,7 @@ int main(void) {
     err = connect(serv_fd, (const struct sockaddr*)&serv_addr, sizeof(serv_addr));
     if(err < 0){
         perror("connect()");
+        close(serv_fd);
         exit(EXIT_FAILURE);
     }
 
@@ -109,51 +114,60 @@ int main(void) {
     printf("connect()'ed to -- ");
     print_sock_peer(serv_fd, &peer_addr);
 
-    err = handshake_first_sec(p, serv_fd, &serv_addr);
-    if(err < 0){
+    err = handshakes(serv_fd, &serv_addr, p, transferpath, windsize);
+    if(err != 0){
         /* todo: clean up, close?, free?*/
         close(serv_fd);
         exit(EXIT_FAILURE);
     }
-    err = handshake_third(p, serv_fd);
-    if(err < 0){
-        /* todo: clean up, close?, free?*/
-        close(serv_fd);
-        exit(EXIT_FAILURE);
-    }
+    /* connected to file transfer port */
+    /* todo: pthread_create consumer thread */
+
+
+
 
     close(serv_fd);
 
     return EXIT_SUCCESS;
 }
 
-int handshake_first_sec(double p, int serv_fd, struct sockaddr_in *serv_addr){
-    char buf[BUFF_SIZE + 1];
+
+int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *transferpath, uint16_t windsize) {
+    char buf[BUFF_SIZE];
+    void *packet;
+    size_t packetlen;
+    uint32_t seq = (uint32_t)lrand48(), ack_seq = 0;
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
-
     ssize_t n, err;
+    /* todo: packt loss */
+    p++;
 
-    strncpy(buf, "SYN SEQ 1", sizeof(buf));
-
+    packetlen = DATAOFFSET + strlen(transferpath);
+    packet = malloc(packetlen);
+    make_pkt(packet, seq, ack_seq, SYN, windsize, transferpath, strlen(transferpath));
+    htonpkt((struct xtcphdr*)packet);
 
     /* todo: print_xtxphdr(&hdr); */
     /* todo: timeout  on oldest packet */
 
     /* simulate packet loss on sends */
-    if(drand48() > p) {
-        err = send(serv_fd, buf, strlen(buf), 0);
+    /*
+    if(drand48() > p) {*/
+        err = send(serv_fd, packet, packetlen, 0);
         if (err < 0) {
             perror("sendto()");
             close(serv_fd);
             exit(EXIT_FAILURE);
         }
         printf("sent first handsake (SYN)\n");
+        print_xtxphdr((struct xtcphdr*)packet);
+    /*
     }
     else{
         printf("dropped first handsake (SYN)\n");
-    }
+    }*/
 
     /* select() for(ever) for SYN */
     /* todo: timeout for dropped packets! */
@@ -167,55 +181,52 @@ int handshake_first_sec(double p, int serv_fd, struct sockaddr_in *serv_addr){
         select(maxfpd1, &rset, NULL, NULL, NULL);
         /* check if the serv_fd is set */
         if(FD_ISSET(serv_fd, &rset)) {
-            _DEBUG("%s\n", "got SYN-ACK or something, next recvfrom ...");
-            printf("waiting for second handshake...\n");
+            _DEBUG("%s\n", "got SYN-ACK or something");
+            _DEBUG("%s\n", "waiting for second handshake...");
             n = recv(serv_fd, buf, sizeof(buf), 0);
             if (n < 0) {
                 perror("recv()");
                 return -1;
             }
-            /* copy the passed port into a short, prevents SIGBUS */
+            /* copy the passed port into a short to prevent SIGBUS */
             memcpy(&newport, buf, sizeof(newport));
             serv_addr->sin_port = newport; /* set the new port */
-            serv_addr->sin_family = AF_INET;
             /* re connect() with new port */
-
             err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
             if (err < 0) {
                 perror("re connect()");
                 return -1;
             }
-            printf("re connect()'d to new server port: %hu\n", newport);
-            return 0;
+            printf("re-connect()'ed to -- ");
+            print_sock_peer(serv_fd, serv_addr);
+            /* move on to third handshake */
+            break;
         }
     }
-}
 
-int handshake_third(double p, int serv_fd){
-    char buf[BUFF_SIZE + 1];
-    ssize_t err;
-
+    /* third handshake */
+    make_pkt(packet, 1, 1, ACK, windsize, transferpath, strlen(transferpath));
     strncpy(buf, "ACK ACK 2 SEQ 2", sizeof(buf));
-
 
     /* todo: print_xtxphdr(&hdr); */
     /* todo: timeout  on oldest packet */
 
     /* simulate packet loss on sends */
-    if(drand48() > p) {
-        err = send(serv_fd, buf, strlen(buf), 0);
-        if (err < 0) {
-            perror("sendto()");
-            close(serv_fd);
-            exit(EXIT_FAILURE);
-        }
-        printf("sent third handsake (SYN)\n");
+    /*
+    if(drand48() > p) {*/
+    err = send(serv_fd, buf, strlen(buf), 0);
+    if (err < 0) {
+        perror("sendto()");
+        close(serv_fd);
+        exit(EXIT_FAILURE);
+    }
+    printf("sent third handsake (SYN)\n");
+    /*
     }
     else{
         printf("dropped third handsake (SYN)\n");
-    }
+    }*/
+
     return 0;
+
 }
-
-
-
