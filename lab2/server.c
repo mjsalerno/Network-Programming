@@ -1,4 +1,3 @@
-#include <assert.h>
 #include "server.h"
 
 struct client_list* cliList;
@@ -9,7 +8,7 @@ int main(int argc, const char **argv) {
     FILE *file;
     unsigned short port;
     fd_set fdset;
-    long window;
+    uint16_t window;
     int pid;
     int err;
     ssize_t n;
@@ -18,7 +17,7 @@ int main(int argc, const char **argv) {
     int sockfd;
     struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
     socklen_t len;
-    char mesg[BUFF_SIZE];
+    char pkt[BUFF_SIZE];
 
     cliList = NULL;
 
@@ -46,12 +45,12 @@ int main(int argc, const char **argv) {
     printf("Port: %hu\n", port);
     
     /*Get the window size*/
-    window = int_from_config(file, "There was an error getting the window size number");
+    window = (uint16_t)int_from_config(file, "There was an error getting the window size number");
     if(window < 1) {
         fprintf(stderr, "The window can not be less than 1\n");
         exit(EXIT_FAILURE);
     }
-    _DEBUG("Window: %ld\n", window);
+    _DEBUG("Window: %hu\n", window);
     _DEBUG("config: %s\n", path);
 
     err = fclose(file);
@@ -88,20 +87,25 @@ int main(int argc, const char **argv) {
 
         /*get filename*/
         len = sizeof(cliaddr);
-        n = recvfrom(sockfd, mesg, sizeof(mesg), 0, (struct sockaddr *)&cliaddr, &len);
+        n = recvfrom(sockfd, pkt, sizeof(pkt), 0, (struct sockaddr *)&cliaddr, &len);
         if(n < -1) {
             perror("server.recvfrom()");
         }
 
-        /* TODO: figure out if I this is a client that is already connected */
         newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
         if(newCli == NULL) {
             _DEBUG("%s\n", "Server: dup clinet, not doing anything");
             continue;
         }
+        ntohpkt((struct xtcphdr*)pkt);
 
-        mesg[n] = 0;
-        _DEBUG("Got filename: %s\n", mesg);
+        pkt[n] = 0;
+        if(((struct xtcphdr*)pkt)->flags != SYN) {
+            printf("server.hs1(): client did not send SYN: %hu\n", ((struct xtcphdr*)pkt)->flags);
+            continue;
+        }
+        print_xtxphdr((struct xtcphdr*) pkt);
+        _DEBUG("Got filename: %s\n", pkt + DATAOFFSET);
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();
@@ -113,7 +117,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(mesg, sockfd, cliaddr);
+            child(pkt, sockfd, cliaddr, window);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -143,7 +147,7 @@ int testmain(void) {
     return EXIT_SUCCESS;
 }
 
-int child(char* fname, int par_sock, struct sockaddr_in cli_addr) {
+int child(char* fname, int par_sock, struct sockaddr_in cli_addr, uint16_t adv_win) {
     struct sockaddr_in childaddr, cliaddr;
     int err;
     int sockfd;
@@ -188,7 +192,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cli_addr) {
     printf("\n");
 
     _DEBUG("%s\n", "doing hs2 ...");
-    err = hand_shake2(par_sock, cli_addr, sockfd, childaddr);
+    err = hand_shake2(par_sock, cli_addr, sockfd, childaddr, adv_win);
     if(err != EXIT_SUCCESS) {
         printf("There was an error with the handshake");
         exit(EXIT_FAILURE);
@@ -251,13 +255,17 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
 
 }
 
-int hand_shake2(int oldSock, struct sockaddr_in oldAddr, int newSock, struct sockaddr_in newAddr) {
+int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct sockaddr_in new_addr, uint16_t adv_win) {
     ssize_t n;
-    socklen_t len = newSock;
-    char msg[BUFF_SIZE];
+    socklen_t len = new_sock;
+    char pkt[BUFF_SIZE];
+    struct xtcphdr* hdr = malloc(sizeof(struct xtcphdr));
+    uint16_t flags = 0;
 
-    len = sizeof(oldAddr);
-    n = sendto(oldSock, &newAddr.sin_port, 2, 0, (struct sockaddr const *)&oldAddr, len);
+    make_pkt(hdr, 1, 1, flags, adv_win, &new_addr.sin_port, 2);
+
+    len = sizeof(old_addr);
+    n = sendto(old_sock, &new_addr.sin_port, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&old_addr, len);
     if (n < 1) {
         perror("hs2.send(port)");
         exit(EXIT_SUCCESS);
@@ -265,17 +273,19 @@ int hand_shake2(int oldSock, struct sockaddr_in oldAddr, int newSock, struct soc
 
     _DEBUG("%s\n", "waiting to get replay on other port ...");
     /*todo: use timer*/
-    len = sizeof(newAddr);
-    n = recvfrom(newSock, msg, sizeof(msg), 0, (struct sockaddr*)&newAddr,&len);
+    len = sizeof(new_addr);
+    n = recvfrom(new_sock, pkt, sizeof(pkt), 0, (struct sockaddr*)&new_addr,&len);
     if(n < 0) {
         perror("child.recvfrom()");
-        close(newSock);
+        close(new_sock);
         exit(EXIT_FAILURE);
     }
 
+    print_xtxphdr((struct xtcphdr*)pkt);
+
     /*todo: finish me*/
-    msg[n] = 0;
-    printf("msg in hs2: %s\n", msg);
+    pkt[n] = 0;
+    printf("msg in hs2: %s\n", pkt);
 
     return EXIT_SUCCESS;
 }
