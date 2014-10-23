@@ -299,7 +299,7 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
 
     /*todo: finish me*/
     pkt[n] = 0;
-    printf("msg in hs2: %s\n", pkt);
+    printf("msg in hs2: '%s'\n", pkt + DATAOFFSET);
 
     return EXIT_SUCCESS;
 }

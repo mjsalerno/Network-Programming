@@ -7,7 +7,7 @@ int main(void) {
     /*stuff mike added*/
 
     ssize_t err; /* for error checking */
-    char *path = "/home/scott-harvey/git/cse533/lab2/client.in"; /* config path */
+    char *path = "client.in"; /* config path */
     char transferpath[BUFF_SIZE]; /* file to transfer */
     FILE *file; /* config file */
     char ip4_str[INET_ADDRSTRLEN];
@@ -221,7 +221,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     ack_seq = hdr->seq;
 
     /* copy the passed port into a short to prevent SIGBUS */
-    memcpy(&newport, pktbuf, sizeof(newport));
+    memcpy(&newport, pktbuf + DATAOFFSET, sizeof(newport));
     serv_addr->sin_port = newport; /* set the new port */
     /* re connect() with new port */
     err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
