@@ -102,7 +102,7 @@ int main(int argc, const char **argv) {
         }
         ntohpkt((struct xtcphdr*)pkt);
 
-        seq = ((struct xtcphdr*)pkt)->ack_seq;
+        ack = ((struct xtcphdr*)pkt)->seq;
 
         pkt[n] = 0;
         if(((struct xtcphdr*)pkt)->flags != SYN) {
@@ -114,11 +114,11 @@ int main(int argc, const char **argv) {
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();
-        _DEBUG("pid: %d\n", pid);
         if (pid < 0) {
             perror("Could not fork()");
             exit(EXIT_FAILURE);
         }
+        _DEBUG("pid: %d\n", pid);
 
         /*in child*/
         if (pid == 0) {
@@ -290,8 +290,12 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
         close(new_sock);
         exit(EXIT_FAILURE);
     }
-
+    ntohpkt((struct xtcphdr*) pkt);
     print_xtxphdr((struct xtcphdr*)pkt);
+    if(((struct xtcphdr*) pkt)->flags != ACK && ((struct xtcphdr*) pkt)->ack_seq == (seq + 1) && ((struct xtcphdr*) pkt)->seq == ack) {
+        printf("server.hs2(): the clients flags/ack/seq are wrong\n");
+        exit(EXIT_FAILURE);
+    }
 
     /*todo: finish me*/
     pkt[n] = 0;
@@ -299,3 +303,16 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
 
     return EXIT_SUCCESS;
 }
+
+/*
+int send_file(char* fname, int sock, struct sockaddr_in addr) {
+    FILE *file;
+
+    file = fopen(fname, "r");
+    if(file == NULL) {
+        perror("server.send_file");
+        exit(EXIT_FAILURE);
+    }
+    return 1;
+}
+*/
