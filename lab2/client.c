@@ -211,7 +211,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
         return -1;
     }
     if(n != DATAOFFSET + 2){
-        fprintf(stderr, "2nd handshake not %d bytes, size: %ld\n", DATAOFFSET + 2, n);
+        fprintf(stderr, "2nd handshake not %d bytes, size: %d\n", DATAOFFSET + 2, (int)n);
         /* todo: RST/ free */
         free(packet);
         return -1;
