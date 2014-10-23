@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include "xtcp.h"
 
-#define BUFF_SIZE 256
+#define BUFF_SIZE 512
 
 int int_from_config(FILE* file, const char* err_str);
 double double_from_config(FILE* file, const char* err_str);
