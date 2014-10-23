@@ -1,4 +1,3 @@
-#include <geos_c.h>
 #include <netinet/in.h>
 #include <stdint.h>
 #include "client.h"
