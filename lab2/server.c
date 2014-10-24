@@ -262,12 +262,13 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
 
 int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct sockaddr_in new_addr, uint16_t adv_win) {
     ssize_t n;
-    socklen_t len = new_sock;
+    socklen_t len;
     char pkt[BUFF_SIZE];
     struct xtcphdr* hdr = malloc(sizeof(struct xtcphdr));
     uint16_t flags = 0;
     fd_set fdset;
     int err;
+    int count = 0;
     struct timeval timer;
 
 
@@ -304,7 +305,8 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
 
     _DEBUG("select(): %d\n", err);
 
-    while(err == 0) {
+    while(!FD_ISSET(new_sock, &fdset) && count < 4) {
+        count++;
         _DEBUG("%s\n", "hs2 time out, send over both sockets ...");
 
         len = sizeof(old_addr);
@@ -355,9 +357,7 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
         exit(EXIT_FAILURE);
     }
 
-    /*todo: finish me*/
-    pkt[n] = 0;
-    printf("msg in hs2: '%s'\n", pkt + DATAOFFSET);
+    _DEBUG("%s\n", "got last hand shake from client");
 
     return EXIT_SUCCESS;
 }
