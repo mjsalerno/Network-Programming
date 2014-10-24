@@ -173,12 +173,16 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
     err = bind(child_sock, (struct sockaddr *) &childaddr, sizeof(childaddr));
     if (err < 0) {
         perror("child.bind()");
+        free_clients(cliList);
+        close(child_sock);
         exit(EXIT_FAILURE);
     }
 
     err = connect(child_sock, (struct sockaddr *) &cliaddr, sizeof(cliaddr));
     if (err < 0) {
         perror("child.connect()");
+        free_clients(cliList);
+        close(child_sock);
         exit(EXIT_FAILURE);
     }
 
@@ -186,6 +190,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
     err = getsockname(child_sock, (struct sockaddr *)&childaddr, &len);
     if(err < 0) {
         perror("child.getsockname()");
+        free_clients(cliList);
+        close(child_sock);
         exit(EXIT_FAILURE);
     }
     /*_DEBUG("port in network format: %hu\n", childaddr.sin_port);*/
@@ -200,6 +206,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
     err = hand_shake2(par_sock, cliaddr, child_sock, childaddr.sin_port, adv_win);
     if(err != EXIT_SUCCESS) {
         printf("There was an error with the handshake");
+        free_clients(cliList);
+        close(child_sock);
         exit(EXIT_FAILURE);
     }
 
@@ -218,6 +226,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
 
     _DEBUG("%s\n", "Exiting child");
     close(child_sock);
+    free_clients(cliList);
     exit(EXIT_SUCCESS);
 }
 
@@ -294,6 +303,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
     if (n < 1) {
         perror("hs2.send(port)");
+        free(hdr);
         exit(EXIT_FAILURE);
     }
 
@@ -308,6 +318,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     err = select(child_sock + 1, &rset, NULL, NULL, &timer);
     if(err < 0) {
         perror("server.hs2()");
+        free(hdr);
         exit(EXIT_FAILURE);
     }
 
@@ -321,12 +332,14 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
         n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
         if (n < 1) {
             perror("hs2.send(port)");
+            free(hdr);
             exit(EXIT_FAILURE);
         }
         /* child_sock connected to new_addr? */
         n = send(child_sock, hdr, sizeof(struct xtcphdr) + 2, 0);
         if (n < 1) {
             perror("hs2.send(port)");
+            free(hdr);
             exit(EXIT_FAILURE);
         }
         _DEBUG("%s\n", "waiting to get reply on new child port ...");
@@ -338,9 +351,12 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
         err = select(child_sock + 1, &rset, NULL, NULL, &timer);
         if(err < 0) {
             perror("hs2.retry()");
+            free(hdr);
             exit(EXIT_FAILURE);
         }
     }
+    free(hdr);
+
     /* will happen when breaking out of while above */
     if(!FD_ISSET(child_sock, &rset)) {
         printf("The handshake is broken, exiting child\n");

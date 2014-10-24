@@ -36,9 +36,11 @@ int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
     err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
     if(err < 0) {
         perror("xtcp.srvsend()");
+        free(pkt);
         return -1;
     }
 
+    free(pkt);
     return 1;
 }
 
