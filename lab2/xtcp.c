@@ -1,10 +1,14 @@
 #include "xtcp.h"
 
 void print_xtxphdr(struct xtcphdr *hdr) {
-    printf("seq     : %u\n", hdr->seq);
-    printf("flags   : %u\n", hdr->flags);
-    printf("ack_seq : %u\n", hdr->ack_seq);
-    printf("advwin  : %u\n", hdr->advwin);
+    printf("|xtcp_hdr| seq:%u", hdr->seq);
+    printf(", flags:");
+    if((hdr->flags & FIN) == FIN){ printf("F"); }
+    if((hdr->flags & SYN) == SYN){ printf("S"); }
+    if((hdr->flags & RST) == RST){ printf("R"); }
+    if((hdr->flags & ACK) == ACK){ printf("A"); }
+    printf(", ack_seq:%u", hdr->ack_seq);
+    printf(", advwin:%u\n", hdr->advwin);
 }
 
 void make_pkt(void *hdr, uint32_t seq, uint32_t ack_seq,
