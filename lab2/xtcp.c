@@ -42,12 +42,39 @@ int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
     return 1;
 }
 
-void free_windows(struct window* head) {
-    if(head->next != NULL) {
-        free_windows(head->next);
+/*private function dont make proto*/
+void fwh(struct window* at, struct window* head) {
+    if(at->next != head)
+        fwh(head->next, head);
 
-    free(head->pkt);
-    free(head);
+    free(at->pkt);
+    free(at);
+
+}
+
+void free_windows(struct window* head) {
+    fwh(head, head);
+}
+
+struct window* malloc_windows(int count) {
+    int i;
+    struct window* head = NULL;
+    struct window* ptr = NULL;
+
+    if(count < 1) {
+        return NULL;
+    }
+
+    head = malloc(sizeof(struct window));
+    ptr = head->next;
+
+    for(i = 1; i < count; ++i) {
+        ptr = malloc(sizeof(struct window));
+        ptr = ptr->next;
+    }
+
+    ptr = head;
+    return head;
 }
 
 void ntohpkt(struct xtcphdr *hdr) {
