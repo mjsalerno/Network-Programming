@@ -65,8 +65,8 @@ int main(int argc, const char **argv) {
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(port);
-    /*servaddr.sin_addr.s_addr = htonl(INADDR_ANY);*/
-    inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    /*inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);*/
 
     err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
     if (err < 0) {
@@ -266,6 +266,10 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
     char pkt[BUFF_SIZE];
     struct xtcphdr* hdr = malloc(sizeof(struct xtcphdr));
     uint16_t flags = 0;
+    fd_set fdset;
+    int err;
+    struct timeval timer;
+
 
     srand((unsigned int)time(NULL));
     seq = (u_int32_t)rand();
@@ -278,22 +282,76 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
     n = sendto(old_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&old_addr, len);
     if (n < 1) {
         perror("hs2.send(port)");
-        exit(EXIT_SUCCESS);
+        exit(EXIT_FAILURE);
     }
 
     _DEBUG("%s\n", "waiting to get replay on other port ...");
     /*todo: use timer*/
+
+    timer.tv_sec = 2;
+    timer.tv_usec = 0;
+
+    FD_ZERO(&fdset);
+    FD_SET(new_sock, &fdset);
+    err = select(new_sock + 1, &fdset, NULL, NULL, &timer);
+    if(err < 0) {
+        perror("server.hs2()");
+        exit(EXIT_FAILURE);
+    } else if(err > 1) {
+        printf("The handshake is broken, exitting child\n");
+        exit(EXIT_FAILURE);
+    }
+
+    _DEBUG("select(): %d\n", err);
+
+    while(err == 0) {
+        _DEBUG("%s\n", "hs2 time out, send over both sockets ...");
+
+        len = sizeof(old_addr);
+        n = sendto(old_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&old_addr, len);
+        if (n < 1) {
+            perror("hs2.send(port)");
+            exit(EXIT_FAILURE);
+        }
+
+        len = sizeof(new_addr);
+        n = sendto(new_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&new_addr, len);
+        if (n < 1) {
+            perror("hs2.send(port)");
+            exit(EXIT_FAILURE);
+        }
+
+        timer.tv_sec = 2;
+        timer.tv_usec = 0;
+        FD_ZERO(&fdset);
+        FD_SET(new_sock, &fdset);
+        err = select(new_sock + 1, &fdset, NULL, NULL, &timer);
+        if(err < 0) {
+            perror("hs2.retry()");
+            exit(EXIT_FAILURE);
+        } else if(err > 1) {
+            printf("The handshake is broken, exitting child\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    if(!FD_ISSET(new_sock, &fdset)) {
+        printf("The handshake is broken, exitting child\n");
+        exit(EXIT_FAILURE);
+    }
+
+
     len = sizeof(new_addr);
     n = recvfrom(new_sock, pkt, sizeof(pkt), 0, (struct sockaddr*)&new_addr,&len);
     if(n < 0) {
-        perror("child.recvfrom()");
+        perror("hs2.recvfrom()");
         close(new_sock);
         exit(EXIT_FAILURE);
     }
     ntohpkt((struct xtcphdr*) pkt);
     print_xtxphdr((struct xtcphdr*)pkt);
     if(((struct xtcphdr*) pkt)->flags != ACK && ((struct xtcphdr*) pkt)->ack_seq == (seq + 1) && ((struct xtcphdr*) pkt)->seq == ack) {
-        printf("server.hs2(): the clients flags/ack/seq are wrong\n");
+        printf("hs2(): the clients flags/ack/seq are wrong\n");
         exit(EXIT_FAILURE);
     }
 

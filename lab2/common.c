@@ -58,7 +58,7 @@ void print_sock_name(int sockfd, struct sockaddr_in *addr) {
 }
 
 /* pass a connect'ed socket and a pointer to sockaddr_in addr */
-void print_sock_peer(int sockfd, struct sockaddr_in *addr){
+void print_sock_peer(int sockfd, struct sockaddr_in *addr) {
     int err;
     socklen_t len;
     char ip4_str[INET_ADDRSTRLEN];
@@ -75,6 +75,10 @@ void print_sock_peer(int sockfd, struct sockaddr_in *addr){
         exit(EXIT_FAILURE);
     }
     printf("%s:%hu\n", ip4_str, ntohs(addr->sin_port));
+}
+
+int max(int a, int b) {
+    return a > b ? a : b;
 }
 
 
