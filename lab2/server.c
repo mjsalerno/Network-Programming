@@ -4,6 +4,7 @@
 struct client_list* cliList;
 uint32_t seq;
 uint32_t ack;
+uint16_t advwin;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -362,15 +363,39 @@ int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct 
     return EXIT_SUCCESS;
 }
 
-/*
-int send_file(char* fname, int sock, struct sockaddr_in addr) {
+
+int send_file(char* fname, int sock) {
     FILE *file;
+    char* data[MAX_DATA_SIZE] = {0};
+    size_t n;
+    int err;
 
     file = fopen(fname, "r");
     if(file == NULL) {
         perror("server.send_file");
         exit(EXIT_FAILURE);
     }
-    return 1;
+
+    for(EVER) {
+        n = fread(data, MAX_DATA_SIZE, 1, file);
+        if (ferror(file)) {
+            printf("server.send_file(): There was an error reading the file\n");
+            clearerr(file);
+            fclose(file);
+            exit(EXIT_FAILURE);
+        } else if (feof(file)) {
+            printf("The file has finished uploading ...");
+            break;
+        } else {
+            _DEBUG("sending %lu bytes of file\n", n);
+            err = srvsend(sock, ++seq, ack, 0, advwin, data, n);
+            if(err < 0) {
+                printf("server.send_file(): there was an error sending the file\n");
+            }
+        }
+    }
+
+    fclose(file);
+
+    return EXIT_SUCCESS;
 }
-*/

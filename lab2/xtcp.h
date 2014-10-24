@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <stdlib.h>
 
 #ifndef XTCP_H
 #define XTCP_H

@@ -1,5 +1,4 @@
 #include "xtcp.h"
-#include "common.h"
 
 void print_xtxphdr(struct xtcphdr *hdr) {
     printf("|xtcp_hdr| seq:%u", hdr->seq);
