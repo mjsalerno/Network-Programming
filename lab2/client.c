@@ -134,7 +134,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     ssize_t n, err;
     struct timeval timer;
 
-    packetlen = DATAOFFSET + strlen(transferpath);
+    packetlen = DATA_OFFSET + strlen(transferpath);
     packet = malloc(packetlen);
     /* make the packet */
     make_pkt(packet, ++seq, ack_seq, SYN, windsize, transferpath, strlen(transferpath));
@@ -207,8 +207,8 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
         free(packet);
         return -1;
     }
-    if(n != DATAOFFSET + 2){
-        fprintf(stderr, "hs2 not %d bytes, size: %d\n", DATAOFFSET + 2, (int)n);
+    if(n != DATA_OFFSET + 2){
+        fprintf(stderr, "hs2 not %d bytes, size: %d\n", DATA_OFFSET + 2, (int)n);
         /* todo: RST/ free */
         free(packet);
         return -1;
@@ -218,7 +218,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     ack_seq = hdr->seq;
 
     /* copy the passed port into the serv_addr */
-    memcpy(&serv_addr->sin_port, pktbuf + DATAOFFSET, sizeof(serv_addr->sin_port));
+    memcpy(&serv_addr->sin_port, pktbuf + DATA_OFFSET, sizeof(serv_addr->sin_port));
     /* re connect() with new port */
     err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
     if (err < 0) {
@@ -240,7 +240,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
 
     /* simulate packet loss on sends */
     if(drand48() > p) {
-        err = send(serv_fd, packet, DATAOFFSET, 0);
+        err = send(serv_fd, packet, DATA_OFFSET, 0);
         if (err < 0) {
             perror("sendto()");
             free(packet);

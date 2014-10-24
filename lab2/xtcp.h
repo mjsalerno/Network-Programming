@@ -11,8 +11,9 @@
 #define RST 0x4
 #define ACK 0x8
 
-#define DATAOFFSET 12
+#define DATA_OFFSET 12
 #define MAX_PKT_SIZE 512
+#define MAX_DATA_SIZE (MAX_PKT_SIZE - DATA_OFFSET)
 
 struct xtcphdr {
 
@@ -28,7 +29,6 @@ struct window {
     struct xtcphdr*  hdr;
     void*            data;
     int              datasize;
-    struct rtt_info* rtt;
     struct window*   next;
 
 };
@@ -40,6 +40,9 @@ void *packet = malloc(sizeof(struct xtcphdr) + datalen)
 make_pkt(packet, .....)
  */
 void make_pkt(void *hdr, uint32_t seq, uint32_t ack_seq,
+        uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+
+int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
         uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
 void ntohpkt(struct xtcphdr *hdr);

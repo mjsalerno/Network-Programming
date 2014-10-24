@@ -16,6 +16,7 @@
 
 #define BUFF_SIZE 512
 #define TIME_OUT 2
+#define EVER ;;
 
 int int_from_config(FILE* file, const char* err_str);
 double double_from_config(FILE* file, const char* err_str);

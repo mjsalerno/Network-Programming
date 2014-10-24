@@ -76,7 +76,7 @@ int main(int argc, const char **argv) {
 
     print_sock_name(sockfd, &p_serveraddr);
 
-    while(1) {
+    for(EVER) {
 
         FD_ZERO(&fdset);
         FD_SET(sockfd, &fdset);
@@ -110,7 +110,7 @@ int main(int argc, const char **argv) {
             continue;
         }
         print_xtxphdr((struct xtcphdr*) pkt);
-        _DEBUG("Got filename: %s\n", pkt + DATAOFFSET);
+        _DEBUG("Got filename: %s\n", pkt + DATA_OFFSET);
 
         _DEBUG("%s\n", "server.fork()");
         pid = fork();
@@ -122,7 +122,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(pkt+ DATAOFFSET, sockfd, cliaddr, window);
+            child(pkt+ DATA_OFFSET, sockfd, cliaddr, window);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);

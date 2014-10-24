@@ -1,4 +1,5 @@
 #include "xtcp.h"
+#include "common.h"
 
 void print_xtxphdr(struct xtcphdr *hdr) {
     printf("|xtcp_hdr| seq:%u", hdr->seq);
@@ -18,7 +19,25 @@ void make_pkt(void *hdr, uint32_t seq, uint32_t ack_seq,
     realhdr->flags = flags;
     realhdr->ack_seq = ack_seq;
     realhdr->advwin = advwin;
-    memcpy(( (char*)(hdr) + DATAOFFSET), data, datalen);
+    memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
+}
+
+int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
+        uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
+
+    ssize_t err;
+    void* pkt = malloc(MAX_PKT_SIZE);
+    make_pkt(pkt, seq, ack_seq, flags, advwin, data, datalen);
+
+    /*todo: do WND/rtt stuff*/
+
+    err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    if(err < 0) {
+        perror("xtcp.srvsend()");
+        return -1;
+    }
+
+    return 1;
 }
 
 void ntohpkt(struct xtcphdr *hdr) {
