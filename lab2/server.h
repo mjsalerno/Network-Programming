@@ -2,10 +2,6 @@
 #define SERVER_H
 
 #include "common.h"
-#include <assert.h>
-#include <inttypes.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 
 #define DEBUG
 #include "debug.h"

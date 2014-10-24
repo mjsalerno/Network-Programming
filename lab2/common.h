@@ -12,6 +12,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <assert.h>
+#include <inttypes.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include "xtcp.h"
 
 #define BUFF_SIZE 512
