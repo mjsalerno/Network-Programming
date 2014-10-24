@@ -204,7 +204,6 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
         close(child_sock);
         exit(EXIT_FAILURE);
     }
-    /*_DEBUG("port in network format: %hu\n", childaddr.sin_port);*/
 
     printf("child bound to: ");
     print_sock_name(child_sock, &childaddr);
