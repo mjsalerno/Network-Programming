@@ -382,14 +382,14 @@ int send_file(char* fname, int sock) {
 
     for(EVER) {
         n = fread(data, 1, sizeof(data), file);
-        _DEBUG("send_file.fread(%lu)", n);
+        _DEBUG("send_file.fread(%lu)", (unsigned long)n);
         if (ferror(file)) {
             printf("server.send_file(): There was an error reading the file\n");
             clearerr(file);
             fclose(file);
             exit(EXIT_FAILURE);
         } else {
-            _DEBUG("sending %lu bytes of file\n", n);
+            _DEBUG("sending %lu bytes of file\n", (unsigned long)n);
             err = srvsend(sock, ++seq, ack, 0, advwin, data, n);
             if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
