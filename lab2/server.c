@@ -76,6 +76,10 @@ int main(int argc, const char **argv) {
     }
 
     print_sock_name(sockfd, &p_serveraddr);
+    if(SIG_ERR == signal(SIGCHLD, proc_exit)) {
+        perror("server.signal()");
+    }
+
 
     for(EVER) {
 
@@ -84,6 +88,11 @@ int main(int argc, const char **argv) {
         err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
 
         if (err < 0 || !FD_ISSET(sockfd, &fdset)) {
+            if(errno == EINTR) {
+                _DEBUG("%s\n", "select interupted, continue ...");
+                continue;
+            }
+
             perror("server.select()");
             exit(EXIT_FAILURE);
         }
@@ -120,6 +129,7 @@ int main(int argc, const char **argv) {
             exit(EXIT_FAILURE);
         }
         _DEBUG("pid: %d\n", pid);
+        newCli->pid = pid;
 
         /*in child*/
         if (pid == 0) {
@@ -230,6 +240,30 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
     exit(EXIT_SUCCESS);
 }
 
+void proc_exit(int i) {
+    int stat = i;
+    pid_t pid;
+    _DEBUG("%s\n", "child died");
+
+    for(EVER) {
+        pid = waitpid(-1, &stat, WNOHANG);
+        if (pid == 0)
+            return;
+        else if (pid == -1)
+            return;
+        else if (WIFEXITED(stat)) {
+            printf("Return code of child: %d\n", WEXITSTATUS(stat));
+            stat = remove_client(&cliList, pid);
+            if(stat < 0) {
+                _DEBUG("%s\n", "there was an error removing the child");
+            }
+
+        } else {
+            printf("proc_exit(): There was an error");
+        }
+    }
+}
+
 /* adds a client to the client_list struct if it does not already exist
 * returns NULL if the client was already in the list
 * returns the pointer to the struct added
@@ -276,6 +310,39 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
         return p;
     }
 
+}
+
+void free_clients(struct client_list* head) {
+    if(head->next != NULL)
+        free_clients(head->next);
+
+    free(head);
+}
+
+int remove_client(struct client_list** head, pid_t pid) {
+    struct client_list* at;
+    struct client_list* prev = NULL;
+    at = (*head);
+
+    while(at != NULL) {
+        if(at->pid == pid) {
+            if((*head) == at) {
+                (*head)= (*head)->next;
+                free(at);
+                _DEBUG("%s\n", "found client at the head");
+                return 0;
+            } else {
+                prev->next = at->next;
+                free(at);
+                _DEBUG("%s\n", "found client NOT at the head");
+                return 0;
+            }
+        }
+        prev = at;
+        at = at->next;
+    }
+    _DEBUG("%s\n", "did NOT find client");
+    return -1;
 }
 
 int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_port_t newport, uint16_t adv_win) {
