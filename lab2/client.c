@@ -1,10 +1,6 @@
 #include "client.h"
 
 int main(void) {
-    /*stuff mike added*/
-    /*socklen_t len;
-    ssize_t n;*/
-    /*stuff mike added*/
 
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
@@ -29,8 +25,6 @@ int main(void) {
     struct sockaddr_in my_addr, serv_addr, bind_addr, peer_addr;
 
     /* struct xtcphdr hdr;*/ /* header for the init conn request */
-    /* for pedantic */
-    /* if(windsize || seed || u || p){} */
 
     /* zero the sockaddr_in's */
     memset((void *)&my_addr, 0, sizeof(my_addr));
@@ -120,8 +114,7 @@ int main(void) {
     /* connected to file transfer port */
     /* todo: pthread_create consumer thread */
 
-
-
+    /*todo: start getting the file*/
 
     close(serv_fd);
 
@@ -139,12 +132,13 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     fd_set rset;
     int maxfpd1 = 0;
     ssize_t n, err;
+    struct timeval timer;
 
     packetlen = DATAOFFSET + strlen(transferpath);
     packet = malloc(packetlen);
     /* make the packet */
     make_pkt(packet, ++seq, ack_seq, SYN, windsize, transferpath, strlen(transferpath));
-    printf("try send hs3: ");
+    printf("try send hs1: ");
     print_xtxphdr((struct xtcphdr*)packet);
     /* convert to network order */
     htonpkt((struct xtcphdr*)packet);
@@ -156,7 +150,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     if(drand48() > p) {
         err = send(serv_fd, packet, packetlen, 0);
         if (err < 0) {
-            perror("sendto()");
+            perror("send()");
             free(packet);
             return -1;
         }
@@ -172,10 +166,16 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     for(;;) {
         FD_ZERO(&rset);
         FD_SET(serv_fd, &rset);
+        timer.tv_usec = 0;
+        timer.tv_sec = TIME_OUT;
         maxfpd1 = serv_fd + 1;
 
         /* todo: liveliness timer? RTO/RTT timer */
-        select(maxfpd1, &rset, NULL, NULL, NULL);
+        err = select(maxfpd1, &rset, NULL, NULL, &timer);
+        if(err < 0) {
+            perror("hs.selcect()");
+            return -1;
+        }
         /* check if the serv_fd is set */
         if(FD_ISSET(serv_fd, &rset)) {
             _DEBUG("%s\n", "recv()'ing something");
@@ -187,6 +187,8 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
             }
             /* we recv()'ed something so break from select */
             break;
+        } else {
+            _DEBUG("%s\n", "hs2.timeout()");
         }
     }
     /* validate the something was a SYN-ACK */
