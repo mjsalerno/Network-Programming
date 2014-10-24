@@ -18,5 +18,6 @@ struct client_list {
 int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_win);
 struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t port);
 int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_port_t newport, uint16_t adv_win);
+int send_file(char* fname, int sock);
 
 #endif

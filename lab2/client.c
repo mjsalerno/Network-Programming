@@ -124,8 +124,13 @@ int main(void) {
             perror("client.getfile()");
             return EXIT_FAILURE;
         }
+        if(((struct xtcphdr*) pkt)->flags & FIN) {
+            _DEBUG("%s\n", "got FIN");
+            break;
+        }
 
-        printf("%s", (char*)pkt + DATA_OFFSET);
+        pkt[err] = 0;
+        printf("%s|", (char*)pkt + DATA_OFFSET);
         if(err == 0) {
             _DEBUG("%s\n", "Done getting file...");
         }

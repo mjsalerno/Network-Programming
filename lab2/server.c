@@ -123,7 +123,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(pkt+ DATA_OFFSET, sockfd, cliaddr, window);
+            child(pkt + DATA_OFFSET, sockfd, cliaddr, window);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -210,9 +210,14 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
     printf("connection established to client at  -- ");
     print_sock_peer(child_sock, &cliaddr);
 
+    _DEBUG("%s\n", "Sending file ...");
+    send_file(fname, child_sock);
 
-    close(child_sock);
+    _DEBUG("%s\n", "sending FIN");
+    srvsend(child_sock, ++seq, ack, FIN, adv_win, NULL, 0);
+
     _DEBUG("%s\n", "Exiting child");
+    close(child_sock);
     exit(EXIT_SUCCESS);
 }
 
@@ -376,20 +381,21 @@ int send_file(char* fname, int sock) {
     }
 
     for(EVER) {
-        n = fread(data, MAX_DATA_SIZE, 1, file);
+        n = fread(data, 1, sizeof(data), file);
+        _DEBUG("send_file.fread(%lu)", n);
         if (ferror(file)) {
             printf("server.send_file(): There was an error reading the file\n");
             clearerr(file);
             fclose(file);
             exit(EXIT_FAILURE);
-        } else if (feof(file)) {
-            printf("The file has finished uploading ...");
-            break;
         } else {
             _DEBUG("sending %lu bytes of file\n", n);
             err = srvsend(sock, ++seq, ack, 0, advwin, data, n);
             if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
+            } else if (feof(file)) {
+                printf("The file has finished uploading ...\n");
+                break;
             }
         }
     }
