@@ -20,6 +20,17 @@ struct xtcphdr {
     uint32_t ack_seq;
     uint16_t flags;
     uint16_t advwin;
+
+};
+
+struct window {
+
+    struct xtcphdr*  hdr;
+    void*            data;
+    int              datasize;
+    struct rtt_info* rtt;
+    struct window*   next;
+
 };
 
 void print_xtxphdr(struct xtcphdr *hdr);

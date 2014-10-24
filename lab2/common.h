@@ -15,6 +15,7 @@
 #include "xtcp.h"
 
 #define BUFF_SIZE 512
+#define TIME_OUT 2
 
 int int_from_config(FILE* file, const char* err_str);
 double double_from_config(FILE* file, const char* err_str);
