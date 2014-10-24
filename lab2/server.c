@@ -377,6 +377,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     _DEBUG("%s\n", "waiting to get reply on new child port ...");
     /*todo: use timer*/
 
+redo_hs1:
     timer.tv_sec = 2;
     timer.tv_usec = 0;
 
@@ -384,6 +385,10 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     FD_SET(child_sock, &rset);
     err = select(child_sock + 1, &rset, NULL, NULL, &timer);
     if(err < 0) {
+        if(errno == EINTR) {
+            _DEBUG("%s\n", "select interupted, redo ...");
+            goto redo_hs1;
+        }
         perror("server.hs2()");
         free(hdr);
         exit(EXIT_FAILURE);
@@ -411,12 +416,17 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
         }
         _DEBUG("%s\n", "waiting to get reply on new child port ...");
 
+redo_hs2:
         timer.tv_sec = 2;
         timer.tv_usec = 0;
         FD_ZERO(&rset);
         FD_SET(child_sock, &rset);
         err = select(child_sock + 1, &rset, NULL, NULL, &timer);
         if(err < 0) {
+            if(errno == EINTR) {
+                _DEBUG("%s\n", "select interupted, redo ...");
+                goto redo_hs2;
+            }
             perror("hs2.retry()");
             free(hdr);
             exit(EXIT_FAILURE);
