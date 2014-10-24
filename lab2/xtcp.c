@@ -42,6 +42,14 @@ int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
     return 1;
 }
 
+void free_windows(struct window* head) {
+    if(head->next != NULL) {
+        free_windows(head->next);
+
+    free(head->pkt);
+    free(head);
+}
+
 void ntohpkt(struct xtcphdr *hdr) {
     hdr->seq = ntohl(hdr->seq);
     hdr->ack_seq = ntohl(hdr->ack_seq);

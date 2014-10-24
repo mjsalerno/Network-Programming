@@ -27,8 +27,7 @@ struct xtcphdr {
 
 struct window {
 
-    struct xtcphdr*  hdr;
-    void*            data;
+    char*            pkt;  /*really misleading, this is hdr + data*/
     int              datasize;
     struct window*   next;
 
@@ -46,6 +45,7 @@ void make_pkt(void *hdr, uint32_t seq, uint32_t ack_seq,
 int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
         uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
+void free_windows(struct window* head);
 void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
 
