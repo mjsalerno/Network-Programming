@@ -2,6 +2,8 @@
 
 int main(void) {
 
+    void* pkt[MAX_PKT_SIZE];
+
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
     char transferpath[BUFF_SIZE]; /* file to transfer */
@@ -114,7 +116,20 @@ int main(void) {
     /* connected to file transfer port */
     /* todo: pthread_create consumer thread */
 
-    /*todo: start getting the file*/
+    _DEBUG("%s\n", "waiting for the file ...");
+    for(EVER) {
+        /*todo: start getting the file*/
+        err = recv(serv_fd, pkt, sizeof(pkt), 0);
+        if (err < 0) {
+            perror("client.getfile()");
+            return EXIT_FAILURE;
+        }
+
+        printf("%s", (char*)pkt + DATA_OFFSET);
+        if(err == 0) {
+            _DEBUG("%s\n", "Done getting file...");
+        }
+    }
 
     close(serv_fd);
 
@@ -163,7 +178,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
 
     /* select() for(ever) for SYN */
     /* todo: timeout for dropped packets! */
-    for(;;) {
+    for(EVER) {
         FD_ZERO(&rset);
         FD_SET(serv_fd, &rset);
         timer.tv_usec = 0;
