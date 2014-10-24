@@ -153,62 +153,65 @@ int testmain(void) {
     return EXIT_SUCCESS;
 }
 
-int child(char* fname, int par_sock, struct sockaddr_in cli_addr, uint16_t adv_win) {
-    struct sockaddr_in childaddr, cliaddr;
+int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_win) {
+    struct sockaddr_in childaddr;
     int err;
-    int sockfd;
+    int child_sock;
     socklen_t len;
 
     _DEBUG("%s\n", "In child");
     _DEBUG("child.filename: %s\n", fname);
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    child_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     bzero(&childaddr, sizeof(childaddr));
-    bzero(&cliaddr, sizeof(cliaddr));
 
     childaddr.sin_family = AF_INET;
     childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     childaddr.sin_port = htons(0);
 
     /*TODO: pass in ip i want*/
-    err = bind(sockfd, (struct sockaddr *) &childaddr, sizeof(childaddr));
+    err = bind(child_sock, (struct sockaddr *) &childaddr, sizeof(childaddr));
     if (err < 0) {
         perror("child.bind()");
         exit(EXIT_FAILURE);
     }
 
-    err = connect(sockfd, (struct sockaddr *) &cli_addr, sizeof(cli_addr));
+    err = connect(child_sock, (struct sockaddr *) &cliaddr, sizeof(cliaddr));
     if (err < 0) {
         perror("child.connect()");
         exit(EXIT_FAILURE);
     }
 
     len = sizeof(childaddr);
-    err = getsockname(sockfd, (struct sockaddr *)&childaddr, &len);
+    err = getsockname(child_sock, (struct sockaddr *)&childaddr, &len);
     if(err < 0) {
         perror("child.getsockname()");
         exit(EXIT_FAILURE);
     }
-    _DEBUG("port in network format: %hu\n", childaddr.sin_port);
+    /*_DEBUG("port in network format: %hu\n", childaddr.sin_port);*/
 
     printf("child bound to: ");
-    print_sock_name(sockfd, &childaddr);
+    print_sock_name(child_sock, &childaddr);
     printf("\nchild connected to: ");
-    print_sock_peer(sockfd, &cli_addr);
+    print_sock_peer(child_sock, &cliaddr);
     printf("\n");
 
     _DEBUG("%s\n", "doing hs2 ...");
-    err = hand_shake2(par_sock, cli_addr, sockfd, childaddr, adv_win);
+    err = hand_shake2(par_sock, cliaddr, child_sock, childaddr.sin_port, adv_win);
     if(err != EXIT_SUCCESS) {
         printf("There was an error with the handshake");
         exit(EXIT_FAILURE);
     }
 
     /* TODO: err = close(everything);*/
-    /* TODO: print out who i am connected to*/
+    /* print out connection extablished */
+    printf("connection established from child at -- ");
+    print_sock_name(child_sock, &childaddr);
+    printf("connection established to client at  -- ");
+    print_sock_peer(child_sock, &cliaddr);
 
 
-    close(sockfd);
+    close(child_sock);
     _DEBUG("%s\n", "Exiting child");
     exit(EXIT_SUCCESS);
 }
@@ -261,100 +264,96 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
 
 }
 
-int hand_shake2(int old_sock, struct sockaddr_in old_addr, int new_sock, struct sockaddr_in new_addr, uint16_t adv_win) {
+int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_port_t newport, uint16_t adv_win) {
     ssize_t n;
     socklen_t len;
-    char pkt[BUFF_SIZE];
-    struct xtcphdr* hdr = malloc(sizeof(struct xtcphdr));
+    char pktbuf[BUFF_SIZE];
+    struct xtcphdr* hdr = malloc(sizeof(struct xtcphdr) + 2);
     uint16_t flags = 0;
-    fd_set fdset;
+    fd_set rset;
     int err;
     int count = 0;
     struct timeval timer;
 
 
-    srand((unsigned int)time(NULL));
-    seq = (u_int32_t)rand();
+    srand48((unsigned int)time(NULL));
+    seq = (u_int32_t)lrand48();
 
     flags = SYN|ACK;
-    make_pkt(hdr, ++seq, ++ack, flags, adv_win, &new_addr.sin_port, 2);
+    make_pkt(hdr, ++seq, ++ack, flags, adv_win, &newport, 2);
+    printf("sent hs2: ");
+    print_xtxphdr(hdr);
     htonpkt(hdr);
 
-    len = sizeof(old_addr);
-    n = sendto(old_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&old_addr, len);
+    len = sizeof(struct sockaddr_in);
+    n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
     if (n < 1) {
         perror("hs2.send(port)");
         exit(EXIT_FAILURE);
     }
 
-    _DEBUG("%s\n", "waiting to get replay on other port ...");
+    _DEBUG("%s\n", "waiting to get reply on new child port ...");
     /*todo: use timer*/
 
     timer.tv_sec = 2;
     timer.tv_usec = 0;
 
-    FD_ZERO(&fdset);
-    FD_SET(new_sock, &fdset);
-    err = select(new_sock + 1, &fdset, NULL, NULL, &timer);
+    FD_ZERO(&rset);
+    FD_SET(child_sock, &rset);
+    err = select(child_sock + 1, &rset, NULL, NULL, &timer);
     if(err < 0) {
         perror("server.hs2()");
-        exit(EXIT_FAILURE);
-    } else if(err > 1) {
-        printf("The handshake is broken, exitting child\n");
         exit(EXIT_FAILURE);
     }
 
     _DEBUG("select(): %d\n", err);
 
-    while(!FD_ISSET(new_sock, &fdset) && count < 4) {
+    while(!FD_ISSET(child_sock, &rset) && count < 4) {
         count++;
-        _DEBUG("%s\n", "hs2 time out, send over both sockets ...");
+        _DEBUG("%s\n", "hs2 time out, re-sending over both sockets ...");
 
-        len = sizeof(old_addr);
-        n = sendto(old_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&old_addr, len);
+        len = sizeof(cliaddr);
+        n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
         if (n < 1) {
             perror("hs2.send(port)");
             exit(EXIT_FAILURE);
         }
-
-        len = sizeof(new_addr);
-        n = sendto(new_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&new_addr, len);
+        /* child_sock connected to new_addr? */
+        n = send(child_sock, hdr, sizeof(struct xtcphdr) + 2, 0);
         if (n < 1) {
             perror("hs2.send(port)");
             exit(EXIT_FAILURE);
         }
+        _DEBUG("%s\n", "waiting to get reply on new child port ...");
 
         timer.tv_sec = 2;
         timer.tv_usec = 0;
-        FD_ZERO(&fdset);
-        FD_SET(new_sock, &fdset);
-        err = select(new_sock + 1, &fdset, NULL, NULL, &timer);
+        FD_ZERO(&rset);
+        FD_SET(child_sock, &rset);
+        err = select(child_sock + 1, &rset, NULL, NULL, &timer);
         if(err < 0) {
             perror("hs2.retry()");
             exit(EXIT_FAILURE);
-        } else if(err > 1) {
-            printf("The handshake is broken, exitting child\n");
-            exit(EXIT_FAILURE);
         }
     }
-
-    if(!FD_ISSET(new_sock, &fdset)) {
-        printf("The handshake is broken, exitting child\n");
+    /* will happen when breaking out of while above */
+    if(!FD_ISSET(child_sock, &rset)) {
+        printf("The handshake is broken, exiting child\n");
         exit(EXIT_FAILURE);
     }
 
-
-    len = sizeof(new_addr);
-    n = recvfrom(new_sock, pkt, sizeof(pkt), 0, (struct sockaddr*)&new_addr,&len);
+    n = recv(child_sock, pktbuf, sizeof(pktbuf), 0);
     if(n < 0) {
         perror("hs2.recvfrom()");
-        close(new_sock);
+        close(child_sock);
         exit(EXIT_FAILURE);
     }
-    ntohpkt((struct xtcphdr*) pkt);
-    print_xtxphdr((struct xtcphdr*)pkt);
-    if(((struct xtcphdr*) pkt)->flags != ACK && ((struct xtcphdr*) pkt)->ack_seq == (seq + 1) && ((struct xtcphdr*) pkt)->seq == ack) {
-        printf("hs2(): the clients flags/ack/seq are wrong\n");
+    ntohpkt((struct xtcphdr*) pktbuf);
+    print_xtxphdr((struct xtcphdr*) pktbuf);
+    if(((struct xtcphdr*) pktbuf)->flags != ACK
+            || ((struct xtcphdr*) pktbuf)->ack_seq != (seq + 1)
+            || ((struct xtcphdr*) pktbuf)->seq != ack) {
+        printf("client's flags||ack||seq are wrong, handshake broken\n");
         exit(EXIT_FAILURE);
     }
 

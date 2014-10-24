@@ -1,13 +1,16 @@
 #include "xtcp.h"
 
 void print_xtxphdr(struct xtcphdr *hdr) {
+    int is_ack = 0;
     printf("|xtcp_hdr| seq:%u", hdr->seq);
     printf(", flags:");
     if((hdr->flags & FIN) == FIN){ printf("F"); }
     if((hdr->flags & SYN) == SYN){ printf("S"); }
     if((hdr->flags & RST) == RST){ printf("R"); }
-    if((hdr->flags & ACK) == ACK){ printf("A"); }
-    printf(", ack_seq:%u", hdr->ack_seq);
+    if((hdr->flags & ACK) == ACK){ printf("A"); is_ack = 1; }
+    if(is_ack) {
+        printf(", ack_seq:%u", hdr->ack_seq);
+    }
     printf(", advwin:%u\n", hdr->advwin);
 }
 
