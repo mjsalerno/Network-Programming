@@ -155,8 +155,6 @@ int main(void) {
 int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
     char pktbuf[MAX_PKT_SIZE];
     struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
-    void *packet;
-    size_t packetlen;
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
@@ -167,32 +165,13 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
     seq = (uint32_t)lrand48();
     ack_seq = 0;
 
-    packetlen = DATA_OFFSET + strlen(transferpath);
-    packet = malloc(packetlen);
-    /* make the packet */
-    ++seq;
-    make_pkt(packet, SYN, advwin, transferpath, strlen(transferpath));
-    printf("try send hs1: ");
-    print_xtxphdr((struct xtcphdr*)packet);
-    /* convert to network order */
-    htonpkt((struct xtcphdr*)packet);
-
-    /* todo: print_xtxphdr(&hdr); */
     /* todo: timeout  on oldest packet */
 
-    /* simulate packet loss on sends */
-    if(drand48() > pkt_loss_thresh) {
-        err = send(serv_fd, packet, packetlen, 0);
-        if (err < 0) {
-            perror("send()");
-            free(packet);
-            return -1;
-        }
-        printf("actually sent hs1 (SYN)\n");
-    }
-    else{
-        printf("dropped hs1 (SYN)\n");
-    }
+    acktimedout: /* jump here if server doesn't respond */
+    printf("try to send hs1: ");
+    clisend(serv_fd, SYN, transferpath, strlen(transferpath));
+    ++seq;
+
     _DEBUG("%s\n", "waiting for hs2...");
 
     /* select() for(ever) for SYN */
@@ -200,14 +179,14 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
     for(EVER) {
         FD_ZERO(&rset);
         FD_SET(serv_fd, &rset);
-        timer.tv_usec = 0;
         timer.tv_sec = TIME_OUT;
+        timer.tv_usec = 0;
         maxfpd1 = serv_fd + 1;
 
-        /* todo: liveliness timer? RTO/RTT timer */
         err = select(maxfpd1, &rset, NULL, NULL, &timer);
         if(err < 0) {
-            perror("hs.selcect()");
+            /* EINTR can't occur yet */
+            perror("hs.select()");
             return -1;
         }
         /* check if the serv_fd is set */
@@ -216,13 +195,15 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
             n = recv(serv_fd, pktbuf, sizeof(pktbuf), 0);
             if (n < 0) {
                 perror("recv()");
-                free(packet);
                 return -1;
             }
             /* we recv()'ed something so break from select */
             break;
-        } else {
-            _DEBUG("%s\n", "hs2.timeout()");
+        }
+        else { /* so the select timed out */
+            _DEBUG("%s\n", "timeout() while waiting for hs2, resending hs1");
+            /* hs1 was lost or hs2 was lost so */
+            goto acktimedout;
         }
     }
     /* validate the something was a SYN-ACK */
@@ -231,25 +212,22 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
     if(hdr->flags != (SYN|ACK)){
         fprintf(stderr, "hs2 not a SYN-ACK, flags: %d\n", hdr->flags);
         /* todo: RST/ free */
-        free(packet);
         return -1;
     }
     /* now validate the SEQ and ACK nums */
-    if(hdr->ack_seq != seq+1){
+    if(hdr->ack_seq != seq){
         fprintf(stderr, "ERROR: hs2 unexpected ack_seq: %d, expected: %d\n", hdr->ack_seq, seq+1);
         /* todo: RST/ free */
-        free(packet);
         return -1;
     }
     if(n != DATA_OFFSET + 2){
         fprintf(stderr, "hs2 not %d bytes, size: %d\n", DATA_OFFSET + 2, (int)n);
         /* todo: RST/ free */
-        free(packet);
         return -1;
     }
     printf("recv'd hs2: ");
     print_xtxphdr(hdr);
-    ack_seq = hdr->seq;
+    ack_seq = hdr->seq + 1; /* we expect their seq + 1 */
 
     /* copy the passed port into the serv_addr */
     memcpy(&serv_addr->sin_port, pktbuf + DATA_OFFSET, sizeof(serv_addr->sin_port));
@@ -257,37 +235,15 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
     err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
     if (err < 0) {
         perror("re connect()");
-        free(packet);
         return -1;
     }
     printf("re-connect()'ed to -- ");
     print_sock_peer(serv_fd, serv_addr);
+
     /* move on to third handshake */
-
-    /* third handshake */
-    ++seq;
-    ++ack_seq;
-    make_pkt(packet, ACK, advwin, NULL, 0);
     printf("try send hs3: ");
-    print_xtxphdr((struct xtcphdr*)packet);
-    htonpkt((struct xtcphdr*)packet);
+    clisend(serv_fd, ACK, NULL, 0);
 
-    /* todo: timeout  on oldest packet */
-
-    /* simulate packet loss on sends */
-    if(drand48() > pkt_loss_thresh) {
-        err = send(serv_fd, packet, DATA_OFFSET, 0);
-        if (err < 0) {
-            perror("sendto()");
-            free(packet);
-            return -1;
-        }
-        printf("actually sent hs3 (ACK)\n");
-    }
-    else{
-        printf("dropped hs3 (ACK)\n");
-    }
-    free(packet);
     return 0;
 
 }
