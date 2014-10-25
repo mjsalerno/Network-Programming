@@ -24,10 +24,10 @@ void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t dat
     memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
 }
 
-int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen) {
 
     ssize_t err;
-    void* pkt = malloc(MAX_PKT_SIZE);
+    void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
     make_pkt(pkt, flags, advwin, data, datalen);
     /*print_xtxphdr((struct xtcphdr*)pkt);*/
     htonpkt((struct xtcphdr*)pkt);
@@ -77,7 +77,7 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
 }
 
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
-    int n = (index + advwin) % advwin;
+    int n = (index + basewin) % advwin;
     if(n > advwin) {
         fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
         return -1;
@@ -94,7 +94,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
 }
 
 const char* remove_from_wnd(uint32_t index, const char** wnd) {
-    int n = (index + advwin) % advwin;
+    int n = (index + basewin) % advwin;
     const char* tmp;
 
     if(n > advwin) {

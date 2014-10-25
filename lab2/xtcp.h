@@ -20,10 +20,10 @@
 
 /* for extern'ing in client and server */
 uint32_t seq;           /* SEQ number */
-uint32_t ack_seq;        /* ACK number */
+uint32_t ack_seq;       /* ACK number */
 
-uint16_t advwin;       /* current advwin */
-char* basewin;          /* for marking the base of the window */
+uint16_t advwin;        /* current advwin */
+int basewin;            /* index of the window base */
 
 double pkt_loss_thresh; /* packet loss percentage */
 
@@ -42,7 +42,7 @@ make_pkt(packet, .....)
  */
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
-int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
