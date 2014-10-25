@@ -5,7 +5,7 @@ extern uint32_t ack_seq;
 
 int main(void) {
 
-    void* pkt[MAX_PKT_SIZE];
+    char pkt[MAX_PKT_SIZE];
 
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
