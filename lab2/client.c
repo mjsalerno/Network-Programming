@@ -1,5 +1,7 @@
 #include "client.h"
 
+extern uint32_t seq;
+
 int main(void) {
 
     void* pkt[MAX_PKT_SIZE];
@@ -124,15 +126,15 @@ int main(void) {
             perror("client.getfile()");
             return EXIT_FAILURE;
         }
+
+        pkt[err] = 0;
+        printf("%s\n#######\n", (char*)pkt + DATA_OFFSET);
+        if(err == 0) {
+            _DEBUG("%s\n", "Done getting file...");
+        }
         if(((struct xtcphdr*) pkt)->flags & FIN) {
             _DEBUG("%s\n", "got FIN");
             break;
-        }
-
-        pkt[err] = 0;
-        printf("%s|", (char*)pkt + DATA_OFFSET);
-        if(err == 0) {
-            _DEBUG("%s\n", "Done getting file...");
         }
     }
 
