@@ -2,9 +2,6 @@
 #include "server.h"
 
 struct client_list* cliList;
-struct window* wndo;
-struct window* wndo_b;
-struct window* wndo_e;
 
 extern uint32_t seq;
 extern uint32_t ack_seq;
@@ -158,12 +155,15 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     int child_sock;
     socklen_t len;
 
+    /* init window */
+    wnd = malloc(sizeof(char*) * advwin);
+    basewin = 0;
+
     _DEBUG("%s\n", "In child");
     _DEBUG("child.filename: %s\n", fname);
     child_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     bzero(&childaddr, sizeof(childaddr));
-
     childaddr.sin_family = AF_INET;
     childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     childaddr.sin_port = htons(0);
@@ -221,7 +221,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     _DEBUG("%s\n", "sending FIN");
     ++seq;
-    srvsend(child_sock, FIN, advwin, NULL, 0);
+    srvsend(child_sock, FIN, NULL, 0);
 
     _DEBUG("%s\n", "Exiting child");
     close(child_sock);
@@ -479,10 +479,15 @@ int send_file(char* fname, int sock) {
             fclose(file);
             exit(EXIT_FAILURE);
         } else {
-            _DEBUG("sending %lu bytes of file\n", (unsigned long)n);
+            _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
             ++seq;
-            err = srvsend(sock, 0, advwin, data, n);
-            if(err < 0) {
+            err = srvsend(sock, 0, data, n);
+            if(err == -1) {      /* the error code for full window */
+                /* todo: do this for real */
+                _DEBUG("%s\n", "window is full ...");
+                exit(EXIT_SUCCESS);
+
+            } else if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
             } else if (feof(file)) {
                 printf("The file has finished uploading ...\n");

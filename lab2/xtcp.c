@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include "xtcp.h"
+#include "debug.h"
 
 void print_xtxphdr(struct xtcphdr *hdr) {
     int is_ack = 0;
@@ -33,14 +34,19 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen) {
     htonpkt((struct xtcphdr*)pkt);
 
     /*todo: do WND/rtt stuff*/
+    err = add_to_wnd(seq, pkt, (const char**)wnd);
+    if(err < 0) {
+        _DEBUG("%s\n", "The window was full, not sending");
+        return -1;
+    }
 
     err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
     if(err < 0) {
         perror("xtcp.srvsend()");
         free(pkt);
-        return -1;
+        return -2;
     }
-
+    seq++;
     free(pkt);
     return 1;
 }
