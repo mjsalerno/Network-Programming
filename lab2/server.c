@@ -483,7 +483,7 @@ int send_file(char* fname, int sock) {
     for(EVER) {
         n = fread(data, 1, sizeof(data), file);
         tally += n;
-        _DEBUG("send_file.fread(%u)\n", (unsigned long)n);
+        _DEBUG("send_file.fread(%lu)\n", (unsigned long)n);
         if (ferror(file)) {
             printf("server.send_file(): There was an error reading the file\n");
             clearerr(file);
