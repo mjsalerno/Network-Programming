@@ -28,7 +28,9 @@ int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t data
     ssize_t err;
     void* pkt = malloc(MAX_PKT_SIZE);
     make_pkt(pkt, flags, advwin, data, datalen);
-
+    /*print_xtxphdr((struct xtcphdr*)pkt);*/
+    htonpkt((struct xtcphdr*)pkt);
+    
     /*todo: do WND/rtt stuff*/
 
     err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
