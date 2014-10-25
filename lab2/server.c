@@ -479,7 +479,7 @@ int send_file(char* fname, int sock) {
     }
 
     _DEBUG("math: %d\n", MAX_DATA_SIZE);
-    _DEBUG("data size: %lu\n", sizeof(data));
+    _DEBUG("data size: %u\n", (unsigned int)sizeof(data));
     for(EVER) {
         n = fread(data, 1, sizeof(data), file);
         tally += n;
