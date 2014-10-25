@@ -21,7 +21,7 @@ xtcp.o: xtcp.c xtcp.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
-	-rm -f client server *.o
+	-rm -f  test client server *.o
 
 touch:
 	touch *.c *.h

@@ -82,6 +82,17 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     return 1;
 }
 
+char** init_wnd() {
+    char** rtn;
+    int i;
+    rtn = malloc(sizeof(char*) * advwin);
+
+    for(i = 0; i < advwin; ++i)
+        *(rtn+i) = 0;
+
+    return rtn;
+}
+
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     int n = (index + basewin) % advwin;
     if(n > advwin) {

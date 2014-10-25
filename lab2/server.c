@@ -156,7 +156,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     socklen_t len;
 
     /* init window */
-    wnd = malloc(sizeof(char*) * advwin);
+    wnd = init_wnd();
     basewin = 0;
 
     _DEBUG("%s\n", "In child");
@@ -246,6 +246,9 @@ void proc_exit(int i) {
             if(stat < 0) {
                 _DEBUG("%s\n", "there was an error removing the child");
             }
+
+        } else if(WIFSIGNALED(stat)) {
+            _DEBUG("dead child sig: %s\n", strsignal(WTERMSIG(stat)));
 
         } else {
             printf("proc_exit(): There was an error");
