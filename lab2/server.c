@@ -466,9 +466,11 @@ redo_hs2:
 
 int send_file(char* fname, int sock) {
     FILE *file;
-    char* data[MAX_DATA_SIZE] = {0};
+    char data[MAX_DATA_SIZE] = {0};
     size_t n;
-    int err;
+    int err, tally;
+
+    tally = 0;
 
     file = fopen(fname, "r");
     if(file == NULL) {
@@ -476,9 +478,12 @@ int send_file(char* fname, int sock) {
         exit(EXIT_FAILURE);
     }
 
+    _DEBUG("math: %d\n", MAX_DATA_SIZE);
+    _DEBUG("data size: %lu\n", sizeof(data));
     for(EVER) {
         n = fread(data, 1, sizeof(data), file);
-        _DEBUG("send_file.fread(%lu)", (unsigned long)n);
+        tally += n;
+        _DEBUG("send_file.fread(%lu)\n", n);
         if (ferror(file)) {
             printf("server.send_file(): There was an error reading the file\n");
             clearerr(file);
@@ -497,6 +502,7 @@ int send_file(char* fname, int sock) {
         }
     }
 
+    _DEBUG("tally: %d\n", tally);
     fclose(file);
 
     return EXIT_SUCCESS;
