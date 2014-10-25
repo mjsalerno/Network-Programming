@@ -20,7 +20,6 @@
 #include "xtcp.h"
 
 #define BUFF_SIZE 512
-#define TIME_OUT 2
 #define EVER ;;
 
 uint32_t seq;

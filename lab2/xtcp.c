@@ -64,8 +64,10 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
         }
     }
     else{
+        /* fixme: remove prints? */
         printf("DROPPED PKT: ");
         ntohpkt((struct xtcphdr*)pkt);
+        print_xtxphdr((struct xtcphdr*)pkt);
         htonpkt((struct xtcphdr*)pkt);
     }
 

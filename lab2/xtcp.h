@@ -16,6 +16,8 @@
 #define MAX_PKT_SIZE 512
 #define MAX_DATA_SIZE (MAX_PKT_SIZE - DATA_OFFSET)
 
+#define TIME_OUT 2
+
 /* for extern'ing in client and server */
 uint32_t seq;
 uint32_t ack_seq;
