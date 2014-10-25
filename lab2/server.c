@@ -3,10 +3,12 @@
 
 struct client_list* cliList;
 struct window* wndo;
+struct window* wndo_b;
+struct window* wndo_e;
 
 extern uint32_t seq;
 extern uint32_t ack_seq;
-uint16_t adv_win;
+extern uint16_t advwin;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -50,12 +52,12 @@ int main(int argc, const char **argv) {
     printf("Port: %hu\n", port);
     
     /*Get the window size*/
-    adv_win = (uint16_t)int_from_config(file, "There was an error getting the window size number");
-    if(adv_win < 1) {
+    advwin = (uint16_t)int_from_config(file, "There was an error getting the window size number");
+    if(advwin < 1) {
         fprintf(stderr, "The window can not be less than 1\n");
         exit(EXIT_FAILURE);
     }
-    _DEBUG("Window: %hu\n", adv_win);
+    _DEBUG("Window: %hu\n", advwin);
     _DEBUG("config: %s\n", path);
 
     err = fclose(file);
@@ -120,6 +122,11 @@ int main(int argc, const char **argv) {
             printf("server.hs1(): client did not send SYN: %hu\n", ((struct xtcphdr*)pkt)->flags);
             continue;
         }
+
+        /* pick the smallest advwin */
+        advwin = ((struct xtcphdr*)pkt)->advwin < advwin ? ((struct xtcphdr*)pkt)->advwin : advwin;
+        _DEBUG("new advwin: %d\n", advwin);
+
         print_xtxphdr((struct xtcphdr*) pkt);
         _DEBUG("Got filename: %s\n", pkt + DATA_OFFSET);
 
@@ -233,7 +240,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     _DEBUG("%s\n", "sending FIN");
     ++seq;
-    srvsend(child_sock, FIN, adv_win, NULL, 0);
+    srvsend(child_sock, FIN, advwin, NULL, 0);
 
     _DEBUG("%s\n", "Exiting child");
     close(child_sock);
@@ -364,7 +371,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     flags = SYN|ACK;
     ++seq;
     ++ack_seq;
-    make_pkt(hdr, flags, adv_win, &newport, 2);
+    make_pkt(hdr, flags, advwin, &newport, 2);
     printf("sent hs2: ");
     print_xtxphdr(hdr);
     htonpkt(hdr);
@@ -493,7 +500,7 @@ int send_file(char* fname, int sock) {
         } else {
             _DEBUG("sending %lu bytes of file\n", (unsigned long)n);
             ++seq;
-            err = srvsend(sock, 0, adv_win, data, n);
+            err = srvsend(sock, 0, advwin, data, n);
             if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
             } else if (feof(file)) {
