@@ -5,7 +5,7 @@ struct client_list* cliList;
 struct window* wndo;
 
 extern uint32_t seq;
-uint32_t ack;
+extern uint32_t ack_seq;
 uint16_t adv_win;
 
 int main(int argc, const char **argv) {
@@ -113,7 +113,7 @@ int main(int argc, const char **argv) {
         }
         ntohpkt((struct xtcphdr*)pkt);
 
-        ack = ((struct xtcphdr*)pkt)->seq;
+        ack_seq = ((struct xtcphdr*)pkt)->seq;
 
         pkt[n] = 0;
         if(((struct xtcphdr*)pkt)->flags != SYN) {
@@ -232,7 +232,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     send_file(fname, child_sock);
 
     _DEBUG("%s\n", "sending FIN");
-    srvsend(child_sock, ++seq, ack, FIN, adv_win, NULL, 0);
+    ++seq;
+    srvsend(child_sock, FIN, adv_win, NULL, 0);
 
     _DEBUG("%s\n", "Exiting child");
     close(child_sock);
@@ -361,7 +362,9 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     seq = (u_int32_t)lrand48();
 
     flags = SYN|ACK;
-    make_pkt(hdr, ++seq, ++ack, flags, adv_win, &newport, 2);
+    ++seq;
+    ++ack_seq;
+    make_pkt(hdr, flags, adv_win, &newport, 2);
     printf("sent hs2: ");
     print_xtxphdr(hdr);
     htonpkt(hdr);
@@ -450,7 +453,7 @@ redo_hs2:
     print_xtxphdr((struct xtcphdr*) pktbuf);
     if(((struct xtcphdr*) pktbuf)->flags != ACK
             || ((struct xtcphdr*) pktbuf)->ack_seq != (seq + 1)
-            || ((struct xtcphdr*) pktbuf)->seq != ack) {
+            || ((struct xtcphdr*) pktbuf)->seq != ack_seq) {
         printf("client's flags||ack||seq are wrong, handshake broken\n");
         exit(EXIT_FAILURE);
     }
@@ -487,8 +490,9 @@ int send_file(char* fname, int sock) {
             fclose(file);
             exit(EXIT_FAILURE);
         } else {
-            _DEBUG("sending %lu bytes of file\n", n);
-            err = srvsend(sock, ++seq, ack, 0, adv_win, data, n);
+            _DEBUG("sending %lu bytes of file\n", (unsigned long)n);
+            ++seq;
+            err = srvsend(sock, 0, adv_win, data, n);
             if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
             } else if (feof(file)) {
