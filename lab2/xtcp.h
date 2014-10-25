@@ -19,6 +19,8 @@
 /* for extern'ing in client and server */
 uint32_t seq;
 uint32_t ack_seq;
+/* packet loss percentage */
+double pkt_loss_thresh;
 
 struct xtcphdr {
 

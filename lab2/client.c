@@ -3,6 +3,9 @@
 extern uint32_t seq;
 extern uint32_t ack_seq;
 
+/* packet loss percentage */
+extern double pkt_loss_thresh;
+
 int main(void) {
 
     void* pkt[MAX_PKT_SIZE];
@@ -16,7 +19,6 @@ int main(void) {
     /* config/xtcp vars */
     uint16_t windsize;
     int seed;
-    double p; /* packet loss percentage */
     double u; /* (!!in ms!!) mean of the exponential distribution func */
 
     /* serv_fd -- the main server connection socket, reconnected later */
@@ -65,7 +67,7 @@ int main(void) {
     /* 5. fill in seed */
     seed = int_from_config(file, "client.in:5: error getting seed");
     /* 6. fill in seed */
-    p = double_from_config(file,
+    pkt_loss_thresh = double_from_config(file,
         "client.in:6: error getting packet loss percentage");
     /* 7. fill in seed */
     u = double_from_config(file, "client.in:7: error getting seed");
@@ -77,7 +79,7 @@ int main(void) {
 
     _DEBUG("config file args below:\nipv4:%s \nport:%hu \ntrans:%s \n"
             "windsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
-        ip4_str, knownport, transferpath, windsize, seed, p, u);
+        ip4_str, knownport, transferpath, windsize, seed, pkt_loss_thresh, u);
 
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -109,7 +111,7 @@ int main(void) {
     printf("connect()'ed to -- ");
     print_sock_peer(serv_fd, &peer_addr);
 
-    err = handshakes(serv_fd, &serv_addr, p, transferpath, windsize);
+    err = handshakes(serv_fd, &serv_addr, transferpath, windsize);
     if(err != 0){
         /* todo: clean up, close?, free?*/
         close(serv_fd);
@@ -144,7 +146,7 @@ int main(void) {
 }
 
 
-int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *transferpath, uint16_t windsize) {
+int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath, uint16_t windsize) {
     char pktbuf[MAX_PKT_SIZE];
     struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
     void *packet;
@@ -173,7 +175,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     /* todo: timeout  on oldest packet */
 
     /* simulate packet loss on sends */
-    if(drand48() > p) {
+    if(drand48() > pkt_loss_thresh) {
         err = send(serv_fd, packet, packetlen, 0);
         if (err < 0) {
             perror("send()");
@@ -267,7 +269,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     /* todo: timeout  on oldest packet */
 
     /* simulate packet loss on sends */
-    if(drand48() > p) {
+    if(drand48() > pkt_loss_thresh) {
         err = send(serv_fd, packet, DATA_OFFSET, 0);
         if (err < 0) {
             perror("sendto()");
