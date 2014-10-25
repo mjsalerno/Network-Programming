@@ -19,28 +19,19 @@
 #define TIME_OUT 2
 
 /* for extern'ing in client and server */
-uint32_t seq;
-uint32_t ack_seq;
-/* current advwin */
-uint16_t advwin;
-/* packet loss percentage */
-double pkt_loss_thresh;
+uint32_t seq;           /* SEQ number */
+uint32_t ack_seq;        /* ACK number */
+
+uint16_t advwin;       /* current advwin */
+char* basewin;          /* for marking the base of the window */
+
+double pkt_loss_thresh; /* packet loss percentage */
 
 struct xtcphdr {
-
     uint32_t seq;
     uint32_t ack_seq;
     uint16_t flags;
     uint16_t advwin;
-
-};
-
-struct window {
-
-    char*            pkt;  /*really misleading, this is hdr + data*/
-    int              datasize;
-    struct window*   next;
-
 };
 
 void print_xtxphdr(struct xtcphdr *hdr);
@@ -52,10 +43,12 @@ make_pkt(packet, .....)
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
 int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
-
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
-void free_windows(struct window* head);
+int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
+const char* remove_from_wnd(uint32_t index, const char** wnd);
+void free_wnd(char** wnd);
+
 void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
 

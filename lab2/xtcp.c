@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include "xtcp.h"
 
 void print_xtxphdr(struct xtcphdr *hdr) {
@@ -63,7 +64,7 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
             return -1;
         }
     }
-    else{
+    else {
         /* fixme: remove prints? */
         printf("DROPPED PKT: ");
         ntohpkt((struct xtcphdr*)pkt);
@@ -75,39 +76,51 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     return 1;
 }
 
-/*private function dont make proto*/
-void fwh(struct window* at, struct window* head) {
-    if(at->next != head)
-        fwh(head->next, head);
+int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
+    int n = (index + advwin) % advwin;
+    if(n > advwin) {
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
+        return -1;
+    }
 
-    free(at->pkt);
-    free(at);
+    if(wnd[n] != NULL) {
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
+        return -1;
+    }
 
+    wnd[n] = pkt;
+
+    return 1;
 }
 
-void free_windows(struct window* head) {
-    fwh(head, head);
-}
+const char* remove_from_wnd(uint32_t index, const char** wnd) {
+    int n = (index + advwin) % advwin;
+    const char* tmp;
 
-struct window* malloc_windows(int count) {
-    int i;
-    struct window* head = NULL;
-    struct window* ptr = NULL;
-
-    if(count < 1) {
+    if(n > advwin) {
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
         return NULL;
     }
 
-    head = malloc(sizeof(struct window));
-    ptr = head->next;
+    tmp = wnd[n];
+    wnd[n] = NULL;
 
-    for(i = 1; i < count; ++i) {
-        ptr = malloc(sizeof(struct window));
-        ptr = ptr->next;
+    return tmp;
+}
+
+void free_wnd(char** wnd) {
+    int size = (sizeof(wnd)) / (sizeof(char *));
+    char* tmp;
+    int i;
+
+    for(i = 0; i < size; ++i) {
+        tmp = wnd[i];
+        if(tmp != NULL) {
+            free(tmp);
+        }
     }
 
-    ptr = head;
-    return head;
+    free(wnd);
 }
 
 void ntohpkt(struct xtcphdr *hdr) {

@@ -22,8 +22,6 @@
 #define BUFF_SIZE 512
 #define EVER ;;
 
-uint32_t seq;
-
 int int_from_config(FILE* file, const char* err_str);
 double double_from_config(FILE* file, const char* err_str);
 void str_from_config(FILE* file, char *line, int len, const char* err_str);
