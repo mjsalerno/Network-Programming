@@ -16,6 +16,10 @@
 #define MAX_PKT_SIZE 512
 #define MAX_DATA_SIZE (MAX_PKT_SIZE - DATA_OFFSET)
 
+/* for extern'ing in client and server */
+uint32_t seq;
+uint32_t ack_seq;
+
 struct xtcphdr {
 
     uint32_t seq;
@@ -39,11 +43,9 @@ Example:
 void *packet = malloc(sizeof(struct xtcphdr) + datalen)
 make_pkt(packet, .....)
  */
-void make_pkt(void *hdr, uint32_t seq, uint32_t ack_seq,
-        uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
-int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
-        uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
 void free_windows(struct window* head);
 void ntohpkt(struct xtcphdr *hdr);

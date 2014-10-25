@@ -14,8 +14,7 @@ void print_xtxphdr(struct xtcphdr *hdr) {
     printf(", advwin:%u\n", hdr->advwin);
 }
 
-void make_pkt(void *hdr, uint32_t seq, uint32_t ack_seq,
-        uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
+void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
     struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
     realhdr->seq = seq;
     realhdr->flags = flags;
@@ -24,12 +23,11 @@ void make_pkt(void *hdr, uint32_t seq, uint32_t ack_seq,
     memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
 }
 
-int srvsend(int sockfd, uint32_t seq, uint32_t ack_seq,
-        uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
+int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
 
     ssize_t err;
     void* pkt = malloc(MAX_PKT_SIZE);
-    make_pkt(pkt, seq, ack_seq, flags, advwin, data, datalen);
+    make_pkt(pkt, flags, advwin, data, datalen);
 
     /*todo: do WND/rtt stuff*/
 

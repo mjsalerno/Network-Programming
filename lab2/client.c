@@ -1,5 +1,8 @@
 #include "client.h"
 
+extern uint32_t seq;
+extern uint32_t ack_seq;
+
 int main(void) {
 
     void* pkt[MAX_PKT_SIZE];
@@ -36,7 +39,6 @@ int main(void) {
     my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     my_addr.sin_port = htons(0);
     serv_addr.sin_family = AF_INET;
-
     /* read the config */
     file = fopen(path, "r");
     if(file == NULL) {
@@ -147,17 +149,21 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
     void *packet;
     size_t packetlen;
-    uint32_t seq = (uint32_t)lrand48(), ack_seq = 0;
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
     ssize_t n, err;
     struct timeval timer;
 
+    /* init seq/ack_seq */
+    seq = (uint32_t)lrand48();
+    ack_seq = 0;
+
     packetlen = DATA_OFFSET + strlen(transferpath);
     packet = malloc(packetlen);
     /* make the packet */
-    make_pkt(packet, ++seq, ack_seq, SYN, windsize, transferpath, strlen(transferpath));
+    ++seq;
+    make_pkt(packet, SYN, windsize, transferpath, strlen(transferpath));
     printf("try send hs1: ");
     print_xtxphdr((struct xtcphdr*)packet);
     /* convert to network order */
@@ -222,7 +228,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     }
     /* now validate the SEQ and ACK nums */
     if(hdr->ack_seq != seq+1){
-        fprintf(stderr, "hs2 ack_seq num wrong, ack_seq: %d\n", hdr->ack_seq);
+        fprintf(stderr, "ERROR: hs2 unexpected ack_seq: %d, expected: %d\n", hdr->ack_seq, seq+1);
         /* todo: RST/ free */
         free(packet);
         return -1;
@@ -251,7 +257,9 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, double p, char *trans
     /* move on to third handshake */
 
     /* third handshake */
-    make_pkt(packet, ++seq, ++ack_seq, ACK, windsize, NULL, 0);
+    ++seq;
+    ++ack_seq;
+    make_pkt(packet, ACK, windsize, NULL, 0);
     printf("try send hs3: ");
     print_xtxphdr((struct xtcphdr*)packet);
     htonpkt((struct xtcphdr*)packet);
