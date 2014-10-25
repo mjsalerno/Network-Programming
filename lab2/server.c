@@ -2,9 +2,11 @@
 #include "server.h"
 
 struct client_list* cliList;
+struct window* wndo;
+
 uint32_t seq;
 uint32_t ack;
-uint16_t advwin;
+uint16_t adv_win;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -12,7 +14,6 @@ int main(int argc, const char **argv) {
     FILE *file;
     unsigned short port;
     fd_set fdset;
-    uint16_t window;
     int pid;
     int err;
     ssize_t n;
@@ -49,12 +50,12 @@ int main(int argc, const char **argv) {
     printf("Port: %hu\n", port);
     
     /*Get the window size*/
-    window = (uint16_t)int_from_config(file, "There was an error getting the window size number");
-    if(window < 1) {
+    adv_win = (uint16_t)int_from_config(file, "There was an error getting the window size number");
+    if(adv_win < 1) {
         fprintf(stderr, "The window can not be less than 1\n");
         exit(EXIT_FAILURE);
     }
-    _DEBUG("Window: %hu\n", window);
+    _DEBUG("Window: %hu\n", adv_win);
     _DEBUG("config: %s\n", path);
 
     err = fclose(file);
@@ -133,7 +134,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(pkt + DATA_OFFSET, sockfd, cliaddr, window);
+            child(pkt + DATA_OFFSET, sockfd, cliaddr);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
@@ -163,7 +164,7 @@ int testmain(void) {
     return EXIT_SUCCESS;
 }
 
-int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_win) {
+int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     struct sockaddr_in childaddr;
     int err;
     int child_sock;
@@ -212,7 +213,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr, uint16_t adv_wi
     printf("\n");
 
     _DEBUG("%s\n", "doing hs2 ...");
-    err = hand_shake2(par_sock, cliaddr, child_sock, childaddr.sin_port, adv_win);
+    err = hand_shake2(par_sock, cliaddr, child_sock, childaddr.sin_port);
     if(err != EXIT_SUCCESS) {
         printf("There was an error with the handshake");
         free_clients(cliList);
@@ -344,7 +345,7 @@ int remove_client(struct client_list** head, pid_t pid) {
     return -1;
 }
 
-int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_port_t newport, uint16_t adv_win) {
+int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_port_t newport) {
     ssize_t n;
     socklen_t len;
     char pktbuf[BUFF_SIZE];
@@ -482,7 +483,7 @@ int send_file(char* fname, int sock) {
             exit(EXIT_FAILURE);
         } else {
             _DEBUG("sending %lu bytes of file\n", (unsigned long)n);
-            err = srvsend(sock, ++seq, ack, 0, advwin, data, n);
+            err = srvsend(sock, ++seq, ack, 0, adv_win, data, n);
             if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
             } else if (feof(file)) {

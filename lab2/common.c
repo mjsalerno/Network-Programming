@@ -76,10 +76,3 @@ void print_sock_peer(int sockfd, struct sockaddr_in *addr) {
     }
     printf("%s:%hu\n", ip4_str, ntohs(addr->sin_port));
 }
-
-int max(int a, int b) {
-    return a > b ? a : b;
-}
-
-
-
