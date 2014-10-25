@@ -364,7 +364,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     flags = SYN|ACK;
     ++seq;
     ++ack_seq;
-    `_pkt(hdr, flags, adv_win, &newport, 2);
+    make_pkt(hdr, flags, adv_win, &newport, 2);
     printf("sent hs2: ");
     print_xtxphdr(hdr);
     htonpkt(hdr);
