@@ -48,9 +48,9 @@ int main(int argc, const char **argv) {
     if(port < 1) {
         fprintf(stderr, "The port can not be less than 1\n");
         exit(EXIT_FAILURE);
-    } 
+    }
     printf("Port: %hu\n", port);
-    
+
     /*Get the window size*/
     advwin = (uint16_t)int_from_config(file, "There was an error getting the window size number");
     if(advwin < 1) {
@@ -149,25 +149,6 @@ int main(int argc, const char **argv) {
     }
 
 
-    return EXIT_SUCCESS;
-}
-
-int testmain(void) {
-
-    struct client_list* list = NULL;
-    struct client_list* p;
-
-    p = add_client(&list, 1, 10);
-
-    printf("---\nip: %d\ncli.port: %d\n", 1, 10);
-    printf("---\np.pid: %d\np.ip: %d\np.port: %d\n", p->pid, p->ip, p->port);
-    printf("---\nlst.pid: %d\nlst.ip: %d\nlst.port: %d\n\n", list->pid, list->ip, list->port);
-
-    p = add_client(&list, -1, 11);
-
-    printf("---\ncli.ip: %d\ncli.port: %d\n", -1, 11);
-    printf("---\np.pid: %d\np.ip: %d\np.port: %d\n", p->pid, p->ip, p->port);
-    printf("---\nlst.pid: %d\nlst.ip: %d\nlst.port: %d\n\n", list->pid, list->ip, list->port);
     return EXIT_SUCCESS;
 }
 
