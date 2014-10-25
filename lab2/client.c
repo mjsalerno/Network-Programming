@@ -2,6 +2,7 @@
 
 extern uint32_t seq;
 extern uint32_t ack_seq;
+extern uint16_t advwin;
 
 /* packet loss percentage */
 extern double pkt_loss_thresh;
@@ -17,7 +18,7 @@ int main(void) {
     char ip4_str[INET_ADDRSTRLEN];
     /* char buf[BUFF_SIZE + 1]; */
     /* config/xtcp vars */
-    uint16_t windsize;
+    uint16_t orig_win_size;
     int seed;
     double u; /* (!!in ms!!) mean of the exponential distribution func */
 
@@ -63,7 +64,8 @@ int main(void) {
     str_from_config(file, transferpath, sizeof(transferpath),
         "client.in:3: error getting transfer file name");
     /* 4. fill in file to transfer */
-    windsize = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
+    advwin = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
+    orig_win_size = advwin;
     /* 5. fill in seed */
     seed = int_from_config(file, "client.in:5: error getting seed");
     /* 6. fill in seed */
@@ -78,8 +80,8 @@ int main(void) {
     srand48(seed);
 
     _DEBUG("config file args below:\nipv4:%s \nport:%hu \ntrans:%s \n"
-            "windsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
-        ip4_str, knownport, transferpath, windsize, seed, pkt_loss_thresh, u);
+            "winsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
+        ip4_str, knownport, transferpath, orig_win_size, seed, pkt_loss_thresh, u);
 
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -111,7 +113,7 @@ int main(void) {
     printf("connect()'ed to -- ");
     print_sock_peer(serv_fd, &peer_addr);
 
-    err = handshakes(serv_fd, &serv_addr, transferpath, windsize);
+    err = handshakes(serv_fd, &serv_addr, transferpath);
     if(err != 0){
         /* todo: clean up, close?, free?*/
         close(serv_fd);
@@ -150,7 +152,7 @@ int main(void) {
 }
 
 
-int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath, uint16_t windsize) {
+int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
     char pktbuf[MAX_PKT_SIZE];
     struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
     void *packet;
@@ -169,7 +171,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath, u
     packet = malloc(packetlen);
     /* make the packet */
     ++seq;
-    make_pkt(packet, SYN, windsize, transferpath, strlen(transferpath));
+    make_pkt(packet, SYN, advwin, transferpath, strlen(transferpath));
     printf("try send hs1: ");
     print_xtxphdr((struct xtcphdr*)packet);
     /* convert to network order */
@@ -265,7 +267,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath, u
     /* third handshake */
     ++seq;
     ++ack_seq;
-    make_pkt(packet, ACK, windsize, NULL, 0);
+    make_pkt(packet, ACK, advwin, NULL, 0);
     printf("try send hs3: ");
     print_xtxphdr((struct xtcphdr*)packet);
     htonpkt((struct xtcphdr*)packet);
