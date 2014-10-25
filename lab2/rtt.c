@@ -1,5 +1,7 @@
 /* include rtt1 */
-#include	"unprtt.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include "rtt.h"
 
 int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
 
@@ -7,11 +9,11 @@ int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
  * Calculate the RTO value based on current estimators:
  *		smoothed RTT plus four times the deviation
  */
-#define	RTT_RTOCALC(ptr) ((ptr)->rtt_srtt + (4.0 * (ptr)->rtt_rttvar))
+#define	RTT_RTOCALC(ptr) ((ptr)->rtt_srtt + (((ptr)->rtt_sdev) << 2))
 
-static float
-rtt_minmax(float rto)
-{
+/*todo: both gettimeofday and setitimer operate on time_t (s) and suseconds_t (us) */
+
+static uint32_t rtt_minmax(uint32_t rto) {
     if (rto < RTT_RXTMIN)
         rto = RTT_RXTMIN;
     else if (rto > RTT_RXTMAX)
@@ -19,53 +21,59 @@ rtt_minmax(float rto)
     return(rto);
 }
 
-void
-rtt_init(struct rtt_info *ptr)
-{
+void rtt_init(struct rtt_info *ptr) {
     struct timeval	tv;
+    int err;
 
-    Gettimeofday(&tv, NULL);
-    ptr->rtt_base = tv.tv_sec;		/* # sec since 1/1/1970 at start */
+    err = gettimeofday(&tv, NULL);
+    if(err < 0){
+        perror("rtt_init.gettimeofday()");
+        exit(EXIT_FAILURE);
+    }
+    ptr->rtt_base_sec = tv.tv_sec;      /* # sec since 1/1/1970 at start */
+    ptr->rtt_base_usec = tv.tv_usec;    /* # us since 1/1/1970 at start */
 
     ptr->rtt_rtt    = 0;
     ptr->rtt_srtt   = 0;
-    ptr->rtt_rttvar = 0.75;
+    ptr->rtt_sdev   = 750000;
     ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
     /* first RTO at (srtt + (4 * rttvar)) = 3 seconds */
 }
-/* end rtt1 */
 
 /*
+ * NOTE: we don't really need this?
  * Return the current timestamp.
- * Our timestamps are 32-bit integers that count milliseconds since
+ * Our timestamps are suseconds_t's that count microseconds since
  * rtt_init() was called.
  */
-
-/* include rtt_ts */
-uint32_t
-rtt_ts(struct rtt_info *ptr)
-{
-    uint32_t		ts;
+suseconds_t rtt_ts(struct rtt_info *ptr) {
+    suseconds_t		ts;
     struct timeval	tv;
+    int err;
 
-    Gettimeofday(&tv, NULL);
-    ts = ((tv.tv_sec - ptr->rtt_base) * 1000) + (tv.tv_usec / 1000);
+    err = gettimeofday(&tv, NULL);
+    if(err < 0){
+        perror("rtt_ts.gettimeofday()");
+        exit(EXIT_FAILURE);
+    }
+    /* todo: double check! */
+    /* fixme: !*/
+    ts = ((tv.tv_sec - ptr->rtt_base_sec) * 1000000) + ((tv.tv_usec - ptr->rtt_base_usec));
     return(ts);
 }
 
-void
-rtt_newpack(struct rtt_info *ptr)
-{
+void rtt_newpack(struct rtt_info *ptr) {
     ptr->rtt_nrexmt = 0;
 }
 
-int
-rtt_start(struct rtt_info *ptr)
-{
-    return((int) (ptr->rtt_rto + 0.5));		/* round float to int */
-    /* 4return value can be used as: alarm(rtt_start(&foo)) */
+suseconds_t rtt_start(struct rtt_info *ptr) {
+    return(ptr->rtt_rto + 500000);
+    /* return value can be used as: alarm(rtt_start(&foo)) */
+    /* setitimer(ITIMER_REAL, &newtimer, NULL) */
+    /* differnt approach below: */
+    /* clock_gettime(CLOCK_MONOTONIC, ) */
+    /* uses: struct timespec {time_t tv_sec; long tv_nsec;} */
 }
-/* end rtt_ts */
 
 /*
  * A response was received.
@@ -74,72 +82,71 @@ rtt_start(struct rtt_info *ptr)
  * estimators of the RTT and its mean deviation.
  * This function should be called right after turning off the
  * timer with alarm(0), or right after a timeout occurs.
+ *
+ * todo| double check?
  */
-
-/* include rtt_stop */
-/**
- * todo| Modify function rtt_stop (Fig. 22.13) so that it uses integer
- * todo| arithmetic rather than floating point. This will entail your also
- * todo| having to modify some of the variable and function parameter
- * todo| declarations throughout Section 22.5 from float to int, as appropriate.
- */
-void
-rtt_stop(struct rtt_info *ptr, uint32_t ms)
-{
-    double		delta;
-
-    ptr->rtt_rtt = ms / 1000.0;		/* measured RTT in seconds */
+void rtt_stop(struct rtt_info *ptr, suseconds_t m) {
+    ptr->rtt_rtt = us; /* update last measured RTT in usecs */
 
     /*
      * Update our estimators of RTT and mean deviation of RTT.
      * See Jacobson's SIGCOMM '88 paper, Appendix A, for the details.
-     * We use floating point here for simplicity.
+     ************************
+     * For the below algorithm:
+     * sa short for "scaled average"
+     * sv short for "scaled mean deviation"
+     * For us:
+     * m --- Err (the current measured rtt)
+     * sa --- rtt_srtt
+     * sv --- rtt_sdev
+     * rto --- rtt_rto
+     ************************
+     *  m −= (sa >> 3);
+     *  sa += m;
+     *  if (m < 0){
+     *      m = −m;
+     *  }
+     *  m −= (sv >> 2);
+     *  sv += m;
+     *  rto = (sa >> 3) + sv;
+     ************************
      */
 
-    delta = ptr->rtt_rtt - ptr->rtt_srtt;
-    ptr->rtt_srtt += delta / 8;		/* g = 1/8 */
-
-    if (delta < 0.0)
-        delta = -delta;				/* |delta| */
-
-    ptr->rtt_rttvar += (delta - ptr->rtt_rttvar) / 4;	/* h = 1/4 */
-
-    ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
+    m -= (ptr->rtt_srtt >> 3); /* rtt_srtt stored scaled by 1/g i.e. 8 */
+    ptr->rtt_srtt += m;
+    if (m < 0) {
+        m = -m;
+    }
+    m -= (ptr->rtt_sdev >> 2);
+    ptr->rtt_sdev += m;
+    ptr->rtt_rto = rtt_minmax((ptr->rtt_srtt >> 3) + ptr->rtt_sdev);
 }
-/* end rtt_stop */
 
 /*
  * A timeout has occurred.
  * Return -1 if it's time to give up, else return 0.
+ *
+ * In function rtt_timeout (Fig. 22.14), after doubling the RTO in line 86,
+ * pass its value through the function rtt_minmax of Fig. 22.11 (somewhat along
+ * the lines of what is done in line 77 of rtt_stop, Fig. 22.13).
  */
-
-/* include rtt_timeout */
-/**
-* todo| In function rtt_timeout (Fig. 22.14), after doubling the RTO in line 86, pass its value through the
-* todo| function rtt_minmax of Fig. 22.11 (somewhat along the lines of what is done in line 77 of rtt_stop, Fig. 22.13).
-*/
-int
-rtt_timeout(struct rtt_info *ptr)
-{
-    ptr->rtt_rto *= 2;		/* next RTO */
+int rtt_timeout(struct rtt_info *ptr) {
+    ptr->rtt_rto <<= 1;		/* next RTO */
+    ptr->rtt_rto = rtt_minmax(ptr->rtt_rto);
 
     if (++ptr->rtt_nrexmt > RTT_MAXNREXMT)
         return(-1);			/* time to give up for this packet */
     return(0);
 }
-/* end rtt_timeout */
 
 /*
  * Print debugging information on stderr, if the "rtt_d_flag" is nonzero.
  */
-
-void
-rtt_debug(struct rtt_info *ptr)
-{
+void rtt_debug(struct rtt_info *ptr) {
     if (rtt_d_flag == 0)
         return;
 
-    fprintf(stderr, "rtt = %.3f, srtt = %.3f, rttvar = %.3f, rto = %.3f\n",
-            ptr->rtt_rtt, ptr->rtt_srtt, ptr->rtt_rttvar, ptr->rtt_rto);
+    fprintf(stderr, "rtt = %.3f, srtt = %.3f, sdev = %.3f, rto = %.3f\n",
+            ptr->rtt_rtt, ptr->rtt_srtt, ptr->rtt_sdev, ptr->rtt_rto);
     fflush(stderr);
 }
