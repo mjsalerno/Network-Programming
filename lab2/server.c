@@ -474,7 +474,8 @@ int send_file(char* fname, int sock) {
 
     file = fopen(fname, "r");
     if(file == NULL) {
-        perror("server.send_file");
+        fprintf(stderr, "server.fopen(%s",fname);
+        perror(")");
         exit(EXIT_FAILURE);
     }
 

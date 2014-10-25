@@ -8,7 +8,7 @@ extern double pkt_loss_thresh;
 
 int main(void) {
 
-    void* pkt[MAX_PKT_SIZE];
+    char pkt[MAX_PKT_SIZE];
 
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
@@ -128,9 +128,13 @@ int main(void) {
             perror("client.getfile()");
             return EXIT_FAILURE;
         }
+        printf("recv'd packet ");
+        ntohpkt((struct xtcphdr*)pkt);
+        print_xtxphdr((struct xtcphdr*)pkt);
 
+        printf("packet contents:\n");
         pkt[err] = 0;
-        printf("%s\n#######\n", (char*)pkt + DATA_OFFSET);
+        printf("%s\n", pkt + DATA_OFFSET);
         if(err == 0) {
             _DEBUG("%s\n", "Done getting file...");
         }
