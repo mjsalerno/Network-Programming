@@ -30,7 +30,7 @@ int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t data
     make_pkt(pkt, flags, advwin, data, datalen);
     /*print_xtxphdr((struct xtcphdr*)pkt);*/
     htonpkt((struct xtcphdr*)pkt);
-    
+
     /*todo: do WND/rtt stuff*/
 
     err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
@@ -38,6 +38,35 @@ int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t data
         perror("xtcp.srvsend()");
         free(pkt);
         return -1;
+    }
+
+    free(pkt);
+    return 1;
+}
+
+int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
+    ssize_t err;
+    void *pkt = malloc(DATA_OFFSET + datalen);
+
+    make_pkt(pkt, flags, advwin, data, datalen);
+    /*print_xtxphdr((struct xtcphdr*)pkt);*/
+    htonpkt((struct xtcphdr*)pkt);
+
+    /*todo: do WND/rtt stuff*/
+
+    /* simulate packet loss on sends */
+    if(drand48() > pkt_loss_thresh) {
+        err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
+        if (err < 0) {
+            perror("xtcp.clisend()");
+            free(pkt);
+            return -1;
+        }
+    }
+    else{
+        printf("DROPPED PKT: ");
+        ntohpkt((struct xtcphdr*)pkt);
+        htonpkt((struct xtcphdr*)pkt);
     }
 
     free(pkt);

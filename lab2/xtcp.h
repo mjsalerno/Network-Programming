@@ -19,6 +19,8 @@
 /* for extern'ing in client and server */
 uint32_t seq;
 uint32_t ack_seq;
+/* current advwin */
+uint16_t advwin;
 /* packet loss percentage */
 double pkt_loss_thresh;
 
@@ -48,6 +50,8 @@ make_pkt(packet, .....)
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
 int srvsend(int sockfd, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+
+int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 void free_windows(struct window* head);
 void ntohpkt(struct xtcphdr *hdr);
