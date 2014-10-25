@@ -174,6 +174,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         perror("child.bind()");
         free_clients(cliList);
         close(child_sock);
+        close(par_sock);
         exit(EXIT_FAILURE);
     }
 
@@ -182,6 +183,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         perror("child.connect()");
         free_clients(cliList);
         close(child_sock);
+        close(par_sock);
         exit(EXIT_FAILURE);
     }
 
@@ -191,6 +193,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         perror("child.getsockname()");
         free_clients(cliList);
         close(child_sock);
+        close(par_sock);
         exit(EXIT_FAILURE);
     }
 
@@ -206,10 +209,12 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         printf("There was an error with the handshake");
         free_clients(cliList);
         close(child_sock);
+        close(par_sock);
         exit(EXIT_FAILURE);
     }
 
     /* TODO: err = close(everything);*/
+    close(par_sock);
     /* print out connection extablished */
     printf("connection established from child at -- ");
     print_sock_name(child_sock, &childaddr);
@@ -217,7 +222,10 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     print_sock_peer(child_sock, &cliaddr);
 
     _DEBUG("%s\n", "Sending file ...");
-    send_file(fname, child_sock);
+    err = send_file(fname, child_sock);
+    if(err < 0) {
+        _DEBUG("%s\n", "Something went wrong while sending the file.");
+    }
 
     _DEBUG("%s\n", "sending FIN");
     ++seq;
@@ -226,6 +234,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     _DEBUG("%s\n", "Exiting child");
     close(child_sock);
     free_clients(cliList);
+    free_wnd(wnd);
     exit(EXIT_SUCCESS);
 }
 
@@ -465,9 +474,9 @@ int send_file(char* fname, int sock) {
 
     file = fopen(fname, "r");
     if(file == NULL) {
-        fprintf(stderr, "server.fopen(%s",fname);
+        fprintf(stderr, "send_file.fopen(%s",fname);
         perror(")");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     _DEBUG("math: %d\n", MAX_DATA_SIZE);
@@ -480,7 +489,7 @@ int send_file(char* fname, int sock) {
             printf("server.send_file(): There was an error reading the file\n");
             clearerr(file);
             fclose(file);
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         } else {
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
             ++seq;
@@ -488,7 +497,7 @@ int send_file(char* fname, int sock) {
             if(err == -1) {      /* the error code for full window */
                 /* todo: do this for real */
                 _DEBUG("%s\n", "window is full ...");
-                exit(EXIT_SUCCESS);
+                return EXIT_SUCCESS;
 
             } else if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
