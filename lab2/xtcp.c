@@ -55,9 +55,9 @@ void htonpkt(struct xtcphdr *hdr) {
 
 void print_wnd(const char** wnd) {
     int i;
-    printf("count: %d", wnd_count);
+    printf("count: %d ", wnd_count);
     for(i = 0; i < max_wnd_size; ++i) {
-        if(has_packet((uint32_t)i, wnd)) {
+        if(wnd[i] != NULL) {
             printf("X ");
         } else {
             printf("_ ");
@@ -68,6 +68,9 @@ void print_wnd(const char** wnd) {
 
 int has_packet(uint32_t index, const char** wnd) {
     int n = dst_from_base_wnd(index);
+    /* now we can mod by max_wnd_size */
+    n = n % max_wnd_size;
+
     return wnd[n] != NULL;
 }
 
