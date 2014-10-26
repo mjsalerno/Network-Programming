@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <errno.h>
 #include "xtcp.h"
 #include "debug.h"
 
@@ -6,15 +7,22 @@ static int max_wnd_size;/* initialized by init_wnd() */
 
 void print_hdr(struct xtcphdr *hdr) {
     int is_ack = 0;
-    printf("|xtcp_hdr| seq:%u", hdr->seq);
+    int any_flags = 0;
+    printf("|hdr| seq:%u", hdr->seq);
     printf(", flags:");
-    if((hdr->flags & FIN) == FIN){ printf("F"); }
-    if((hdr->flags & SYN) == SYN){ printf("S"); }
-    if((hdr->flags & RST) == RST){ printf("R"); }
-    if((hdr->flags & ACK) == ACK){ printf("A"); is_ack = 1; }
+    if((hdr->flags & FIN) == FIN){ printf("F"); any_flags = 1; }
+    if((hdr->flags & SYN) == SYN){ printf("S"); any_flags = 1; }
+    if((hdr->flags & RST) == RST){ printf("R"); any_flags = 1; }
+    if((hdr->flags & ACK) == ACK){ printf("A"); any_flags = 1; is_ack = 1; }
+    if(!any_flags) {
+        printf("0");
+    }
     if(is_ack) {
         printf(", ack_seq:%u", hdr->ack_seq);
-    }
+    }/*
+    else{
+        printf(", dlen:%u", hdr->datalen);
+    }*/
     printf(", advwin:%u\n", hdr->advwin);
 }
 
@@ -145,6 +153,11 @@ void htonpkt(struct xtcphdr *hdr) {
     hdr->advwin = htons(hdr->advwin);
 }
 
+/*
+The client only directly calls this function once, for the SYN.
+It provides packet loss to the client's sends.
+This malloc()'s and free()'s
+*/
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     ssize_t err;
     void *pkt = malloc(DATA_OFFSET + datalen);
@@ -152,8 +165,6 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     make_pkt(pkt, flags, advwin, data, datalen);
     /*print_hdr((struct xtcphdr*)pkt);*/
     htonpkt((struct xtcphdr*)pkt);
-
-    /* todo: do WND/rtt stuff or in cli_ack, cli_dup_ack */
 
     /* simulate packet loss on sends */
     if(drand48() > pkt_loss_thresh) {
@@ -176,16 +187,82 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     return 1;
 }
 
-int cli_ack(int sockfd) {
+/*
+Returns number of bytes recv'd on success
+        -1 on failure, with perror printed
+
+null terminates the data sent
+*/
+ssize_t clirecv(int sockfd, char **wnd) {
+    ssize_t bytes = 0;
+    int err;
+    fd_set rset;
+    void *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
+    for(;;) {
+        FD_ZERO(&rset);
+        FD_SET(sockfd, &rset);
+
+        err = select(sockfd + 1, &rset, NULL, NULL, NULL);
+        if(err < 0){
+            if(err == EINTR){
+                continue;
+            }
+            perror("clirecv().select()");
+            return -1;
+        }
+        if(FD_ISSET(sockfd, &rset)){
+            /* recv the server's datagram */
+            bytes = recv(sockfd, pkt, MAX_PKT_SIZE, 0);
+            if(bytes < 0){
+                perror("clirecv().recv()");
+                return -1;
+            }
+            /* should we drop it? */
+            if(drand48() > pkt_loss_thresh){
+                /* keep the pkt */
+                /* todo: */
+            }else{
+                /* drop the pkt */
+                printf("DROPPED PKT: ");
+                ntohpkt((struct xtcphdr*)pkt);
+                print_hdr((struct xtcphdr *) pkt);
+                htonpkt((struct xtcphdr*)pkt);
+            }
+        }
+        break;
+    }
+
+    err = add_to_wnd(seq, pkt, (const char**)wnd);
+    if(err == -1) {          /* out of bounds */
+        _DEBUG("ERROR: %s\n", "out of bounds");
+        free(pkt);
+        return -1;
+
+    } else if(err == -2) {  /* full window */
+        _DEBUG("%s\n", "The window was full, not sending");
+        free(pkt);
+        return -1;
+
+    } else if (err == 1) {
+        _DEBUG("%s\n", "packet was added ...");
+    } else {
+        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
+    }
+    return 1;
+}
+
+int cli_ack(int sockfd, char **wnd) {
     int err;
     /*todo: window stuff*/
+    wnd++;
     err = clisend(sockfd, ACK, NULL, 0);
     return (int)err;
 }
 
-int cli_dup_ack(int sockfd) {
+int cli_dup_ack(int sockfd, char **wnd) {
     int err;
     /*todo: window stuff*/
+    wnd++;
     err = clisend(sockfd, ACK, NULL, 0);
-    return (int)err;
+    return err;
 }

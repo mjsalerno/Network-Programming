@@ -1,8 +1,12 @@
 #include "client.h"
 
 extern uint32_t seq;
-extern uint32_t ack_seq;
+extern uint32_t ack_seq; /* also used by wnd as next expected seq */
 extern uint16_t advwin;
+
+static char** wnd; /* will point to malloc()'d array from init_wnd()*/
+/* base of the window to start reading, once set it is only updated by the consumer */
+static uint32_t wnd_base_seq;
 
 /* packet loss percentage */
 extern double pkt_loss_thresh;
@@ -122,13 +126,13 @@ int main(void) {
     /* connected to file transfer port */
     /* todo: pthread_create consumer thread */
 
+
     _DEBUG("%s\n", "waiting for the file ...");
     for(EVER) {
         /*todo: start getting the file*/
-        err = recv(serv_fd, pkt, MAX_PKT_SIZE, 0);
+        err = clirecv(serv_fd, wnd);
         if (err < 0) {
-            perror("client.getfile()");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
         printf("recv'd packet ");
         ntohpkt((struct xtcphdr*)pkt);
@@ -220,6 +224,10 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     print_hdr(hdr);
     ack_seq = hdr->seq + 1; /* we expect their seq + 1 */
 
+    /* pick the smallest advwin */
+    advwin = ((hdr)->advwin < advwin) ? (hdr)->advwin : advwin;
+    _DEBUG("new advwin: %d\n", advwin);
+
     /* copy the passed port into the serv_addr */
     memcpy(&serv_addr->sin_port, pktbuf + DATA_OFFSET, sizeof(serv_addr->sin_port));
     /* re connect() with new port */
@@ -232,9 +240,13 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     print_sock_peer(serv_fd, serv_addr);
 
     /* move on to third handshake */
+    /* init the window and the wnd_base_seq */
+    wnd = init_wnd();
+    wnd_base_seq = ack_seq;
+
     /* todo: back by ARQ */
     printf("try send hs3: ");
-    err = cli_ack(serv_fd);
+    err = cli_ack(serv_fd, wnd);
     if(err < 0){
         return -1;
     }
