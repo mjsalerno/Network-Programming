@@ -33,6 +33,7 @@ struct xtcphdr {
     uint32_t ack_seq;
     uint16_t flags;
     uint16_t advwin;
+    /*uint16_t datalen;*/
 };
 
 void print_hdr(struct xtcphdr *hdr);
@@ -57,8 +58,8 @@ uint32_t get_wnd_index(uint32_t n);
 void print_wnd(const char** wnd);
 
 /* for the client/reciever/acker */
-ssize_t clirecv(int sockfd, void *buf, size_t len, int flags);
-int cli_ack(int sockfd);
-int cli_dup_ack(int sockfd);
+ssize_t clirecv(int sockfd, char **wnd);
+int cli_ack(int sockfd, char **wnd);
+int cli_dup_ack(int sockfd, char **wnd);
 
 #endif /*XTCP_H*/
