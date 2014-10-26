@@ -128,9 +128,10 @@ void free_wnd(char** wnd) {
 
 /**
 * Adds packets that are already malloc()'d to the window
-* returns -3 E_WASREMOVED   index used to be in the wnd, i.e. index < wnd_base_seq
-* returns -2 E_CANTFIT      index cannot currently fit into the wnd, i.e. wnd_base_seq-index > advwin
-* returns -1 E_OCCUPIED     if index was occupied
+* returns E_WASREMOVED   index used to be in the wnd, i.e. index < wnd_base_seq
+* returns E_CANTFIT      index cannot currently fit into the wnd, i.e. wnd_base_seq-index > advwin
+* returns E_INDEXTOOFAR  index would exceed the max_wnd_size
+* returns E_OCCUPIED     if index was occupied
 * returns 0 on success fully added
 */
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
@@ -142,7 +143,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     }
     else if(n > max_wnd_size){
         _DEBUG("index %"PRIu32" tried to exceed max wnd size\n", index);
-        return E_CANTFIT;
+        return E_INDEXTOOFAR;
     }
     else if(n > advwin) {
         _DEBUG("index %"PRIu32" cannot currently fit into the wnd\n", index);
