@@ -1,6 +1,7 @@
 /* include rtt1 */
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "rtt.h"
 
 int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
@@ -9,7 +10,7 @@ int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
  * Calculate the RTO value based on current estimators:
  *		smoothed RTT plus four times the deviation
  */
-#define	RTT_RTOCALC(ptr) ((ptr)->rtt_srtt + (((ptr)->rtt_sdev) << 2))
+#define	RTT_RTOCALC(ptr) ((ptr->rtt_srtt >> 3) + ptr->rtt_sdev)
 
 /*todo: both gettimeofday and setitimer operate on time_t (s) and suseconds_t (us) */
 
@@ -35,13 +36,12 @@ void rtt_init(struct rtt_info *ptr) {
 
     ptr->rtt_rtt    = 0;
     ptr->rtt_srtt   = 0;
-    ptr->rtt_sdev   = 750000;
+    ptr->rtt_sdev   = 750000 << 2;
     ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
     /* first RTO at (srtt + (4 * rttvar)) = 3 seconds */
 }
 
 /*
- * NOTE: we don't really need this?
  * Return the current timestamp.
  * Our timestamps are suseconds_t's that count microseconds since
  * rtt_init() was called.
@@ -68,11 +68,18 @@ void rtt_newpack(struct rtt_info *ptr) {
 
 suseconds_t rtt_start(struct rtt_info *ptr) {
     return(ptr->rtt_rto + 500000);
-    /* return value can be used as: alarm(rtt_start(&foo)) */
-    /* setitimer(ITIMER_REAL, &newtimer, NULL) */
-    /* differnt approach below: */
-    /* clock_gettime(CLOCK_MONOTONIC, ) */
-    /* uses: struct timespec {time_t tv_sec; long tv_nsec;} */
+    /* DONT DO:
+     * alarm(rtt_start(&foo))
+     *
+     * USE AS:
+     * struct itimerval newtimer =  {(struct timeval){0, 0}, (struct timeval){0,rtt_start(&foo)}}
+     * setitimer(ITIMER_REAL, &newtimer, NULL)
+     */
+
+    /* different approach below to consider?
+     *   clock_gettime(CLOCK_MONOTONIC, )
+     *   uses: struct timespec {time_t tv_sec; long tv_nsec;}
+     */
 }
 
 /*
@@ -83,10 +90,10 @@ suseconds_t rtt_start(struct rtt_info *ptr) {
  * This function should be called right after turning off the
  * timer with alarm(0), or right after a timeout occurs.
  *
- * todo| double check?
+ * note suseconds_t is a signed type
  */
 void rtt_stop(struct rtt_info *ptr, suseconds_t m) {
-    ptr->rtt_rtt = us; /* update last measured RTT in usecs */
+    ptr->rtt_rtt = m; /* update last measured RTT in usecs */
 
     /*
      * Update our estimators of RTT and mean deviation of RTT.
@@ -119,7 +126,7 @@ void rtt_stop(struct rtt_info *ptr, suseconds_t m) {
     }
     m -= (ptr->rtt_sdev >> 2);
     ptr->rtt_sdev += m;
-    ptr->rtt_rto = rtt_minmax((ptr->rtt_srtt >> 3) + ptr->rtt_sdev);
+    ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
 }
 
 /*
@@ -146,7 +153,7 @@ void rtt_debug(struct rtt_info *ptr) {
     if (rtt_d_flag == 0)
         return;
 
-    fprintf(stderr, "rtt = %.3f, srtt = %.3f, sdev = %.3f, rto = %.3f\n",
-            ptr->rtt_rtt, ptr->rtt_srtt, ptr->rtt_sdev, ptr->rtt_rto);
+    fprintf(stderr, "rtt = %ld, srtt = %ld, sdev = %ld, rto = %ld\n",
+            ptr->rtt_rtt, ptr->rtt_srtt >> 3, ptr->rtt_sdev >> 2, ptr->rtt_rto);
     fflush(stderr);
 }

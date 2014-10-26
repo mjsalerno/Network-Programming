@@ -1,8 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "server.h"
 
-int main(void) {
+#include <signal.h>
+#include <string.h>
+#include <sys/time.h>
+
+#include "server.h"
+#include "rtt.h"
+static struct rtt_info rttinfo;
+
+int mmmain(void) {
 
     struct client_list* list = NULL;
     struct client_list* p;
@@ -60,4 +67,48 @@ int mmain(void) {
 
     _DEBUG("%s\n", "build was fine");
     return 1;
+}
+
+
+void timer_handler (int signum) {
+    static int count = 0;
+    suseconds_t ustimestamp = rtt_ts(&rttinfo);
+    printf ("timer expired %d times\n", ++count);
+    printf ("last time stamp: %ld\n", ustimestamp);
+}
+/* rtt_main tests for rtt*/
+int main(){
+    struct sigaction sa = {0};
+    struct itimerval timer;
+    int err;
+
+
+    suseconds_t op1 = 1, op2 = 6;
+    suseconds_t res = op1 - op2;
+    printf("suseconds_t calc: %ld\n", res);
+    printf("sizeof(suseconds_t): %ld\n", sizeof(suseconds_t));
+
+
+
+
+    /* Install timer_handler as the signal handler for SIGVTALRM. */
+    sa.sa_handler = &timer_handler;
+    sigaction (SIGALRM, &sa, NULL);
+
+    /* Configure the timer to expire after 250 msec... */
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = 750000;
+    /* ... and every never after that. */
+    timer.it_interval = (struct timeval){0, 750000};
+
+    rtt_init(&rttinfo);
+    setitimer(ITIMER_REAL, &timer, NULL);
+
+    /* Do busy work. */
+    while (1){
+        err = sleep(5);
+        printf("secs left to sleep %d\n", err);
+    }
+
+    return 0;
 }
