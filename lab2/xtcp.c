@@ -128,45 +128,45 @@ void free_wnd(char** wnd) {
 
 /**
 * Adds packets that are already malloc()'d to the window
-* returns -4 index used to be in the wnd, i.e. index < wnd_base_seq
-* returns -3 index cannot currently fit into the wnd, i.e. wnd_base_seq-index > advwin
-* returns -2 index would exceed max wnd size
-* returns -1 if window is full
-* returns 0 if index was occupied
-* returns 1 on success fully added
+* returns -3 E_WASREMOVED   index used to be in the wnd, i.e. index < wnd_base_seq
+* returns -2 E_CANTFIT      index cannot currently fit into the wnd, i.e. wnd_base_seq-index > advwin
+* returns -1 E_OCCUPIED     if index was occupied
+* returns 0 on success fully added
 */
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     int n = dst_from_base_wnd(index);
 
     if(n < 0){
         _DEBUG("index %"PRIu32" used to be in the wnd ", index);
-        return -4;
+        return E_WASREMOVED;
     }
     else if(n > max_wnd_size){
         _DEBUG("index %"PRIu32" tried to exceed max wnd size\n", index);
-        return -2;
+        return E_CANTFIT;
     }
     else if(n > advwin) {
         _DEBUG("index %"PRIu32" cannot currently fit into the wnd\n", index);
-        return -3;
+        return E_CANTFIT;
     }
 
-    if(max_wnd_size == wnd_count){ /* sanity check */
+    /*
+    if(max_wnd_size == wnd_count){
         _DEBUG("window is full but this index passed: %"PRIu32"\n", index);
-        return -1;
+        return -6;
     }
+    */
 
     /* now we can mod by max_wnd_size */
     n = n % max_wnd_size;
 
     if(wnd[n] != NULL) { /* sanity check */
         fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
-        return 0;
+        return E_OCCUPIED;
     }
     wnd[n] = pkt;
     wnd_count++;
     _DEBUG("fine, stored at n: %d, new wnd_count: %d", n, wnd_count);
-    return 1;
+    return 0;
     /* NOTE: don't try to update wnd_base_seq in here because the first
     * thing the client gets might not be the base of the wnd.
     * e.g. the first pkt recv'ed is the second pkt the server sent

@@ -21,6 +21,9 @@
 #define MAX_DATA_SIZE (MAX_PKT_SIZE - DATA_OFFSET)
 
 #define TIME_OUT 2
+#define E_WASREMOVED -3
+#define E_CANTFIT    -2
+#define E_OCCUPIED   -1
 
 /* for extern'ing in client and server */
 uint32_t seq;           /* SEQ number */
