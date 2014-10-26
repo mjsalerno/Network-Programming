@@ -158,12 +158,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     int err;
     int child_sock;
     socklen_t len;
-    char** wnd;
-
-    /* init window */
-    _DEBUG("%s\n", "init_wnd()");
-    wnd  = init_wnd(); /* the actual window */
-    print_wnd((const char**)wnd);
+    char** wnd;  /* the actual window */
 
     _DEBUG("%s\n", "In child");
     _DEBUG("child.filename: %s\n", fname);
@@ -218,6 +213,11 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         close(par_sock);
         exit(EXIT_FAILURE);
     }
+
+    /* init window */
+    _DEBUG("%s\n", "init_wnd()");
+    wnd  = init_wnd(wnd_base);
+    print_wnd((const char**)wnd);
 
     /* TODO: err = close(everything);*/
     close(par_sock);
@@ -480,6 +480,8 @@ redo_hs2:
     }
 
     _DEBUG("%s\n", "got last hand shake from client");
+    wnd_base = seq;
+    _DEBUG("set win_base to: %" PRIu32 "\n", wnd_base);
 
     return EXIT_SUCCESS;
 }
@@ -567,7 +569,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
         if(wnd_base == pkt_ack) {                                       /* the packet is at base */
             _DEBUG("%s\n", "ACK was at the base");
 
-            tmp2 = mikes_mysterious_get(pkt_ack, wnd);                       /* check if correct pkt */
+            tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);                       /* check if correct pkt */
             if(tmp2 == NULL) {
                 _DEBUG("%s\n", "ERROR: getting the pkt returned null");
                 return -1;
@@ -593,7 +595,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
             _DEBUG("%s\n", "ACKing several pkts");
             for(; wnd_base <= pkt_ack; ++wnd_base) {
 
-                tmp2 = mikes_mysterious_get(pkt_ack, wnd);                     /* check if correct pkt */
+                tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);                     /* check if correct pkt */
                 if(tmp2 == NULL) {
                     _DEBUG("%s\n", "ERROR: getting the pkt returned null");
                     return -1;

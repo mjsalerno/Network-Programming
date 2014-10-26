@@ -59,7 +59,6 @@ char** init_wnd(int first_seq_num);
 int has_packet(uint32_t index, const char** wnd);
 int dst_from_base_wnd(uint32_t n);
 void print_wnd(const char** wnd);
-char* mikes_mysterious_get(uint32_t n, char** wnd);
 
 /**
 * clirecv -- for the client/receiver/acker
