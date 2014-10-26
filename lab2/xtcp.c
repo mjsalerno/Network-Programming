@@ -2,6 +2,8 @@
 #include "xtcp.h"
 #include "debug.h"
 
+static int max_wnd_size;/* initialized by init_wnd() */
+
 void print_xtxphdr(struct xtcphdr *hdr) {
     int is_ack = 0;
     printf("|xtcp_hdr| seq:%u", hdr->seq);
@@ -35,19 +37,31 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen) {
 
     /*todo: do WND/rtt stuff*/
     err = add_to_wnd(seq, pkt, (const char**)wnd);
-    if(err < 0) {
+    if(err == -1) {          /* out of bounds */
+        _DEBUG("ERROR: %s\n", "out of bounds");
+        free(pkt);
+        return -3;
+
+    } else if(err == -2) {  /* full window */
         _DEBUG("%s\n", "The window was full, not sending");
+        free(pkt);
         return -1;
+
+    } else if (err == 1) {
+        _DEBUG("%s\n", "packet was added ...");
+    } else {
+        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
     }
 
     err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
     if(err < 0) {
         perror("xtcp.srvsend()");
+        remove_from_wnd(seq, (const char **)wnd);
         free(pkt);
         return -2;
     }
+
     seq++;
-    free(pkt);
     return 1;
 }
 
@@ -85,7 +99,9 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
 char** init_wnd() {
     char** rtn;
     int i;
-    rtn = malloc(sizeof(char*) * advwin);
+    max_wnd_size = advwin;
+
+    rtn = malloc((size_t)(max_wnd_size * sizeof(char*)));
 
     for(i = 0; i < advwin; ++i)
         *(rtn+i) = 0;
@@ -93,8 +109,14 @@ char** init_wnd() {
     return rtn;
 }
 
+/**
+* Adds packets that are already malloced to the window
+* returns -1 if out of bounds
+* returns -2 if window is full
+* returns 1 on sucsess
+*/
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
-    int n = (index + basewin) % advwin;
+    int n = (index + basewin) % max_wnd_size;
     if(n > advwin) {
         fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
         return -1;
@@ -102,7 +124,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
 
     if(wnd[n] != NULL) {
         fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
-        return -1;
+        return -2;
     }
 
     wnd[n] = pkt;
@@ -110,8 +132,8 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     return 1;
 }
 
-const char* remove_from_wnd(uint32_t index, const char** wnd) {
-    int n = (index + basewin) % advwin;
+char* remove_from_wnd(uint32_t index, const char** wnd) {
+    int n = (index + basewin) % max_wnd_size;
     const char* tmp;
 
     if(n > advwin) {
@@ -122,15 +144,17 @@ const char* remove_from_wnd(uint32_t index, const char** wnd) {
     tmp = wnd[n];
     wnd[n] = NULL;
 
-    return tmp;
+    return (char*)tmp;
 }
 
 void free_wnd(char** wnd) {
-    int size = (sizeof(wnd)) / (sizeof(char *));
+    int size = max_wnd_size;
     char* tmp;
     int i;
 
     for(i = 0; i < size; ++i) {
+        _DEBUG("freeing %d\n", i);
+        printf("freeing %d\n", i);
         tmp = wnd[i];
         if(tmp != NULL) {
             free(tmp);

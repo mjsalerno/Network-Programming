@@ -47,7 +47,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
-const char* remove_from_wnd(uint32_t index, const char** wnd);
+char* remove_from_wnd(uint32_t index, const char** wnd);
 void free_wnd(char** wnd);
 char** init_wnd();
 

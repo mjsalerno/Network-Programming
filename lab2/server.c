@@ -231,10 +231,13 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     ++seq;
     srvsend(child_sock, FIN, NULL, 0);
 
-    _DEBUG("%s\n", "Exiting child");
+    _DEBUG("%s\n", "cleaning up sockets ...");
     close(child_sock);
+    _DEBUG("%s\n", "cleaning up client list ...");
     free_clients(cliList);
+    _DEBUG("%s\n", "cleaning up window ...");
     free_wnd(wnd);
+    _DEBUG("%s\n", "Exiting child");
     exit(EXIT_SUCCESS);
 }
 
@@ -497,6 +500,7 @@ int send_file(char* fname, int sock) {
             if(err == -1) {      /* the error code for full window */
                 /* todo: do this for real */
                 _DEBUG("%s\n", "window is full ...");
+                fclose(file);
                 return EXIT_SUCCESS;
 
             } else if(err < 0) {

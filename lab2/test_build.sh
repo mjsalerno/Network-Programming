@@ -1,3 +1,4 @@
+#valgrind --track-fds=yes --leak-check=full --show-leak-kinds=all
 sed -i s/main/notmain/g server.c
 sed -i s/main/notmain/g client.c
 
