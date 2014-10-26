@@ -157,7 +157,6 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     /* init window */
     char** wnd  = init_wnd(); /* the actual window */
-    basewin = 0;
 
     _DEBUG("%s\n", "In child");
     _DEBUG("child.filename: %s\n", fname);

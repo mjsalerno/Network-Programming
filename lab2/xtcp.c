@@ -2,7 +2,8 @@
 #include "xtcp.h"
 #include "debug.h"
 
-static int max_wnd_size;/* initialized by init_wnd() */
+static int max_wnd_size;   /* initialized by init_wnd() */
+static int basewin;        /* index of the window base */
 
 void print_hdr(struct xtcphdr *hdr) {
     int is_ack = 0;
@@ -18,7 +19,7 @@ void print_hdr(struct xtcphdr *hdr) {
     printf(", advwin:%u\n", hdr->advwin);
 }
 
-void print_wnd(const char** wnd) {
+void print_wnd(/*const char** wnd*/) {
     printf("print_wnd is not done\n");
     /*int i;
 
@@ -86,6 +87,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
 char** init_wnd() {
     char** rtn;
     int i;
+    basewin = 0;
     max_wnd_size = advwin;
 
     rtn = malloc((size_t)(max_wnd_size * sizeof(char*)));

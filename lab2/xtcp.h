@@ -23,8 +23,6 @@ uint32_t seq;           /* SEQ number */
 uint32_t ack_seq;       /* ACK number */
 
 uint16_t advwin;        /* current advwin */
-int basewin;            /* index of the window base */
-
 
 double pkt_loss_thresh; /* packet loss percentage */
 
