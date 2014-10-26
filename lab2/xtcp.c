@@ -206,24 +206,18 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
         printf("DROPPED PKT: ");
         ntohpkt((struct xtcphdr*)pkt);
         print_hdr((struct xtcphdr *) pkt);
-        htonpkt((struct xtcphdr*)pkt);
     }
 
     free(pkt);
     return 1;
 }
 
-/*
-Returns number of bytes recv'd on success
-        -1 on failure, with perror printed
 
-null terminates the data sent
-*/
-ssize_t clirecv(int sockfd, char **wnd) {
+int clirecv(int sockfd, char **wnd) {
     ssize_t bytes = 0;
     int err;
     fd_set rset;
-    void *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
+    char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
     for(;;) {
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
@@ -234,35 +228,55 @@ ssize_t clirecv(int sockfd, char **wnd) {
                 continue;
             }
             perror("clirecv().select()");
-            return -1;
+            free(pkt);
+            return -2;
         }
         if(FD_ISSET(sockfd, &rset)){
             /* recv the server's datagram */
             bytes = recv(sockfd, pkt, MAX_PKT_SIZE, 0);
             if(bytes < 0){
                 perror("clirecv().recv()");
-                return -1;
+                free(pkt);
+                return -2;
             }
-            /* should we drop it? */
+            ntohpkt((struct xtcphdr *)pkt); /* host order please */
+            pkt[bytes] = 0; /* NULL terminate the ASCII text */
+
+            /* if it's a FIN don't try to drop it, we're closing dirty! */
+            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN){
+                free(pkt);
+                return 0;
+            }
+            /* if not a FIN: try to drop it */
             if(drand48() > pkt_loss_thresh){
                 /* keep the pkt */
-                /* todo: */
+                break;
             }else{
                 /* drop the pkt */
+                /* fixme: remove prints? */
                 printf("DROPPED PKT: ");
-                ntohpkt((struct xtcphdr*)pkt);
                 print_hdr((struct xtcphdr *) pkt);
-                htonpkt((struct xtcphdr*)pkt);
+                continue;
             }
         }
-        break;
+        /* end of select for(EVER) */
     }
+    /* recv'ed a pkt, it is in host order, and we will put it in the window */
+    printf("recv'd packet ");
+    print_hdr((struct xtcphdr *) pkt);
 
-    err = add_to_wnd(seq, pkt, (const char**)wnd);
+    /* if it's a RST then return */
+    if((((struct xtcphdr*)pkt)->flags & RST) == RST){
+        _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
+        free(pkt);
+        return -1;
+    }
+    _DEBUG("%s\n", "placing packet into the window.");
+    err = add_to_wnd(((struct xtcphdr *)pkt)->seq, pkt, (const char**)wnd);
     if(err == -1) {          /* out of bounds */
         _DEBUG("ERROR: %s\n", "out of bounds");
         free(pkt);
-        return -1;
+        return -2;
 
     } else if(err == -2) {  /* full window */
         _DEBUG("%s\n", "The window was full, not sending");
@@ -272,7 +286,7 @@ ssize_t clirecv(int sockfd, char **wnd) {
     } else if (err == 1) {
         _DEBUG("%s\n", "packet was added ...");
     } else {
-        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
+        _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
     }
     return 1;
 }
