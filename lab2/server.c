@@ -561,33 +561,49 @@ int send_file(char* fname, int sock, char **wnd) {
 
 int handle_ack(struct xtcphdr* pkt, char** wnd) {
     uint32_t pkt_ack = pkt->ack_seq;
-    char* tmp;
+    char* tmp1;
+    char* tmp2;
 
     if(has_packet(pkt_ack, (const char**)wnd)) {
         if(wnd_base == pkt_ack) {                                       /* the packet is at base */
             _DEBUG("%s\n", "ACK was at the base");
 
-            /* todo: check if correct pkt */
-            tmp = remove_from_wnd(pkt_ack, (const char**) wnd);
-            if(tmp ==NULL) {
+            tmp2 = mikes_mysterious_get(pkt_ack);                       /* check if correct pkt */
+            if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {
+                _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
+                        ((struct xtcphdr*) tmp2)->ack_seq,
+                        pkt_ack);
+                return -1;
+            }
+
+            tmp1 = remove_from_wnd(pkt_ack, (const char**) wnd);        /* remove it */
+            if(tmp1 ==NULL) {
                 _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
                 return -1;
             }
 
-            free(tmp);
+            free(tmp1);
             wnd_base++;
             return 0;
 
         } else if(wnd_base < pkt_ack) {                                   /* ACK for several pkts */
             _DEBUG("%s\n", "ACKing several pkts");
             for(; wnd_base <= pkt_ack; ++wnd_base) {
-                /* todo: check if correct pkt */
-                tmp = remove_from_wnd(wnd_base, (const char**) wnd);
+
+                if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {        /* check if correct pkt */
+                    _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
+                            ((struct xtcphdr*) tmp2)->ack_seq,
+                            pkt_ack);
+                    return -1;
+                }
+
+                tmp1 = remove_from_wnd(wnd_base, (const char**) wnd);      /* remove it */
                 _DEBUG("removing: %" PRIu32 "\n", wnd_base);
-                if(tmp ==NULL) {
+                if(tmp1 ==NULL) {
                     _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
                     return -1;
                 }
+                free(tmp1);
             }
         }
     } else {
