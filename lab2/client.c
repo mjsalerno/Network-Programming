@@ -9,11 +9,11 @@ extern double pkt_loss_thresh;
 
 int main(void) {
 
-    char pkt[MAX_PKT_SIZE];
+    char pkt[MAX_PKT_SIZE + 1];
 
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
-    char transferpath[BUFF_SIZE]; /* file to transfer */
+    char fname[BUFF_SIZE]; /* file to transfer */
     FILE *file; /* config file */
     char ip4_str[INET_ADDRSTRLEN];
     /* char buf[BUFF_SIZE + 1]; */
@@ -61,7 +61,7 @@ int main(void) {
     knownport = (uint16_t) int_from_config(file, "client.in:2: error getting port");
     serv_addr.sin_port = htons(knownport);
     /* 3. fill in file to transfer */
-    str_from_config(file, transferpath, sizeof(transferpath),
+    str_from_config(file, fname, sizeof(fname),
         "client.in:3: error getting transfer file name");
     /* 4. fill in file to transfer */
     advwin = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
@@ -79,9 +79,9 @@ int main(void) {
     /* set the seed for drand48() */
     srand48(seed);
 
-    _DEBUG("config file args below:\nipv4:%s \nport:%hu \ntrans:%s \n"
+    _DEBUG("config file args below:\nipv4:%s \nport:%hu \nfname:%s \n"
             "winsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
-        ip4_str, knownport, transferpath, orig_win_size, seed, pkt_loss_thresh, u);
+        ip4_str, knownport, fname, orig_win_size, seed, pkt_loss_thresh, u);
 
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -113,7 +113,7 @@ int main(void) {
     printf("connect()'ed to -- ");
     print_sock_peer(serv_fd, &peer_addr);
 
-    err = handshakes(serv_fd, &serv_addr, transferpath);
+    err = handshakes(serv_fd, &serv_addr, fname);
     if(err != 0){
         /* todo: clean up, close?, free?*/
         close(serv_fd);
@@ -125,14 +125,14 @@ int main(void) {
     _DEBUG("%s\n", "waiting for the file ...");
     for(EVER) {
         /*todo: start getting the file*/
-        err = recv(serv_fd, pkt, sizeof(pkt), 0);
+        err = recv(serv_fd, pkt, MAX_PKT_SIZE, 0);
         if (err < 0) {
             perror("client.getfile()");
             return EXIT_FAILURE;
         }
         printf("recv'd packet ");
         ntohpkt((struct xtcphdr*)pkt);
-        print_xtxphdr((struct xtcphdr*)pkt);
+        print_hdr((struct xtcphdr *) pkt);
 
         printf("packet contents:\n");
         pkt[err] = 0;
@@ -152,7 +152,7 @@ int main(void) {
 }
 
 
-int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
+int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     char pktbuf[MAX_PKT_SIZE];
     struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
     /* select vars */
@@ -167,10 +167,10 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
 
     /* todo: timeout  on oldest packet */
 
-    acktimedout: /* jump here if server doesn't respond */
+    sendagain: /* jump here if server doesn't respond */
     printf("try to send hs1: ");
-    clisend(serv_fd, SYN, transferpath, strlen(transferpath));
-    ++seq;
+    clisend(serv_fd, SYN, fname, strlen(fname));
+    /* don't increment seq until we know this sent */
 
     _DEBUG("%s\n", "waiting for hs2...");
 
@@ -186,7 +186,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
         err = select(maxfpd1, &rset, NULL, NULL, &timer);
         if(err < 0) {
             /* EINTR can't occur yet */
-            perror("hs.select()");
+            perror("hs1.select()");
             return -1;
         }
         /* check if the serv_fd is set */
@@ -203,30 +203,21 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
         else { /* so the select timed out */
             _DEBUG("%s\n", "timeout() while waiting for hs2, resending hs1");
             /* hs1 was lost or hs2 was lost so */
-            goto acktimedout;
+            goto sendagain;
         }
     }
+    /* the server responded so now inc seq */
+    ++seq;
     /* validate the something was a SYN-ACK */
     hdr = (struct xtcphdr*)pktbuf;
     ntohpkt(hdr);
-    if(hdr->flags != (SYN|ACK)){
-        fprintf(stderr, "hs2 not a SYN-ACK, flags: %d\n", hdr->flags);
-        /* todo: RST/ free */
+    err = validate_hs2(hdr, (int)n);
+    if(err < 0){
         return -1;
     }
-    /* now validate the SEQ and ACK nums */
-    if(hdr->ack_seq != seq){
-        fprintf(stderr, "ERROR: hs2 unexpected ack_seq: %d, expected: %d\n", hdr->ack_seq, seq+1);
-        /* todo: RST/ free */
-        return -1;
-    }
-    if(n != DATA_OFFSET + 2){
-        fprintf(stderr, "hs2 not %d bytes, size: %d\n", DATA_OFFSET + 2, (int)n);
-        /* todo: RST/ free */
-        return -1;
-    }
+
     printf("recv'd hs2: ");
-    print_xtxphdr(hdr);
+    print_hdr(hdr);
     ack_seq = hdr->seq + 1; /* we expect their seq + 1 */
 
     /* copy the passed port into the serv_addr */
@@ -241,9 +232,35 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *transferpath) {
     print_sock_peer(serv_fd, serv_addr);
 
     /* move on to third handshake */
+    /* todo: back by ARQ */
     printf("try send hs3: ");
-    clisend(serv_fd, ACK, NULL, 0);
+    err = cli_ack(serv_fd);
+    if(err < 0){
+        return -1;
+    }
 
     return 0;
 
 }
+
+/* hdr must be in host byte order */
+int validate_hs2(struct xtcphdr* hdr, int len){
+    if(hdr->flags != (SYN|ACK)){
+        fprintf(stderr, "hs2 not a SYN-ACK, flags: %d\n", hdr->flags);
+        /* todo: RST/ free */
+        return -1;
+    }
+    /* now validate the SEQ and ACK nums */
+    if(hdr->ack_seq != seq){
+        fprintf(stderr, "ERROR: hs2 unexpected ack_seq: %d, expected: %d\n", hdr->ack_seq, seq+1);
+        /* todo: RST/ free */
+        return -1;
+    }
+    if(len != DATA_OFFSET + 2){
+        fprintf(stderr, "hs2 not %d bytes, size: %d\n", DATA_OFFSET + 2, len);
+        /* todo: RST/ free */
+        return -1;
+    }
+    return 0;
+}
+
