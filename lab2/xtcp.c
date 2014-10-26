@@ -83,38 +83,6 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
     return 1;
 }
 
-int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
-    ssize_t err;
-    void *pkt = malloc(DATA_OFFSET + datalen);
-
-    make_pkt(pkt, flags, advwin, data, datalen);
-    /*print_hdr((struct xtcphdr*)pkt);*/
-    htonpkt((struct xtcphdr*)pkt);
-
-    /* todo: do WND/rtt stuff or in cli_ack, cli_dup_ack */
-
-    /* simulate packet loss on sends */
-    if(drand48() > pkt_loss_thresh) {
-        err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
-        if (err < 0) {
-            perror("xtcp.clisend()");
-            free(pkt);
-            return -1;
-        }
-    }
-    else {
-        /* fixme: remove prints? */
-        printf("DROPPED PKT: ");
-        ntohpkt((struct xtcphdr*)pkt);
-        print_hdr((struct xtcphdr *) pkt);
-        htonpkt((struct xtcphdr*)pkt);
-    }
-
-    free(pkt);
-    return 1;
-}
-
-/* Set advwin to the correct value before use*/
 char** init_wnd() {
     char** rtn;
     int i;
@@ -193,4 +161,49 @@ void htonpkt(struct xtcphdr *hdr) {
     hdr->ack_seq = htonl(hdr->ack_seq);
     hdr->flags = htons(hdr->flags);
     hdr->advwin = htons(hdr->advwin);
+}
+
+int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
+    ssize_t err;
+    void *pkt = malloc(DATA_OFFSET + datalen);
+
+    make_pkt(pkt, flags, advwin, data, datalen);
+    /*print_hdr((struct xtcphdr*)pkt);*/
+    htonpkt((struct xtcphdr*)pkt);
+
+    /* todo: do WND/rtt stuff or in cli_ack, cli_dup_ack */
+
+    /* simulate packet loss on sends */
+    if(drand48() > pkt_loss_thresh) {
+        err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
+        if (err < 0) {
+            perror("xtcp.clisend()");
+            free(pkt);
+            return -1;
+        }
+    }
+    else {
+        /* fixme: remove prints? */
+        printf("DROPPED PKT: ");
+        ntohpkt((struct xtcphdr*)pkt);
+        print_hdr((struct xtcphdr *) pkt);
+        htonpkt((struct xtcphdr*)pkt);
+    }
+
+    free(pkt);
+    return 1;
+}
+
+int cli_ack(int sockfd) {
+    int err;
+    /*todo: window stuff*/
+    err = clisend(sockfd, ACK, NULL, 0);
+    return (int)err;
+}
+
+int cli_dup_ack(int sockfd) {
+    int err;
+    /*todo: window stuff*/
+    err = clisend(sockfd, ACK, NULL, 0);
+    return (int)err;
 }

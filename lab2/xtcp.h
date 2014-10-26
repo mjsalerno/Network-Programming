@@ -42,6 +42,8 @@ void *packet = malloc(sizeof(struct xtcphdr) + datalen)
 make_pkt(packet, .....)
  */
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+void ntohpkt(struct xtcphdr *hdr);
+void htonpkt(struct xtcphdr *hdr);
 
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
@@ -53,7 +55,9 @@ char** init_wnd();
 int has_packet(uint32_t index, const char** wnd);
 uint32_t get_wnd_index(uint32_t n);
 
-void ntohpkt(struct xtcphdr *hdr);
-void htonpkt(struct xtcphdr *hdr);
+/* for the client/reciever/acker */
+ssize_t clirecv(int sockfd, void *buf, size_t len, int flags);
+int cli_ack(int sockfd);
+int cli_dup_ack(int sockfd);
 
 #endif /*XTCP_H*/
