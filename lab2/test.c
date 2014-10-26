@@ -9,7 +9,7 @@
 #include "rtt.h"
 static struct rtt_info rttinfo;
 
-int mmmain(void) {
+/*int mmmain(void) {
 
     struct client_list* list = NULL;
     struct client_list* p;
@@ -28,42 +28,44 @@ int mmmain(void) {
 
     free_clients(list);
     return EXIT_SUCCESS;
-}
+}*/
 
 
 
-int mmain(void) {
+int main(void) {
     /* clientlist_test(); */
     int err = 0;
-    char** wnd = malloc(sizeof(char*) * 3);
-    bzero(wnd, sizeof(wnd));
+    int seq = 0;
+    char *pkt1, *pkt2, *pkt3;
+    char** wnd;
     advwin = 3;
-    basewin = 0;
+    wnd = init_wnd(seq);
 
-    wnd[0] = 0;
-    wnd[1] = 0;
-    wnd[2] = 0;
-
-    err = add_to_wnd(0, "hello", (const char **)wnd);
+    pkt1 = malloc(MAX_PKT_SIZE);
+    pkt2 = malloc(MAX_PKT_SIZE);
+    pkt3 = malloc(MAX_PKT_SIZE);
+    err = add_to_wnd(seq++, pkt1, (const char **)wnd);
     if(err < 0) {
         _DEBUG("%s\n", "ERR");
         free(wnd);
         return -1;
     }
 
-    err = add_to_wnd(1, "hello", (const char **)wnd);
+    err = add_to_wnd(seq++, pkt2, (const char **)wnd);
     if(err < 0) {
         _DEBUG("%s\n", "ERR");
         free(wnd);
         return -1;
     }
 
-    err = add_to_wnd(2, "hello", (const char **)wnd);
+    err = add_to_wnd(seq++, pkt3, (const char **)wnd);
     if(err < 0) {
         _DEBUG("%s\n", "ERR");
         free(wnd);
         return -1;
     }
+
+    free_wnd(wnd);
 
     _DEBUG("%s\n", "build was fine");
     return 1;
@@ -77,7 +79,7 @@ void timer_handler (int signum) {
     printf ("last time stamp: %ld\n", ustimestamp);
 }
 /* rtt_main tests for rtt*/
-int main(){
+int rtt_main(){
     struct sigaction sa = {0};
     struct itimerval timer;
     int err;

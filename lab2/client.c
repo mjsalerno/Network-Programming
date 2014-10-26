@@ -241,7 +241,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
 
     /* move on to third handshake */
     /* init the window and the wnd_base_seq */
-    wnd = init_wnd();
+    wnd = init_wnd(ack_seq);
     wnd_base_seq = ack_seq;
 
     /* todo: back by ARQ */
