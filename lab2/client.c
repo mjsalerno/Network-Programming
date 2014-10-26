@@ -12,9 +12,6 @@ static uint32_t wnd_base_seq;
 extern double pkt_loss_thresh;
 
 int main(void) {
-
-    char pkt[MAX_PKT_SIZE + 1];
-
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
     char fname[BUFF_SIZE]; /* file to transfer */
@@ -131,23 +128,18 @@ int main(void) {
     for(EVER) {
         /*todo: start getting the file*/
         err = clirecv(serv_fd, wnd);
-        if (err < 0) {
+        if (err <= -2) {
             exit(EXIT_FAILURE);
         }
-        printf("recv'd packet ");
-        ntohpkt((struct xtcphdr*)pkt);
-        print_hdr((struct xtcphdr *) pkt);
-
-        printf("packet contents:\n");
-        pkt[err] = 0;
-        printf("%s\n", pkt + DATA_OFFSET);
-        if(err == 0) {
-            _DEBUG("%s\n", "Done getting file...");
-        }
-        if(((struct xtcphdr*) pkt)->flags & FIN) {
-            _DEBUG("%s\n", "got FIN");
+        else if(err == -1){
+            _DEBUG("%s\n", "Got RST, ending client...");
             break;
         }
+        else if(err == 0) {
+            _DEBUG("%s\n", "Done getting file...");
+            break;
+        }
+        /* got actual data, loop back around for more */
     }
 
     close(serv_fd);

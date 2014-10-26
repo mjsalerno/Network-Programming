@@ -375,6 +375,8 @@ int clirecv(int sockfd, char **wnd) {
     /* recv'ed a pkt, it is in host order, and we will put it in the window */
     printf("recv'd packet ");
     print_hdr((struct xtcphdr *) pkt);
+    printf("packet contents:\n");
+    printf("%s\n", pkt + DATA_OFFSET);
 
     /* if it's a RST then return */
     if((((struct xtcphdr*)pkt)->flags & RST) == RST){
@@ -382,22 +384,32 @@ int clirecv(int sockfd, char **wnd) {
         free(pkt);
         return -1;
     }
+    /* do window stuff */
     _DEBUG("%s\n", "placing packet into the window.");
     err = add_to_wnd(((struct xtcphdr *)pkt)->seq, pkt, (const char**)wnd);
-    if(err == -1) {          /* out of bounds */
-        _DEBUG("ERROR: %s\n", "out of bounds");
-        free(pkt);
-        return -2;
-
-    } else if(err == -2) {  /* full window */
-        _DEBUG("%s\n", "The window was full, not sending");
-        free(pkt);
-        return -1;
-
-    } else if (err == 1) {
-        _DEBUG("%s\n", "packet was added ...");
-    } else {
-        _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
+    switch(err){
+        case 0:
+            /* send ACK, added correctly and for the first time */
+            cli_ack(sockfd, wnd);
+            break;
+        case E_WASREMOVED:
+            /* send duplicate ACK */
+            cli_dup_ack(sockfd, wnd);
+            break;
+        case E_OCCUPIED:
+            /* send duplicate ACK */
+            cli_dup_ack(sockfd, wnd);
+            break;
+        case E_INDEXTOOFAR:
+            /* fixme: why don't ACK, instead does this mean bad flow control? */
+            /* don't ACK this, it's too far */
+            printf("not acking prev hdr because flow control bad? Plus I can't store it.\n");
+            break;
+        case E_CANTFIT:
+            /* i don't know */
+            break;
+        default:
+            _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
     }
     return 1;
 }
