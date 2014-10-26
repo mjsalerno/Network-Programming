@@ -153,8 +153,6 @@ void free_wnd(char** wnd) {
     int i;
 
     for(i = 0; i < size; ++i) {
-        _DEBUG("freeing %d\n", i);
-        printf("freeing %d\n", i);
         tmp = wnd[i];
         if(tmp != NULL) {
             free(tmp);
