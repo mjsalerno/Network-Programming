@@ -2,7 +2,7 @@
 #include "xtcp.h"
 #include "debug.h"
 
-void print_xtxphdr(struct xtcphdr *hdr) {
+void print_hdr(struct xtcphdr *hdr) {
     int is_ack = 0;
     printf("|xtcp_hdr| seq:%u", hdr->seq);
     printf(", flags:");
@@ -30,7 +30,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen) {
     ssize_t err;
     void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
     make_pkt(pkt, flags, advwin, data, datalen);
-    /*print_xtxphdr((struct xtcphdr*)pkt);*/
+    /*print_hdr((struct xtcphdr*)pkt);*/
     htonpkt((struct xtcphdr*)pkt);
 
     /*todo: do WND/rtt stuff*/
@@ -56,10 +56,10 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     void *pkt = malloc(DATA_OFFSET + datalen);
 
     make_pkt(pkt, flags, advwin, data, datalen);
-    /*print_xtxphdr((struct xtcphdr*)pkt);*/
+    /*print_hdr((struct xtcphdr*)pkt);*/
     htonpkt((struct xtcphdr*)pkt);
 
-    /*todo: do WND/rtt stuff*/
+    /* todo: do WND/rtt stuff or in cli_ack, cli_dup_ack */
 
     /* simulate packet loss on sends */
     if(drand48() > pkt_loss_thresh) {
@@ -74,7 +74,7 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
         /* fixme: remove prints? */
         printf("DROPPED PKT: ");
         ntohpkt((struct xtcphdr*)pkt);
-        print_xtxphdr((struct xtcphdr*)pkt);
+        print_hdr((struct xtcphdr *) pkt);
         htonpkt((struct xtcphdr*)pkt);
     }
 

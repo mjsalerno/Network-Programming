@@ -35,7 +35,7 @@ struct xtcphdr {
     uint16_t advwin;
 };
 
-void print_xtxphdr(struct xtcphdr *hdr);
+void print_hdr(struct xtcphdr *hdr);
 /*
 Example:
 void *packet = malloc(sizeof(struct xtcphdr) + datalen)

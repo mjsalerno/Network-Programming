@@ -21,7 +21,7 @@ int main(int argc, const char **argv) {
     int sockfd;
     struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
     socklen_t len;
-    char pkt[BUFF_SIZE];
+    char pkt[MAX_PKT_SIZE + 1];
 
     cliList = NULL;
 
@@ -100,7 +100,7 @@ int main(int argc, const char **argv) {
 
         /*get filename*/
         len = sizeof(cliaddr);
-        n = recvfrom(sockfd, pkt, sizeof(pkt), 0, (struct sockaddr *)&cliaddr, &len);
+        n = recvfrom(sockfd, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *)&cliaddr, &len);
         if(n < -1) {
             perror("server.recvfrom()");
         }
@@ -124,7 +124,7 @@ int main(int argc, const char **argv) {
         advwin = ((struct xtcphdr*)pkt)->advwin < advwin ? ((struct xtcphdr*)pkt)->advwin : advwin;
         _DEBUG("new advwin: %d\n", advwin);
 
-        print_xtxphdr((struct xtcphdr*) pkt);
+        print_hdr((struct xtcphdr *) pkt);
         _DEBUG("Got filename: %s\n", pkt + DATA_OFFSET);
 
         _DEBUG("%s\n", "server.fork()");
@@ -357,7 +357,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     ++ack_seq;
     make_pkt(hdr, flags, advwin, &newport, 2);
     printf("sent hs2: ");
-    print_xtxphdr(hdr);
+    print_hdr(hdr);
     htonpkt(hdr);
 
     len = sizeof(struct sockaddr_in);
@@ -441,7 +441,7 @@ redo_hs2:
         exit(EXIT_FAILURE);
     }
     ntohpkt((struct xtcphdr*) pktbuf);
-    print_xtxphdr((struct xtcphdr*) pktbuf);
+    print_hdr((struct xtcphdr *) pktbuf);
     if(((struct xtcphdr*) pktbuf)->flags != ACK
             || ((struct xtcphdr*) pktbuf)->ack_seq != (seq + 1)
             || ((struct xtcphdr*) pktbuf)->seq != ack_seq) {

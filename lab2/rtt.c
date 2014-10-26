@@ -138,7 +138,7 @@ void rtt_stop(struct rtt_info *ptr, suseconds_t m) {
  * the lines of what is done in line 77 of rtt_stop, Fig. 22.13).
  */
 int rtt_timeout(struct rtt_info *ptr) {
-    ptr->rtt_rto <<= 1;		/* next RTO */
+    ptr->rtt_rto <<= 1;		/* double next RTO */
     ptr->rtt_rto = rtt_minmax(ptr->rtt_rto);
 
     if (++ptr->rtt_nrexmt > RTT_MAXNREXMT)
