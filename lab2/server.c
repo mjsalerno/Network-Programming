@@ -567,7 +567,11 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
         if(wnd_base == pkt_ack) {                                       /* the packet is at base */
             _DEBUG("%s\n", "ACK was at the base");
 
-            tmp2 = mikes_mysterious_get(pkt_ack);                       /* check if correct pkt */
+            tmp2 = mikes_mysterious_get(pkt_ack, wnd);                       /* check if correct pkt */
+            if(tmp2 == NULL) {
+                _DEBUG("%s\n", "ERROR: getting the pkt returned null");
+                return -1;
+            }
             if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {
                 _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
                         ((struct xtcphdr*) tmp2)->ack_seq,
@@ -589,7 +593,11 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
             _DEBUG("%s\n", "ACKing several pkts");
             for(; wnd_base <= pkt_ack; ++wnd_base) {
 
-                tmp2 = mikes_mysterious_get(pkt_ack);                     /* check if correct pkt */
+                tmp2 = mikes_mysterious_get(pkt_ack, wnd);                     /* check if correct pkt */
+                if(tmp2 == NULL) {
+                    _DEBUG("%s\n", "ERROR: getting the pkt returned null");
+                    return -1;
+                }
                 if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {
                     _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
                             ((struct xtcphdr*) tmp2)->ack_seq,
