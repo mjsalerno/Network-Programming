@@ -26,6 +26,20 @@ void print_hdr(struct xtcphdr *hdr) {
     printf(", advwin:%u\n", hdr->advwin);
 }
 
+void ntohpkt(struct xtcphdr *hdr) {
+    hdr->seq = ntohl(hdr->seq);
+    hdr->ack_seq = ntohl(hdr->ack_seq);
+    hdr->flags = ntohs(hdr->flags);
+    hdr->advwin = ntohs(hdr->advwin);
+}
+
+void htonpkt(struct xtcphdr *hdr) {
+    hdr->seq = htonl(hdr->seq);
+    hdr->ack_seq = htonl(hdr->ack_seq);
+    hdr->flags = htons(hdr->flags);
+    hdr->advwin = htons(hdr->advwin);
+}
+
 void print_wnd(const char** wnd) {
     int i;
 
@@ -59,44 +73,6 @@ void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t dat
     memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
 }
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
-
-    ssize_t err;
-    void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
-    make_pkt(pkt, flags, advwin, data, datalen);
-    /*print_hdr((struct xtcphdr*)pkt);*/
-    htonpkt((struct xtcphdr*)pkt);
-
-    /*todo: do WND/rtt stuff*/
-    err = add_to_wnd(seq, pkt, (const char**)wnd);
-    if(err == -1) {          /* out of bounds */
-        _DEBUG("ERROR: %s\n", "out of bounds");
-        free(pkt);
-        return -3;
-
-    } else if(err == -2) {  /* full window */
-        _DEBUG("%s\n", "The window was full, not sending");
-        free(pkt);
-        return -1;
-
-    } else if (err == 1) {
-        _DEBUG("%s\n", "packet was added ...");
-    } else {
-        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
-    }
-
-    err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
-    if(err < 0) {
-        perror("xtcp.srvsend()");
-        remove_from_wnd(seq, (const char **)wnd);
-        free(pkt);
-        return -2;
-    }
-
-    print_wnd((const char**)wnd);
-
-    return 1;
-}
 
 /* MUST have advwin set to the max wnd size */
 char** init_wnd() {
@@ -165,18 +141,43 @@ void free_wnd(char** wnd) {
     free(wnd);
 }
 
-void ntohpkt(struct xtcphdr *hdr) {
-    hdr->seq = ntohl(hdr->seq);
-    hdr->ack_seq = ntohl(hdr->ack_seq);
-    hdr->flags = ntohs(hdr->flags);
-    hdr->advwin = ntohs(hdr->advwin);
-}
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
 
-void htonpkt(struct xtcphdr *hdr) {
-    hdr->seq = htonl(hdr->seq);
-    hdr->ack_seq = htonl(hdr->ack_seq);
-    hdr->flags = htons(hdr->flags);
-    hdr->advwin = htons(hdr->advwin);
+    ssize_t err;
+    void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
+    make_pkt(pkt, flags, advwin, data, datalen);
+    /*print_hdr((struct xtcphdr*)pkt);*/
+    htonpkt((struct xtcphdr*)pkt);
+
+    /*todo: do WND/rtt stuff*/
+    err = add_to_wnd(seq, pkt, (const char**)wnd);
+    if(err == -1) {          /* out of bounds */
+        _DEBUG("ERROR: %s\n", "out of bounds");
+        free(pkt);
+        return -3;
+
+    } else if(err == -2) {  /* full window */
+        _DEBUG("%s\n", "The window was full, not sending");
+        free(pkt);
+        return -1;
+
+    } else if (err == 1) {
+        _DEBUG("%s\n", "packet was added ...");
+    } else {
+        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
+    }
+
+    err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    if(err < 0) {
+        perror("xtcp.srvsend()");
+        remove_from_wnd(seq, (const char **)wnd);
+        free(pkt);
+        return -2;
+    }
+
+    print_wnd((const char**)wnd);
+
+    return 1;
 }
 
 /*
@@ -206,24 +207,18 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
         printf("DROPPED PKT: ");
         ntohpkt((struct xtcphdr*)pkt);
         print_hdr((struct xtcphdr *) pkt);
-        htonpkt((struct xtcphdr*)pkt);
     }
 
     free(pkt);
     return 1;
 }
 
-/*
-Returns number of bytes recv'd on success
-        -1 on failure, with perror printed
 
-null terminates the data sent
-*/
-ssize_t clirecv(int sockfd, char **wnd) {
+int clirecv(int sockfd, char **wnd) {
     ssize_t bytes = 0;
     int err;
     fd_set rset;
-    void *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
+    char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
     for(;;) {
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
@@ -234,35 +229,55 @@ ssize_t clirecv(int sockfd, char **wnd) {
                 continue;
             }
             perror("clirecv().select()");
-            return -1;
+            free(pkt);
+            return -2;
         }
         if(FD_ISSET(sockfd, &rset)){
             /* recv the server's datagram */
             bytes = recv(sockfd, pkt, MAX_PKT_SIZE, 0);
             if(bytes < 0){
                 perror("clirecv().recv()");
-                return -1;
+                free(pkt);
+                return -2;
             }
-            /* should we drop it? */
+            ntohpkt((struct xtcphdr *)pkt); /* host order please */
+            pkt[bytes] = 0; /* NULL terminate the ASCII text */
+
+            /* if it's a FIN don't try to drop it, we're closing dirty! */
+            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN){
+                free(pkt);
+                return 0;
+            }
+            /* if not a FIN: try to drop it */
             if(drand48() > pkt_loss_thresh){
                 /* keep the pkt */
-                /* todo: */
+                break;
             }else{
                 /* drop the pkt */
+                /* fixme: remove prints? */
                 printf("DROPPED PKT: ");
-                ntohpkt((struct xtcphdr*)pkt);
                 print_hdr((struct xtcphdr *) pkt);
-                htonpkt((struct xtcphdr*)pkt);
+                continue;
             }
         }
-        break;
+        /* end of select for(EVER) */
     }
+    /* recv'ed a pkt, it is in host order, and we will put it in the window */
+    printf("recv'd packet ");
+    print_hdr((struct xtcphdr *) pkt);
 
-    err = add_to_wnd(seq, pkt, (const char**)wnd);
+    /* if it's a RST then return */
+    if((((struct xtcphdr*)pkt)->flags & RST) == RST){
+        _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
+        free(pkt);
+        return -1;
+    }
+    _DEBUG("%s\n", "placing packet into the window.");
+    err = add_to_wnd(((struct xtcphdr *)pkt)->seq, pkt, (const char**)wnd);
     if(err == -1) {          /* out of bounds */
         _DEBUG("ERROR: %s\n", "out of bounds");
         free(pkt);
-        return -1;
+        return -2;
 
     } else if(err == -2) {  /* full window */
         _DEBUG("%s\n", "The window was full, not sending");
@@ -272,7 +287,7 @@ ssize_t clirecv(int sockfd, char **wnd) {
     } else if (err == 1) {
         _DEBUG("%s\n", "packet was added ...");
     } else {
-        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
+        _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
     }
     return 1;
 }

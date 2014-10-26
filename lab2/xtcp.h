@@ -57,8 +57,24 @@ int has_packet(uint32_t index, const char** wnd);
 uint32_t get_wnd_index(uint32_t n);
 void print_wnd(const char** wnd);
 
-/* for the client/reciever/acker */
-ssize_t clirecv(int sockfd, char **wnd);
+/**
+* clirecv -- for the client/receiver/acker
+* Returns: >0 bytes recv'd
+*           0 on FIN recv'd
+*          -1 on RST recv'd
+*          -2 on failure, with perror printed
+* DESC:
+* Blocks until a packet is recv'ed from sockfd. If it's a FIN, immediately return 0.
+* If it's not a FIN then try to drop it based on pkt_loss_thresh.
+*     -if dropped, pretend it never happened and continue to block in select()
+*     -if kept:
+*         -if RST then return -1
+*         -else try to add to the window.
+* NOTES:
+* Sends ACKs and duplicate ACKS.
+* NULL terminates the data sent.
+*/
+int clirecv(int sockfd, char **wnd);
 int cli_ack(int sockfd, char **wnd);
 int cli_dup_ack(int sockfd, char **wnd);
 
