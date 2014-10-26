@@ -23,8 +23,6 @@ uint32_t seq;           /* SEQ number */
 uint32_t ack_seq;       /* ACK number */
 
 uint16_t advwin;        /* current advwin */
-int basewin;            /* index of the window base */
-
 
 double pkt_loss_thresh; /* packet loss percentage */
 
@@ -53,6 +51,8 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
 char* remove_from_wnd(uint32_t index, const char** wnd);
 void free_wnd(char** wnd);
 char** init_wnd();
+int has_packet(uint32_t index, const char** wnd);
+uint32_t get_wnd_index(uint32_t n);
 
 /* for the client/reciever/acker */
 ssize_t clirecv(int sockfd, char **wnd);
