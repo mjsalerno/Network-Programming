@@ -18,6 +18,24 @@ void print_hdr(struct xtcphdr *hdr) {
     printf(", advwin:%u\n", hdr->advwin);
 }
 
+void print_wnd(const char** wnd) {
+    printf("print_wnd is not done\n");
+    /*int i;
+
+    for(i = 0; i < max_wnd_size; ++i) {
+
+    }*/
+}
+
+int has_packet(uint32_t index, const char** wnd) {
+    int n = get_wnd_index(index);
+    return wnd[n] != NULL;
+}
+
+uint32_t get_wnd_index(uint32_t n) {
+    return (n + basewin) % max_wnd_size;
+}
+
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
     struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
     realhdr->seq = seq;
@@ -96,6 +114,7 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     return 1;
 }
 
+/* Set advwin to the correct value before use*/
 char** init_wnd() {
     char** rtn;
     int i;
@@ -116,7 +135,7 @@ char** init_wnd() {
 * returns 1 on sucsess
 */
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
-    int n = (index + basewin) % max_wnd_size;
+    int n = get_wnd_index(index);
     if(n > advwin) {
         fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
         return -1;
@@ -133,7 +152,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
 }
 
 char* remove_from_wnd(uint32_t index, const char** wnd) {
-    int n = (index + basewin) % max_wnd_size;
+    int n = get_wnd_index(index);
     const char* tmp;
 
     if(n > advwin) {

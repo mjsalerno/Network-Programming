@@ -50,6 +50,8 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
 char* remove_from_wnd(uint32_t index, const char** wnd);
 void free_wnd(char** wnd);
 char** init_wnd();
+int has_packet(uint32_t index, const char** wnd);
+uint32_t get_wnd_index(uint32_t n);
 
 void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
