@@ -19,13 +19,17 @@ void print_hdr(struct xtcphdr *hdr) {
     printf(", advwin:%u\n", hdr->advwin);
 }
 
-void print_wnd(/*const char** wnd*/) {
-    printf("print_wnd is not done\n");
-    /*int i;
+void print_wnd(const char** wnd) {
+    int i;
 
     for(i = 0; i < max_wnd_size; ++i) {
-
-    }*/
+        if(has_packet((uint32_t)i, wnd)) {
+            printf("X ");
+        } else {
+            printf("_ ");
+        }
+    }
+    printf("\n");
 }
 
 int has_packet(uint32_t index, const char** wnd) {
@@ -34,7 +38,9 @@ int has_packet(uint32_t index, const char** wnd) {
 }
 
 uint32_t get_wnd_index(uint32_t n) {
-    return (n + basewin) % max_wnd_size;
+    uint32_t rtn = (n + basewin) % max_wnd_size;
+    /*_DEBUG("n: %-3" PRIu32 " basewin: %-3" PRIu32 " max: %-3" PRIu32 " got index: %-3" PRIu32 "\n", n, basewin, max_wnd_size, rtn);*/
+    return rtn;
 }
 
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
@@ -80,10 +86,12 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
         return -2;
     }
 
-    seq++;
+    print_wnd((const char**)wnd);
+
     return 1;
 }
 
+/* MUST have advwin set to the max wnd size */
 char** init_wnd() {
     char** rtn;
     int i;

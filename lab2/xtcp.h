@@ -7,6 +7,8 @@
 #ifndef XTCP_H
 #define XTCP_H
 
+#define DEBUG
+
 #define FIN 0x1
 #define SYN 0x2
 #define RST 0x4
@@ -52,6 +54,7 @@ void free_wnd(char** wnd);
 char** init_wnd();
 int has_packet(uint32_t index, const char** wnd);
 uint32_t get_wnd_index(uint32_t n);
+void print_wnd(const char** wnd);
 
 /* for the client/reciever/acker */
 ssize_t clirecv(int sockfd, void *buf, size_t len, int flags);
