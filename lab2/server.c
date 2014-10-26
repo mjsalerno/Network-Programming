@@ -380,8 +380,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
 
 
     srand48((unsigned int)time(NULL));
-    seq = (u_int32_t)lrand48();
-    wnd_base = seq;
+    seq = (uint32_t)lrand48();
 
     flags = SYN|ACK;
     ++seq;

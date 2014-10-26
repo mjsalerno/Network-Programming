@@ -4,6 +4,8 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 
+#include "common.h"
+
 #ifndef XTCP_H
 #define XTCP_H
 

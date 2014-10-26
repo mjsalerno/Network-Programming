@@ -1,7 +1,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <signal.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
