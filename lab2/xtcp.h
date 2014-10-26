@@ -24,7 +24,7 @@ uint32_t ack_seq;       /* ACK number */
 
 uint16_t advwin;        /* current advwin */
 int basewin;            /* index of the window base */
-char** wnd;             /* the actual window */
+
 
 double pkt_loss_thresh; /* packet loss percentage */
 
@@ -35,7 +35,7 @@ struct xtcphdr {
     uint16_t advwin;
 };
 
-void print_xtxphdr(struct xtcphdr *hdr);
+void print_hdr(struct xtcphdr *hdr);
 /*
 Example:
 void *packet = malloc(sizeof(struct xtcphdr) + datalen)
@@ -43,7 +43,7 @@ make_pkt(packet, .....)
  */
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen);
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);

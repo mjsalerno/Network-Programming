@@ -21,7 +21,7 @@ int main(int argc, const char **argv) {
     int sockfd;
     struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
     socklen_t len;
-    char pkt[BUFF_SIZE];
+    char pkt[MAX_PKT_SIZE + 1];
 
     cliList = NULL;
 
@@ -100,7 +100,7 @@ int main(int argc, const char **argv) {
 
         /*get filename*/
         len = sizeof(cliaddr);
-        n = recvfrom(sockfd, pkt, sizeof(pkt), 0, (struct sockaddr *)&cliaddr, &len);
+        n = recvfrom(sockfd, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *)&cliaddr, &len);
         if(n < -1) {
             perror("server.recvfrom()");
         }
@@ -124,7 +124,7 @@ int main(int argc, const char **argv) {
         advwin = ((struct xtcphdr*)pkt)->advwin < advwin ? ((struct xtcphdr*)pkt)->advwin : advwin;
         _DEBUG("new advwin: %d\n", advwin);
 
-        print_xtxphdr((struct xtcphdr*) pkt);
+        print_hdr((struct xtcphdr *) pkt);
         _DEBUG("Got filename: %s\n", pkt + DATA_OFFSET);
 
         _DEBUG("%s\n", "server.fork()");
@@ -156,7 +156,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     socklen_t len;
 
     /* init window */
-    wnd = init_wnd();
+    char** wnd  = init_wnd(); /* the actual window */
     basewin = 0;
 
     _DEBUG("%s\n", "In child");
@@ -222,14 +222,14 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     print_sock_peer(child_sock, &cliaddr);
 
     _DEBUG("%s\n", "Sending file ...");
-    err = send_file(fname, child_sock);
+    err = send_file(fname, child_sock, wnd);
     if(err < 0) {
         _DEBUG("%s\n", "Something went wrong while sending the file.");
     }
 
     _DEBUG("%s\n", "sending FIN");
     ++seq;
-    srvsend(child_sock, FIN, NULL, 0);
+    srvsend(child_sock, FIN, NULL, 0, wnd);
 
     _DEBUG("%s\n", "cleaning up sockets ...");
     close(child_sock);
@@ -369,7 +369,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     ++ack_seq;
     make_pkt(hdr, flags, advwin, &newport, 2);
     printf("sent hs2: ");
-    print_xtxphdr(hdr);
+    print_hdr(hdr);
     htonpkt(hdr);
 
     len = sizeof(struct sockaddr_in);
@@ -453,7 +453,7 @@ redo_hs2:
         exit(EXIT_FAILURE);
     }
     ntohpkt((struct xtcphdr*) pktbuf);
-    print_xtxphdr((struct xtcphdr*) pktbuf);
+    print_hdr((struct xtcphdr *) pktbuf);
     if(((struct xtcphdr*) pktbuf)->flags != ACK
             || ((struct xtcphdr*) pktbuf)->ack_seq != (seq + 1)
             || ((struct xtcphdr*) pktbuf)->seq != ack_seq) {
@@ -467,7 +467,7 @@ redo_hs2:
 }
 
 
-int send_file(char* fname, int sock) {
+int send_file(char* fname, int sock, char **wnd) {
     FILE *file;
     char data[MAX_DATA_SIZE] = {0};
     size_t n;
@@ -496,7 +496,7 @@ int send_file(char* fname, int sock) {
         } else {
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
             ++seq;
-            err = srvsend(sock, 0, data, n);
+            err = srvsend(sock, 0, data, n, wnd);
             if(err == -1) {      /* the error code for full window */
                 /* todo: do this for real */
                 _DEBUG("%s\n", "window is full ...");
