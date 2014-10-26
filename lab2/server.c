@@ -87,7 +87,7 @@ int main(int argc, const char **argv) {
         FD_SET(sockfd, &fdset);
         err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
 
-        if (err < 0 || !FD_ISSET(sockfd, &fdset)) {
+        if (err < 0) {
             if(errno == EINTR) {
                 _DEBUG("%s\n", "select interupted, continue ...");
                 continue;
@@ -103,6 +103,8 @@ int main(int argc, const char **argv) {
         n = recvfrom(sockfd, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *)&cliaddr, &len);
         if(n < -1) {
             perror("server.recvfrom()");
+            fprintf(stderr, "continuing anyway\n");
+            continue;
         }
 
         newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
