@@ -589,7 +589,8 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
             _DEBUG("%s\n", "ACKing several pkts");
             for(; wnd_base <= pkt_ack; ++wnd_base) {
 
-                if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {        /* check if correct pkt */
+                tmp2 = mikes_mysterious_get(pkt_ack);                     /* check if correct pkt */
+                if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {
                     _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
                             ((struct xtcphdr*) tmp2)->ack_seq,
                             pkt_ack);
