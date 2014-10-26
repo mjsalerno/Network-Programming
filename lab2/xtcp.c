@@ -5,6 +5,10 @@
 
 static int max_wnd_size;   /* initialized by init_wnd() */
 
+/* the seq number mapping to the current wnd base */
+static int wnd_base_seq; /* initialized by init_wnd() */
+static int wnd_count = 0; /* number of pkts currently in the window */
+
 void print_hdr(struct xtcphdr *hdr) {
     int is_ack = 0;
     int any_flags = 0;
@@ -26,6 +30,15 @@ void print_hdr(struct xtcphdr *hdr) {
     printf(", advwin:%u\n", hdr->advwin);
 }
 
+void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
+    struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
+    realhdr->seq = seq;
+    realhdr->flags = flags;
+    realhdr->ack_seq = ack_seq;
+    realhdr->advwin = advwin;
+    memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
+}
+
 void ntohpkt(struct xtcphdr *hdr) {
     hdr->seq = ntohl(hdr->seq);
     hdr->ack_seq = ntohl(hdr->ack_seq);
@@ -42,7 +55,7 @@ void htonpkt(struct xtcphdr *hdr) {
 
 void print_wnd(const char** wnd) {
     int i;
-
+    printf("count: %d", wnd_count);
     for(i = 0; i < max_wnd_size; ++i) {
         if(has_packet((uint32_t)i, wnd)) {
             printf("X ");
@@ -54,31 +67,37 @@ void print_wnd(const char** wnd) {
 }
 
 int has_packet(uint32_t index, const char** wnd) {
-    int n = get_wnd_index(index);
+    int n = dst_from_base_wnd(index);
     return wnd[n] != NULL;
 }
 
-uint32_t get_wnd_index(uint32_t n) {
-    uint32_t rtn = n % max_wnd_size;
-    /*_DEBUG("n: %-3" PRIu32 " basewin: %-3" PRIu32 " max: %-3" PRIu32 " got index: %-3" PRIu32 "\n", n, basewin, max_wnd_size, rtn);*/
+/**
+* Calc the distance from the current wnd_base_seq.
+* This gives the offset into the "continuous" buffer we have.
+* MOD this only if it's smaller than the current advwin.
+*/
+int dst_from_base_wnd(uint32_t n) {
+    int rtn = n - wnd_base_seq;
+    _DEBUG("n: %-3" PRIu32 " basewin: %-3d max: %-3d got index: %-3d\n", n, wnd_base_seq, max_wnd_size, rtn);
     return rtn;
 }
 
-void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
-    struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
-    realhdr->seq = seq;
-    realhdr->flags = flags;
-    realhdr->ack_seq = ack_seq;
-    realhdr->advwin = advwin;
-    memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
-}
 
-
-/* MUST have advwin set to the max wnd size */
-char** init_wnd() {
+/**
+* MUST have advwin set to the max wnd size.
+*
+* The arg first_seq_num must be the first index passed to add_to_wnd()
+*
+* RETURNS:
+* A malloc()'d pointer to the window, to be passed to the window funcs.
+* MUST be free_wnd()'d when done.
+**/
+char** init_wnd(int first_seq_num) {
     char** rtn;
     int i;
+    wnd_count = 0;
     max_wnd_size = advwin;
+    wnd_base_seq = first_seq_num;
 
     rtn = malloc((size_t)(max_wnd_size * sizeof(char*)));
 
@@ -86,44 +105,6 @@ char** init_wnd() {
         *(rtn+i) = 0;
 
     return rtn;
-}
-
-/**
-* Adds packets that are already malloced to the window
-* returns -1 if out of bounds
-* returns -2 if window is full
-* returns 1 on sucsess
-*/
-int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
-    int n = get_wnd_index(index);
-    if(n > advwin) {
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
-        return -1;
-    }
-
-    if(wnd[n] != NULL) {
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
-        return -2;
-    }
-
-    wnd[n] = pkt;
-
-    return 1;
-}
-
-char* remove_from_wnd(uint32_t index, const char** wnd) {
-    int n = get_wnd_index(index);
-    const char* tmp;
-
-    if(n > advwin) {
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
-        return NULL;
-    }
-
-    tmp = wnd[n];
-    wnd[n] = NULL;
-
-    return (char*)tmp;
 }
 
 void free_wnd(char** wnd) {
@@ -139,7 +120,132 @@ void free_wnd(char** wnd) {
     }
 
     free(wnd);
+    wnd_count = 0;
 }
+
+/**
+* Adds packets that are already malloc()'d to the window
+* returns -4 index used to be in the wnd, i.e. index < wnd_base_seq
+* returns -3 index cannot currently fit into the wnd, i.e. wnd_base_seq-index > advwin
+* returns -2 index would exceed max wnd size
+* returns -1 if window is full
+* returns 0 if index was occupied
+* returns 1 on success fully added
+*/
+int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
+    int n = dst_from_base_wnd(index);
+
+    if(n < 0){
+        _DEBUG("index %"PRIu32" used to be in the wnd ", index);
+        return -4;
+    }
+    else if(n > max_wnd_size){
+        _DEBUG("index %"PRIu32" tried to exceed max wnd size\n", index);
+        return -2;
+    }
+    else if(n > advwin) {
+        _DEBUG("index %"PRIu32" cannot currently fit into the wnd\n", index);
+        return -3;
+    }
+
+    if(max_wnd_size == wnd_count){ /* sanity check */
+        _DEBUG("window is full but this index passed: %"PRIu32"\n", index);
+        return -1;
+    }
+
+    /* now we can mod by max_wnd_size */
+    n = n % max_wnd_size;
+
+    if(wnd[n] != NULL) { /* sanity check */
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
+        return 0;
+    }
+    wnd[n] = pkt;
+    wnd_count++;
+    _DEBUG("fine, stored at n: %d, new wnd_count: %d", n, wnd_count);
+    return 1;
+    /* NOTE: don't try to update wnd_base_seq in here because the first
+    * thing the client gets might not be the base of the wnd.
+    * e.g. the first pkt recv'ed is the second pkt the server sent
+    */
+}
+
+/**
+* Removes the pkt pointer from the window at seq (index) and returns it.
+*
+* NOTE:
+* Caller must free() the returned pointer.
+*
+*/
+char* remove_from_wnd(uint32_t index, const char** wnd) {
+    int n = dst_from_base_wnd(index);
+    const char* tmp;
+
+    if(n > advwin) {
+        fprintf(stderr, "ERROR: can't remove, index %"PRIu32" is beyond advwin %d\n", index, advwin);
+        return NULL;
+    }
+    if(n > max_wnd_size) { /* sanity check */
+        fprintf(stderr, "ERROR: can't remove, index %"PRIu32" is beyond the max window size %d\n", index, max_wnd_size);
+        return NULL;
+    }
+    if(n != 0) { /* sanity check, users only remove the base */
+        fprintf(stderr, "ERROR: can't remove, index %"PRIu32" != wnd_base_seq %d\n", index, wnd_base_seq);
+        return NULL;
+    }
+    if(wnd_count <= 0) { /* sanity check, should never happen */
+        fprintf(stderr, "ERROR: can't remove, index %"PRIu32", the window count:", wnd_count);
+        return NULL;
+    }
+
+    /* now we can mod by max_wnd_size */
+    n = n % max_wnd_size;
+
+    tmp = wnd[n];
+    wnd[n] = NULL;
+    wnd_count--;
+    /* this should be right, moving the wnd_base_seq forward on correct removals*/
+    wnd_base_seq = index;
+
+    if(tmp == NULL){ /* sanity check */
+        _DEBUG("remove_from_wnd() is returning a NULL entry at n: %d\n", n);
+    }
+    return (char*)tmp;
+}
+
+/**
+* Same sorta stuff as remove except it doesn't remove, duh!
+*
+*/
+char* get_from_wnd(uint32_t index, const char** wnd) {
+    int n = dst_from_base_wnd(index);
+    const char* tmp;
+
+    if(n > advwin) {
+        /* change for congestion control? */
+        fprintf(stderr, "ERROR: can't get, index %"PRIu32" is beyond advwin %d\n", index, advwin);
+        return NULL;
+    }
+    if(n > max_wnd_size) { /* sanity check */
+        fprintf(stderr, "ERROR: can't get, index %"PRIu32" is beyond the max window size %d\n", index, max_wnd_size);
+        return NULL;
+    }
+    if(wnd_count <= 0) { /* sanity check, should never happen */
+        fprintf(stderr, "ERROR: can't get, index %"PRIu32", the window count:", wnd_count);
+        return NULL;
+    }
+
+    /* now we can mod by max_wnd_size */
+    n = n % max_wnd_size;
+
+    tmp = wnd[n];
+
+    if(tmp == NULL){ /* sanity check */
+        _DEBUG("get_from_wnd() is returning a NULL entry at n: %d\n", n);
+    }
+    return (char*)tmp;
+}
+
 
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
 
@@ -183,7 +289,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
 /*
 The client only directly calls this function once, for the SYN.
 It provides packet loss to the client's sends.
-This malloc()'s and free()'s
+This malloc()'s and free()'s space for data and a header.
 */
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     ssize_t err;
