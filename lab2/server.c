@@ -154,9 +154,12 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     int err;
     int child_sock;
     socklen_t len;
+    char** wnd;
 
     /* init window */
-    char** wnd  = init_wnd(); /* the actual window */
+    _DEBUG("%s\n", "init_wnd()");
+    wnd  = init_wnd(); /* the actual window */
+    print_wnd((const char**)wnd);
 
     _DEBUG("%s\n", "In child");
     _DEBUG("child.filename: %s\n", fname);
@@ -228,7 +231,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     _DEBUG("%s\n", "sending FIN");
     ++seq;
-    srvsend(child_sock, FIN, NULL, 0, wnd);
+    /*srvsend(child_sock, FIN, NULL, 0, wnd);*/
+    send_fin(child_sock);
 
     _DEBUG("%s\n", "cleaning up sockets ...");
     close(child_sock);
@@ -238,6 +242,17 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     free_wnd(wnd);
     _DEBUG("%s\n", "Exiting child");
     exit(EXIT_SUCCESS);
+}
+
+void send_fin(int sock) {
+    ssize_t err;
+    void* pkt = malloc(sizeof(struct xtcphdr));
+    make_pkt(pkt, FIN, advwin, NULL, 0);
+    htonpkt(pkt);
+    err = send(sock, pkt, sizeof(struct xtcphdr), 0);
+    if(err < 0) {
+        perror("send_fin()");
+    }
 }
 
 void proc_exit(int i) {

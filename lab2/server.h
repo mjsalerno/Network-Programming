@@ -20,5 +20,6 @@ int send_file(char* fname, int sock, char **wnd);
 void free_clients(struct client_list* head);
 int remove_client(struct client_list** head, pid_t pid);
 void proc_exit(int i);
+void send_fin(int sock);
 
 #endif
