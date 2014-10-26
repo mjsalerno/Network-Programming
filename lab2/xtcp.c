@@ -26,6 +26,20 @@ void print_hdr(struct xtcphdr *hdr) {
     printf(", advwin:%u\n", hdr->advwin);
 }
 
+void ntohpkt(struct xtcphdr *hdr) {
+    hdr->seq = ntohl(hdr->seq);
+    hdr->ack_seq = ntohl(hdr->ack_seq);
+    hdr->flags = ntohs(hdr->flags);
+    hdr->advwin = ntohs(hdr->advwin);
+}
+
+void htonpkt(struct xtcphdr *hdr) {
+    hdr->seq = htonl(hdr->seq);
+    hdr->ack_seq = htonl(hdr->ack_seq);
+    hdr->flags = htons(hdr->flags);
+    hdr->advwin = htons(hdr->advwin);
+}
+
 void print_wnd(const char** wnd) {
     int i;
 
@@ -59,44 +73,6 @@ void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t dat
     memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
 }
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
-
-    ssize_t err;
-    void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
-    make_pkt(pkt, flags, advwin, data, datalen);
-    /*print_hdr((struct xtcphdr*)pkt);*/
-    htonpkt((struct xtcphdr*)pkt);
-
-    /*todo: do WND/rtt stuff*/
-    err = add_to_wnd(seq, pkt, (const char**)wnd);
-    if(err == -1) {          /* out of bounds */
-        _DEBUG("ERROR: %s\n", "out of bounds");
-        free(pkt);
-        return -3;
-
-    } else if(err == -2) {  /* full window */
-        _DEBUG("%s\n", "The window was full, not sending");
-        free(pkt);
-        return -1;
-
-    } else if (err == 1) {
-        _DEBUG("%s\n", "packet was added ...");
-    } else {
-        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
-    }
-
-    err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
-    if(err < 0) {
-        perror("xtcp.srvsend()");
-        remove_from_wnd(seq, (const char **)wnd);
-        free(pkt);
-        return -2;
-    }
-
-    print_wnd((const char**)wnd);
-
-    return 1;
-}
 
 /* MUST have advwin set to the max wnd size */
 char** init_wnd() {
@@ -165,18 +141,43 @@ void free_wnd(char** wnd) {
     free(wnd);
 }
 
-void ntohpkt(struct xtcphdr *hdr) {
-    hdr->seq = ntohl(hdr->seq);
-    hdr->ack_seq = ntohl(hdr->ack_seq);
-    hdr->flags = ntohs(hdr->flags);
-    hdr->advwin = ntohs(hdr->advwin);
-}
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
 
-void htonpkt(struct xtcphdr *hdr) {
-    hdr->seq = htonl(hdr->seq);
-    hdr->ack_seq = htonl(hdr->ack_seq);
-    hdr->flags = htons(hdr->flags);
-    hdr->advwin = htons(hdr->advwin);
+    ssize_t err;
+    void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
+    make_pkt(pkt, flags, advwin, data, datalen);
+    /*print_hdr((struct xtcphdr*)pkt);*/
+    htonpkt((struct xtcphdr*)pkt);
+
+    /*todo: do WND/rtt stuff*/
+    err = add_to_wnd(seq, pkt, (const char**)wnd);
+    if(err == -1) {          /* out of bounds */
+        _DEBUG("ERROR: %s\n", "out of bounds");
+        free(pkt);
+        return -3;
+
+    } else if(err == -2) {  /* full window */
+        _DEBUG("%s\n", "The window was full, not sending");
+        free(pkt);
+        return -1;
+
+    } else if (err == 1) {
+        _DEBUG("%s\n", "packet was added ...");
+    } else {
+        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
+    }
+
+    err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    if(err < 0) {
+        perror("xtcp.srvsend()");
+        remove_from_wnd(seq, (const char **)wnd);
+        free(pkt);
+        return -2;
+    }
+
+    print_wnd((const char**)wnd);
+
+    return 1;
 }
 
 /*
