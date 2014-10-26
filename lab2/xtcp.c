@@ -5,6 +5,10 @@
 
 static int max_wnd_size;   /* initialized by init_wnd() */
 
+/* the seq number mapping to the current wnd base */
+static int wnd_base_seq; /* initialized by init_wnd() */
+static int wnd_count = 0; /* number of pkts currently in the window */
+
 void print_hdr(struct xtcphdr *hdr) {
     int is_ack = 0;
     int any_flags = 0;
@@ -24,6 +28,15 @@ void print_hdr(struct xtcphdr *hdr) {
         printf(", dlen:%u", hdr->datalen);
     }*/
     printf(", advwin:%u\n", hdr->advwin);
+}
+
+void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
+    struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
+    realhdr->seq = seq;
+    realhdr->flags = flags;
+    realhdr->ack_seq = ack_seq;
+    realhdr->advwin = advwin;
+    memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
 }
 
 void ntohpkt(struct xtcphdr *hdr) {
@@ -64,21 +77,22 @@ uint32_t get_wnd_index(uint32_t n) {
     return rtn;
 }
 
-void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
-    struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
-    realhdr->seq = seq;
-    realhdr->flags = flags;
-    realhdr->ack_seq = ack_seq;
-    realhdr->advwin = advwin;
-    memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
-}
 
-
-/* MUST have advwin set to the max wnd size */
+/**
+* MUST have advwin set to the max wnd size.
+*
+* The arg first_seq_num must be the first index passed to add_to_wnd()
+*
+* RETURNS:
+* A malloc()'d pointer to the window, to be passed to the window funcs.
+* MUST be free_wnd()'d when done.
+**/
 char** init_wnd() {
     char** rtn;
     int i;
+    wnd_count = 0;
     max_wnd_size = advwin;
+    wnd_base_seq = 0;
 
     rtn = malloc((size_t)(max_wnd_size * sizeof(char*)));
 
@@ -86,44 +100,6 @@ char** init_wnd() {
         *(rtn+i) = 0;
 
     return rtn;
-}
-
-/**
-* Adds packets that are already malloced to the window
-* returns -1 if out of bounds
-* returns -2 if window is full
-* returns 1 on sucsess
-*/
-int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
-    int n = get_wnd_index(index);
-    if(n > advwin) {
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
-        return -1;
-    }
-
-    if(wnd[n] != NULL) {
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
-        return -2;
-    }
-
-    wnd[n] = pkt;
-
-    return 1;
-}
-
-char* remove_from_wnd(uint32_t index, const char** wnd) {
-    int n = get_wnd_index(index);
-    const char* tmp;
-
-    if(n > advwin) {
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
-        return NULL;
-    }
-
-    tmp = wnd[n];
-    wnd[n] = NULL;
-
-    return (char*)tmp;
 }
 
 void free_wnd(char** wnd) {
@@ -139,7 +115,67 @@ void free_wnd(char** wnd) {
     }
 
     free(wnd);
+    wnd_count = 0;
 }
+
+/**
+* Adds packets that are already malloced to the window
+* returns -1 if out of bounds
+* returns -2 if window is full
+* returns 1 on sucsess
+*/
+int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
+    int n = get_wnd_index(index);
+    if(wnd_count == 0){
+        wnd_base_seq = index;
+    }
+
+    if(n > advwin) {
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
+        return -1;
+    }
+
+    if(wnd[n] != NULL) {
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
+        return -2;
+    }
+    wnd[n] = pkt;
+    wnd_count++;
+
+    /* note: don't try to update wnd_base_seq in here because the first
+    * thing the client gets might not be the base of the wnd.
+    * e.g. the first pkt recv'ed is the second pkt the server sent
+    */
+
+    return 1;
+}
+
+/**
+* Removes the pkt pointer from the window at seq (index) and returns it.
+*
+* NOTE:
+* Caller must free() the returned pointer.
+*
+*/
+char* remove_from_wnd(uint32_t index, const char** wnd) {
+    int n = get_wnd_index(index);
+    const char* tmp;
+
+    if(n > advwin) {
+        fprintf(stderr, "ERROR: xtcp.remove_from_wnd() result of mod (%d) was greater than window size (%" PRIu32 ")\n", n, index);
+        return NULL;
+    }
+
+    tmp = wnd[n];
+    wnd[n] = NULL;
+    wnd_count--;
+
+    if(tmp == NULL){
+        _DEBUG("remove_from_wnd() is returning a NULL entry at n: %d\n", n);
+    }
+    return (char*)tmp;
+}
+
 
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
 
@@ -183,7 +219,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
 /*
 The client only directly calls this function once, for the SYN.
 It provides packet loss to the client's sends.
-This malloc()'s and free()'s
+This malloc()'s and free()'s space for data and a header.
 */
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     ssize_t err;
