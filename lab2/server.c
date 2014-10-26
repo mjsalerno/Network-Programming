@@ -7,6 +7,8 @@ extern uint32_t seq;
 extern uint32_t ack_seq;
 extern uint16_t advwin;
 
+static uint32_t wnd_base;
+
 int main(int argc, const char **argv) {
     const char *path;
 
@@ -379,6 +381,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
 
     srand48((unsigned int)time(NULL));
     seq = (u_int32_t)lrand48();
+    wnd_base = seq;
 
     flags = SYN|ACK;
     ++seq;
@@ -485,7 +488,7 @@ redo_hs2:
 
 int send_file(char* fname, int sock, char **wnd) {
     FILE *file;
-    char data[MAX_DATA_SIZE] = {0};
+    char data[MAX_PKT_SIZE] = {0};  /* buffer for sending file and getting ACKs */
     size_t n;
     int err, tally;
 
@@ -498,10 +501,9 @@ int send_file(char* fname, int sock, char **wnd) {
         return EXIT_FAILURE;
     }
 
-    _DEBUG("math: %d\n", MAX_DATA_SIZE);
-    _DEBUG("data size: %u\n", (unsigned int)sizeof(data));
+    _DEBUG("data size: %u\n", (unsigned int) MAX_DATA_SIZE);
     for(EVER) {
-        n = fread(data, 1, sizeof(data), file);
+        n = fread(data, 1, MAX_DATA_SIZE, file);
         tally += n;
         _DEBUG("send_file.fread(%lu)\n", (unsigned long)n);
         if (ferror(file)) {
@@ -514,10 +516,33 @@ int send_file(char* fname, int sock, char **wnd) {
             ++seq;
             err = srvsend(sock, 0, data, n, wnd);
             if(err == -1) {      /* the error code for full window */
+
                 /* todo: do this for real */
-                _DEBUG("%s\n", "window is full ...");
-                fclose(file);
-                return EXIT_SUCCESS;
+                _DEBUG("%s\n", "window is full listening fosend_filer ACK...");
+                for(EVER) {                                                           /* listen for ACKs */
+                    int acks = 0;
+
+                    err = (int) recv(sock, data, sizeof(data), MSG_DONTWAIT);
+                    if (err <= 0) {
+                        if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
+                            fprintf(stderr, "send_file.get_ack(%d", err);
+                            perror(")");
+                            return EXIT_FAILURE;
+                        } else {                                                       /* no ACKs */
+                            _DEBUG("ACKs recvd: %d\n", acks);
+                            break;
+                        }
+                    } else {                                                           /* got an ACK */
+                        _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32,
+                                ((struct xtcphdr *)data)->seq,
+                                ((struct xtcphdr *)data)->ack_seq);
+
+                        err = handle_ack((struct xtcphdr *)data, wnd);
+                        if(err < 0) {
+                            _DEBUG("%s\n", "There was something wrong woth client ACK");
+                        }
+                    }
+                }
 
             } else if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
@@ -532,4 +557,42 @@ int send_file(char* fname, int sock, char **wnd) {
     fclose(file);
 
     return EXIT_SUCCESS;
+}
+
+int handle_ack(struct xtcphdr* pkt, char** wnd) {
+    uint32_t pkt_ack = pkt->ack_seq;
+    char* tmp;
+
+    if(has_packet(pkt_ack, (const char**)wnd)) {
+        if(wnd_base == pkt_ack) {                                       /* the packet is at base */
+            _DEBUG("%s\n", "ACK was at the base");
+
+            /* todo: check if correct pkt */
+            tmp = remove_from_wnd(pkt_ack, (const char**) wnd);
+            if(tmp ==NULL) {
+                _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
+                return -1;
+            }
+
+            free(tmp);
+            wnd_base++;
+            return 0;
+
+        } else if(wnd_base < pkt_ack) {                                   /* ACK for several pkts */
+            _DEBUG("%s\n", "ACKing several pkts");
+            for(; wnd_base <= pkt_ack; ++wnd_base) {
+                /* todo: check if correct pkt */
+                tmp = remove_from_wnd(wnd_base, (const char**) wnd);
+                _DEBUG("removing: %" PRIu32 "\n", wnd_base);
+                if(tmp ==NULL) {
+                    _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
+                    return -1;
+                }
+            }
+        }
+    } else {
+        _DEBUG("%s\n", "the ACKed pkt is not even in window");
+        return -1;
+    }
+    return 0;
 }
