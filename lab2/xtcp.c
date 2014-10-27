@@ -136,17 +136,18 @@ void free_wnd(char** wnd) {
 */
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     int n = dst_from_base_wnd(index);
+    _DEBUG("n = %d, going to ifs\n", n);
 
     if(n < 0){
-        _DEBUG("index %"PRIu32" used to be in the wnd ", index);
+        _DEBUG("index: %"PRIu32" used to be in the wnd, n: %d\n", index, n);
         return E_WASREMOVED;
     }
     else if(n > max_wnd_size){
-        _DEBUG("index %"PRIu32" tried to exceed max wnd size\n", index);
+        _DEBUG("index %"PRIu32" tried to exceed max wnd size, n: %d\n", index, n);
         return E_INDEXTOOFAR;
     }
     else if(n > advwin) {
-        _DEBUG("index %"PRIu32" cannot currently fit into the wnd\n", index);
+        _DEBUG("index %"PRIu32" cannot currently fit into the wnd, n: %d\n", index, n);
         return E_CANTFIT;
     }
 
@@ -159,6 +160,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
 
     /* now we can mod by max_wnd_size */
     n = n % max_wnd_size;
+    _DEBUG("n %% max_wnd_size = %d\n", n);
 
     if(wnd[n] != NULL) { /* sanity check */
         fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
@@ -166,7 +168,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     }
     wnd[n] = pkt;
     wnd_count++;
-    _DEBUG("fine, stored at n: %d, new wnd_count: %d", n, wnd_count);
+    _DEBUG("added pkt at wnd[%d], wnd_count: %d\n", n, wnd_count);
     return 0;
     /* NOTE: don't try to update wnd_base_seq in here because the first
     * thing the client gets might not be the base of the wnd.
@@ -184,7 +186,11 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
 char* remove_from_wnd(uint32_t index, const char** wnd) {
     int n = dst_from_base_wnd(index);
     const char* tmp;
-
+    _DEBUG("n = %d, going to ifs\n", n);
+    if(n < 0){
+        _DEBUG("ERROR: can't remove, index %"PRIu32" is not in wnd, n: %d\n", index, n);
+        return NULL;
+    }
     if(n > advwin) {
         fprintf(stderr, "ERROR: can't remove, index %"PRIu32" is beyond advwin %d\n", index, advwin);
         return NULL;
@@ -198,13 +204,13 @@ char* remove_from_wnd(uint32_t index, const char** wnd) {
         return NULL;
     }
     if(wnd_count <= 0) { /* sanity check, should never happen */
-        fprintf(stderr, "ERROR: can't remove, index %"PRIu32", the window count:", wnd_count);
+        fprintf(stderr, "ERROR: can't remove, index %"PRIu32", the wnd_count: %d\n", index, wnd_count);
         return NULL;
     }
 
     /* now we can mod by max_wnd_size */
     n = n % max_wnd_size;
-
+    _DEBUG("n %% max_wnd_size = %d\n", n);
     tmp = wnd[n];
     wnd[n] = NULL;
     wnd_count--;
@@ -235,7 +241,7 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
         return NULL;
     }
     if(wnd_count <= 0) { /* sanity check, should never happen */
-        fprintf(stderr, "ERROR: can't get, index %"PRIu32", the window count:", wnd_count);
+        fprintf(stderr, "ERROR: can't get, index %"PRIu32", the wnd_count: %d\n", index, wnd_count);
         return NULL;
     }
 
@@ -411,7 +417,7 @@ int clirecv(int sockfd, char **wnd) {
         default:
             _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
     }
-    return 1;
+    return (int)bytes;
 }
 
 int cli_ack(int sockfd, char **wnd) {

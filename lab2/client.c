@@ -128,7 +128,9 @@ int main(void) {
     for(EVER) {
         /*todo: start getting the file*/
         err = clirecv(serv_fd, wnd);
+        _DEBUG("clirecv() returned: %d\n", (int)err);
         if (err <= -2) {
+            _DEBUG("%s\n", "client exit(EXIT_FAILURE)");
             exit(EXIT_FAILURE);
         }
         else if(err == -1){
@@ -140,8 +142,10 @@ int main(void) {
             break;
         }
         /* got actual data, loop back around for more */
+        _DEBUG("%s\n", "clirecv() got actual data, loop back around for more");
     }
 
+    _DEBUG("%s\n", "closing serv_fd then exit(EXIT_SUCCESS)");
     close(serv_fd);
 
     return EXIT_SUCCESS;
