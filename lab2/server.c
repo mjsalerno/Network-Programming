@@ -637,9 +637,11 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
 
     while(ge_base(pkt_ack -1)) {
         count++;
+        _DEBUG("eating pkts until SEQ: %" PRIu32 "\n",  pkt_ack);
         remove_from_wnd((const char **) wnd);
     }
 
     /*if(count == 0) count = -1;*/
+    _DEBUG("ate %d pkts\n", count);
     return count;
 }
