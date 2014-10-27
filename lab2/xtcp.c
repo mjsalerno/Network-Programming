@@ -7,7 +7,7 @@ static int max_wnd_size;   /* initialized by init_wnd() */
 
 /* the seq number mapping to the current wnd base */
 static uint32_t wnd_base_seq; /* initialized by init_wnd() */
-static int wnd_base_offset; /* initialized by init_wnd() */
+static int wnd_base_i; /* initialized by init_wnd() */
 static int wnd_count = 0; /* number of pkts currently in the window */
 
 void print_hdr(struct xtcphdr *hdr) {
@@ -63,7 +63,7 @@ void htonpkt(struct xtcphdr *hdr) {
 
 void print_wnd(const char** wnd) {
     int i;
-    printf("wnd: count: %d ", wnd_count);
+    printf("wnd: ");
     for(i = 0; i < max_wnd_size; ++i) {
         if(wnd[i] != NULL) {
             printf("X ");
@@ -71,7 +71,7 @@ void print_wnd(const char** wnd) {
             printf("_ ");
         }
     }
-    printf("\n");
+    printf("count: %d,  advwin: %" PRIu16 "\n", wnd_count, advwin);
 }
 
 /**
@@ -125,7 +125,7 @@ int dst_from_base_wnd(uint32_t n) {
 *         0 if not
 */
 int ge_base(uint32_t ack_seq_1) {
-    return (ack_seq_1 >= wnd_base_seq);
+    return (ack_seq_1 >= wnd_base_seq) && wnd_count > 0;
 }
 
 
@@ -144,7 +144,9 @@ char** init_wnd(uint32_t first_seq_num) {
     wnd_count = 0;
     max_wnd_size = advwin;
     wnd_base_seq = first_seq_num;
-    wnd_base_offset = wnd_base_seq % max_wnd_size;
+    wnd_base_i = wnd_base_seq % max_wnd_size;
+
+    _DEBUG("wnd_base_seq: %" PRIu32 ", wnd_base_i: %d max_wnd_size %d\n", wnd_base_seq, wnd_base_i, max_wnd_size);
 
     rtn = malloc((size_t)(max_wnd_size * sizeof(char*)));
     if(rtn == NULL){
@@ -207,8 +209,8 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     */
 
     /* now we can mod by max_wnd_size */
-    n = (n + wnd_base_offset) % max_wnd_size;
-    _DEBUG("n %% max_wnd_size = %d\n", n);
+    n = (n + wnd_base_i) % max_wnd_size;
+    _DEBUG("(n + wnd_base_i) %% max_wnd_size = %d\n", n);
 
     if(wnd[n] != NULL) { /* sanity check */
         fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
@@ -233,22 +235,22 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
 */
 char* remove_from_wnd(const char** wnd) {
     const char* tmp;
-    _DEBUG("removing wnd[wnd_base_offset %d]\n", wnd_base_offset);
+    _DEBUG("removing wnd[wnd_base_i %d]\n", wnd_base_i);
     if(wnd_count <= 0) { /* sanity check, should never happen */
         fprintf(stderr, "ERROR: can't remove because the wnd_count: %d\n", wnd_count);
         return NULL;
     }
-    tmp = wnd[wnd_base_offset];
-    wnd[wnd_base_offset] = NULL;
+    tmp = wnd[wnd_base_i];
+    wnd[wnd_base_i] = NULL;
     wnd_count--;
     if(tmp == NULL){ /* sanity check */
-        _DEBUG("%s\n","remove_from_wnd() returning NULL at wnd[wnd_base_offset]");
+        _DEBUG("%s\n","remove_from_wnd() returning NULL at wnd[wnd_base_i]");
     }
     /* this should be right, moving the wnd_base's forward on correct removals*/
     wnd_base_seq++;
-    wnd_base_offset++;
-    if(wnd_base_offset >= max_wnd_size){
-        wnd_base_offset -= max_wnd_size;
+    wnd_base_i++;
+    if(wnd_base_i >= max_wnd_size){
+        wnd_base_i -= max_wnd_size;
     }
     return (char*)tmp;
 }
@@ -276,7 +278,8 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
     }
 
     /* now we can mod by max_wnd_size */
-    n = (n + wnd_base_offset) % max_wnd_size;
+    n = (n + wnd_base_i) % max_wnd_size;
+    _DEBUG("(n + wnd_base_i) %% max_wnd_size = %d\n", n);
 
     tmp = wnd[n];
 

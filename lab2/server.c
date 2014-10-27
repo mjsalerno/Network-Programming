@@ -238,7 +238,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     }
 
     _DEBUG("%s\n", "waiting for unACKed pkts");
-    while(is_wnd_full()) {
+    while(!is_wnd_empty()) {
         err = get_aks(wnd, child_sock, 1);
         if(err < 0) {
             _DEBUG("%s\n", "there was a problem getting ACKs");
@@ -505,8 +505,8 @@ redo_hs2:
     }
 
     _DEBUG("%s\n", "got last hand shake from client");
-    start_seq = seq;
-    _DEBUG("set win_base to: %" PRIu32 "\n", start_seq);
+    start_seq = ((struct xtcphdr*) pktbuf)->ack_seq;
+    _DEBUG("set start_seq to: %" PRIu32 "\n", start_seq);
 
     return EXIT_SUCCESS;
 }
@@ -546,9 +546,10 @@ int send_file(char* fname, int sock, char **wnd) {
             printf("File finished uploading ...\n");
             break;
         } else {
+            ++seq;
 saving_data:
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
-            ++seq;
+
             err = srvsend(sock, 0, data, n, wnd);
             if(err == -1) {                                                           /* the error code for full window */
                 save_data = 1;
@@ -560,6 +561,8 @@ saving_data:
 
             } else if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
+            } else {
+                save_data = 0;
             }
         }
     }
@@ -582,32 +585,32 @@ int get_aks(char** wnd, int sock, int always_block) {
         return -1;
     }
 
-    _DEBUG("%s\n", "window is full listening for ACK...");
     for(EVER) {                                                           /* listen for ACKs */
-
+        print_wnd((const char**) wnd);
         if(is_wnd_full() || always_block) {                                               /* see if we need to wait for the window */
             flag = 0;
             _DEBUG("%s\n", "wnd IS full or quitting, recv WILL block");
         } else {
             flag = MSG_DONTWAIT;
-            _DEBUG("%s\n", "wnd NOT full, recv WONT block");
+            _DEBUG("%s\n", "wnd NOT full, recv WONT block: MSG_DONTWAIT");
         }
 
         do {
             err = (int) recv(sock, pkt, sizeof(pkt), flag);
         } while(errno == EINTR);
-        if (err <= 0) {
+        if (err < 0) {
             if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
                 fprintf(stderr, "send_file.get_ack(%d", err);
                 perror(")");
                 free(pkt);
                 return -1;
             } else {                                                       /* no ACKs */
-                _DEBUG("ACKs recvd: %d\n", acks);
+                _DEBUG("EWOULDBLOCK: ACKs recvd: %d\n", acks);
                 break;
             }
         } else {                                                           /* got an ACK */
-            _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32,
+            ntohpkt(pkt);
+            _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32 "\n",
                     ((struct xtcphdr *)pkt)->seq,
                     ((struct xtcphdr *)pkt)->ack_seq);
 
