@@ -513,8 +513,7 @@ int send_file(char* fname, int sock, char **wnd) {
         perror(")");
         return EXIT_FAILURE;
     }
-
-    _DEBUG("data size: %lu\n", sizeof(data));
+    
     for(EVER) {
         if(save_data) {
             _DEBUG("%s\n", "sending old data ...");
