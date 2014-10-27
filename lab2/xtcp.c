@@ -213,7 +213,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     _DEBUG("(n + wnd_base_i) %% max_wnd_size = %d\n", n);
 
     if(wnd[n] != NULL) { /* sanity check */
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() wnd[%d] already ocupied, contains pkt->seq = %"PRIu32"\n", n, ((struct xtcphdr*)(wnd[n]))->seq);
         return E_OCCUPIED;
     }
     wnd[n] = pkt;
