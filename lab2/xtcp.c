@@ -172,7 +172,7 @@ void free_wnd(char** wnd) {
 * RETURNS: 1 if you can call add_to_wnd(seq, wnd)
 *          0 otherwise
 */
-int can_add_to_wnd(uint32_t seq, char **wnd){
+int can_add_to_wnd(uint32_t seq){
     int can_add = 0;
     /* todo: add cwin to calc */
     if(wnd_base_seq <= seq && seq < (wnd_base_seq + max_wnd_size)){
@@ -205,13 +205,6 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
         _DEBUG("index %"PRIu32" cannot currently fit into the wnd, n: %d\n", index, n);
         return E_CANTFIT;
     }
-
-    /*
-    if(max_wnd_size == wnd_count){
-        _DEBUG("window is full but this index passed: %"PRIu32"\n", index);
-        return -6;
-    }
-    */
 
     /* now we can mod by max_wnd_size */
     n = (n + wnd_base_i) % max_wnd_size;
