@@ -8,7 +8,7 @@ extern uint32_t seq;
 extern uint32_t ack_seq;
 extern uint16_t advwin;
 
-static uint32_t wnd_base;
+static uint32_t start_seq;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -220,7 +220,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     /* init window */
     _DEBUG("%s\n", "init_wnd()");
-    wnd  = init_wnd(wnd_base);
+    wnd  = init_wnd(start_seq);
     print_wnd((const char**)wnd);
 
     /* TODO: err = close(everything);*/
@@ -505,8 +505,8 @@ redo_hs2:
     }
 
     _DEBUG("%s\n", "got last hand shake from client");
-    wnd_base = seq;
-    _DEBUG("set win_base to: %" PRIu32 "\n", wnd_base);
+    start_seq = seq;
+    _DEBUG("set win_base to: %" PRIu32 "\n", start_seq);
 
     return EXIT_SUCCESS;
 }
@@ -626,63 +626,13 @@ int get_aks(char** wnd, int sock, int always_block) {
 
 int handle_ack(struct xtcphdr* pkt, char** wnd) {
     uint32_t pkt_ack = pkt->ack_seq;
-    char* tmp1;
-    char* tmp2;
+    int count = 0;
 
-    if(has_packet(pkt_ack, (const char**)wnd)) {
-        if(wnd_base == pkt_ack) {                                       /* the packet is at base */
-            _DEBUG("%s\n", "ACK was at the base");
-
-            tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);            /* check if correct pkt */
-            if(tmp2 == NULL) {
-                _DEBUG("%s\n", "ERROR: getting the pkt returned null");
-                return -1;
-            }
-            if(((struct xtcphdr*) tmp2)->seq != pkt_ack) {
-                _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
-                        ((struct xtcphdr*) tmp2)->seq,
-                        pkt_ack);
-                return -1;
-            }
-
-            tmp1 = remove_from_wnd((const char**) wnd);        /* remove it */
-            if(tmp1 ==NULL) {
-                _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
-                return -1;
-            }
-
-            free(tmp1);
-            wnd_base++;
-            return 0;
-
-        } else if(wnd_base < pkt_ack) {                                   /* ACK for several pkts */
-            _DEBUG("%s\n", "ACKing several pkts");
-            for(; wnd_base <= pkt_ack; ++wnd_base) {
-
-                tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);          /* check if correct pkt */
-                if(tmp2 == NULL) {
-                    _DEBUG("%s\n", "ERROR: getting the pkt returned null");
-                    return -1;
-                }
-                if(((struct xtcphdr*) tmp2)->seq != pkt_ack) {
-                    _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
-                            ((struct xtcphdr*) tmp2)->seq,
-                            pkt_ack);
-                    return -1;
-                }
-
-                tmp1 = remove_from_wnd((const char**) wnd);      /* remove it */
-                _DEBUG("removing: %" PRIu32 "\n", wnd_base);
-                if(tmp1 ==NULL) {
-                    _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
-                    return -1;
-                }
-                free(tmp1);
-            }
-        }
-    } else {
-        _DEBUG("%s\n", "the ACKed pkt is not even in window");
-        return -1;
+    while(ge_base(pkt_ack -1)) {
+        count++;
+        remove_from_wnd(wnd);
     }
-    return 0;
+
+    if(count == 0) count = -1;
+    return count;
 }

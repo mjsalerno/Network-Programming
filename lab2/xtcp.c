@@ -124,7 +124,7 @@ int dst_from_base_wnd(uint32_t n) {
 * Returns 1 if ack_seq_1 >= wnd_base_seq
 *         0 if not
 */
-int ge_base(uint32_t ack_seq_1){
+int ge_base(uint32_t ack_seq_1) {
     return (ack_seq_1 >= wnd_base_seq);
 }
 
