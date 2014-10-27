@@ -288,7 +288,7 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
 }
 
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new) {
 
     int err;
     void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
@@ -299,26 +299,31 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
     htonpkt((struct xtcphdr*)pkt);
 
     /*todo: do WND/rtt stuff*/
-    err = add_to_wnd(seq, pkt, (const char**)wnd);
-    switch(err) {
-        case E_OCCUPIED:
-        case E_CANTFIT:
-        case E_INDEXTOOFAR:
-            _DEBUG("%s\n", "The window was full, not sending");
-            free(pkt);
-            return -1;
-        case -100:
-            _DEBUG("ERROR: %s\n", "out of bounds");
-            free(pkt);
-            return -3;
-        case 0:
-            _DEBUG("%s\n", "packet was added ...");
-            break;
-        case E_WASREMOVED:
-        default:
-            _DEBUG("ERROR: SOMETHING IS WRONG: %d\n", err);
-            free(pkt);
-            return -5;
+    if (is_new) {
+        err = add_to_wnd(seq, pkt, (const char **) wnd);
+        _DEBUG("%s\n", "data was new, will add to window");
+        switch (err) {
+            case E_OCCUPIED:
+            case E_CANTFIT:
+            case E_INDEXTOOFAR:
+                _DEBUG("%s\n", "The window was full, not sending");
+                free(pkt);
+                return -1;
+            case -100:
+                _DEBUG("ERROR: %s\n", "out of bounds");
+                free(pkt);
+                return -3;
+            case 0:
+                _DEBUG("%s\n", "packet was added ...");
+                break;
+            case E_WASREMOVED:
+            default:
+                _DEBUG("ERROR: SOMETHING IS WRONG: %d\n", err);
+                free(pkt);
+                return -5;
+        }
+    } else {
+        _DEBUG("%s\n", "data was old, not adding to window");
     }
 
     do {
@@ -327,7 +332,8 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
     if(err < 0) {
         perror("xtcp.srvsend()");
         /* FIXME: fix this */
-        remove_from_wnd((const char **)wnd);
+        _DEBUG("%s\n", "ERROR ERROR: DOING BAD THINGS!!!!!");
+        /* remove_from_wnd((const char **)wnd); */
         free(pkt);
         return -2;
     }

@@ -564,7 +564,7 @@ int send_file(char* fname, int sock, char **wnd) {
 saving_data:
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
 
-            err = srvsend(sock, 0, data, n, wnd);
+            err = srvsend(sock, 0, data, n, wnd, !save_data);
             if(err == -1) {                                                           /* the error code for full window */
                 save_data = 1;
                 err = get_aks(wnd, sock, 0);
