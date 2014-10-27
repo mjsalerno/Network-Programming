@@ -265,7 +265,9 @@ void send_fin(int sock) {
     void* pkt = malloc(sizeof(struct xtcphdr));
     make_pkt(pkt, FIN, advwin, NULL, 0);
     htonpkt(pkt);
-    err = send(sock, pkt, sizeof(struct xtcphdr), 0);
+    do {
+        err = send(sock, pkt, sizeof(struct xtcphdr), 0);
+    } while(errno == EINTR);
     if(err < 0) {
         perror("send_fin()");
     }
@@ -405,7 +407,9 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     htonpkt(hdr);
 
     len = sizeof(struct sockaddr_in);
-    n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
+    do {
+        n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
+    } while(errno == EINTR);
     if (n < 1) {
         perror("hs2.send(port)");
         free(hdr);
@@ -439,14 +443,18 @@ redo_hs1:
         _DEBUG("%s\n", "hs2 time out, re-sending over both sockets ...");
 
         len = sizeof(cliaddr);
-        n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
+        do {
+            n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
+        } while(errno == EINTR);
         if (n < 1) {
             perror("hs2.send(port)");
             free(hdr);
             exit(EXIT_FAILURE);
         }
         /* child_sock connected to new_addr? */
-        n = send(child_sock, hdr, sizeof(struct xtcphdr) + 2, 0);
+        do {
+            n = send(child_sock, hdr, sizeof(struct xtcphdr) + 2, 0);
+        } while(errno == EINTR);
         if (n < 1) {
             perror("hs2.send(port)");
             free(hdr);
