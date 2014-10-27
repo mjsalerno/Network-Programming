@@ -56,12 +56,12 @@ void htonpkt(struct xtcphdr *hdr);
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
+int can_add_to_wnd(uint32_t seq);
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
 char* remove_from_wnd(const char** wnd);
 char* get_from_wnd(uint32_t index, const char** wnd);
 void free_wnd(char** wnd);
 char** init_wnd(uint32_t first_seq_num);
-int has_packet(uint32_t index, const char** wnd);
 int dst_from_base_wnd(uint32_t n);
 void print_wnd(const char** wnd);
 int ge_base(uint32_t ack_seq_1);
