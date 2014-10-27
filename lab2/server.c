@@ -237,12 +237,16 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         _DEBUG("%s\n", "Something went wrong while sending the file.");
     }
 
-    _DEBUG("%s\n", "waiting for unACKed pkts");
     while(!is_wnd_empty()) {
+        _DEBUG("%s\n", "QUITING: waiting for unACKed pkts");
         err = get_aks(wnd, child_sock, 1);
         if(err < 0) {
             _DEBUG("%s\n", "there was a problem getting ACKs");
+        } else {
+            _DEBUG("%s\n", "got ACK");
         }
+
+        print_wnd((const char **)wnd);
     }
 
     _DEBUG("%s\n", "sending FIN");
@@ -542,7 +546,7 @@ int send_file(char* fname, int sock, char **wnd) {
             clearerr(file);
             fclose(file);
             return EXIT_FAILURE;
-        } else if(feof(file)) {
+        } else if(feof(file) && n < 1) {
             printf("File finished uploading ...\n");
             break;
         } else {
@@ -587,7 +591,7 @@ int get_aks(char** wnd, int sock, int always_block) {
 
     for(EVER) {                                                           /* listen for ACKs */
         print_wnd((const char**) wnd);
-        if(is_wnd_full() || always_block) {                                               /* see if we need to wait for the window */
+        if((is_wnd_full() || always_block) && !is_wnd_empty()) {                                               /* see if we need to wait for the window */
             flag = 0;
             _DEBUG("%s\n", "wnd IS full or quitting, recv WILL block");
         } else {
@@ -633,9 +637,11 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
 
     while(ge_base(pkt_ack -1)) {
         count++;
+        _DEBUG("eating pkts until SEQ: %" PRIu32 "\n",  pkt_ack);
         remove_from_wnd((const char **) wnd);
     }
 
-    if(count == 0) count = -1;
+    /*if(count == 0) count = -1;*/
+    _DEBUG("ate %d pkts\n", count);
     return count;
 }
