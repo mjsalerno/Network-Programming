@@ -141,8 +141,15 @@ int main(void) {
             _DEBUG("%s\n", "Done getting file...");
             break;
         }
+
         /* got actual data, loop back around for more */
         _DEBUG("%s\n", "clirecv() got actual data, loop back around for more");
+    }
+
+    /* wake up when the window is empty */
+    if(!is_wnd_empty()){
+        _DEBUG("%s\n", "waiting for consumer to read the file. ");
+        sleep(1);
     }
 
     _DEBUG("%s\n", "closing serv_fd then exit(EXIT_SUCCESS)");

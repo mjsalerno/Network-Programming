@@ -65,6 +65,7 @@ int has_packet(uint32_t index, const char** wnd);
 int dst_from_base_wnd(uint32_t n);
 void print_wnd(const char** wnd);
 int is_wnd_full();
+int is_wnd_empty();
 
 /**
 * clirecv -- for the client/receiver/acker

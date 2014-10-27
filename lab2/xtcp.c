@@ -67,16 +67,29 @@ void print_wnd(const char** wnd) {
 }
 
 /**
-* RETURNS: 1 if count is greater or equal to advwin.
+* RETURNS: 1 if wnd_count == advwin (also when > advwin)
 *
 */
 int is_wnd_full(){
-    int full = 0;
-    if(wnd_count >= advwin){
+    int full = (wnd_count == advwin);
+    if(wnd_count > advwin){
         full = 1;
-        _DEBUG("ERROR: (wnd_count) %d >= %d (max_wnd_size)\n", wnd_count, max_wnd_size);
+        _DEBUG("ERROR: (wnd_count) %d > %d (max_wnd_size)\n", wnd_count, max_wnd_size);
     }
     return full;
+}
+
+/**
+* RETURNS: 1 if count is = 0. (also when < 0)
+*
+*/
+int is_wnd_empty(){
+    int empty = (wnd_count == 0);
+    if(wnd_count < 0){
+        empty = 1;
+        _DEBUG("ERROR: (wnd_count) %d < 0 \n", wnd_count);
+    }
+    return empty;
 }
 
 int has_packet(uint32_t index, const char** wnd) {
@@ -382,7 +395,7 @@ int clirecv(int sockfd, char **wnd) {
                 free(pkt);
                 return 0;
             }
-            /* if not a FIN: try to drop it */
+            /* not a FIN: try to drop it */
             if(drand48() > pkt_loss_thresh){
                 /* keep the pkt */
                 break;
@@ -398,19 +411,21 @@ int clirecv(int sockfd, char **wnd) {
     }
     /* recv'ed a pkt, it is in host order, and we will put it in the window */
     printf("recv'd packet ");
-    print_hdr((struct xtcphdr *) pkt);
-    printf("packet contents:\n");
-    printf("%s\n", pkt + DATA_OFFSET);
-
     /* if it's a RST then return */
     if((((struct xtcphdr*)pkt)->flags & RST) == RST){
         _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
         free(pkt);
         return -1;
     }
+
+    print_hdr((struct xtcphdr *) pkt);
+    printf("packet contents:\n");
+    printf("%s\n", pkt + DATA_OFFSET);
+
     /* do window stuff */
     _DEBUG("%s\n", "placing packet into the window.");
     err = add_to_wnd(((struct xtcphdr *)pkt)->seq, pkt, (const char**)wnd);
+    _DEBUG("add_to_wnd() returned: %d\n", err);
     switch(err){
         case 0:
             /* send ACK, added correctly and for the first time */
