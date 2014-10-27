@@ -213,12 +213,13 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     _DEBUG("(n + wnd_base_i) %% max_wnd_size = %d\n", n);
 
     if(wnd[n] != NULL) { /* sanity check */
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() index location already ocupied: %d\n", n);
+        fprintf(stderr, "ERROR: xtcp.add_to_wnd() wnd[%d] already ocupied, contains pkt->seq = %"PRIu32"\n", n, ((struct xtcphdr*)(wnd[n]))->seq);
         return E_OCCUPIED;
     }
     wnd[n] = pkt;
     wnd_count++;
     _DEBUG("added pkt at wnd[%d], wnd_count: %d\n", n, wnd_count);
+    print_wnd(wnd);
     return 0;
     /* NOTE: don't try to update wnd_base_seq in here because the first
     * thing the client gets might not be the base of the wnd.
@@ -252,6 +253,7 @@ char* remove_from_wnd(const char** wnd) {
     if(wnd_base_i >= max_wnd_size){
         wnd_base_i -= max_wnd_size;
     }
+    print_wnd(wnd);
     return (char*)tmp;
 }
 
@@ -263,11 +265,7 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
     int n = dst_from_base_wnd(index);
     const char* tmp;
 
-    if(n > advwin) {
-        /* change for congestion control? */
-        fprintf(stderr, "ERROR: can't get, index %"PRIu32" is beyond advwin %d\n", index, advwin);
-        return NULL;
-    }
+    /* change for congestion control? */
     if(n > max_wnd_size) { /* sanity check */
         fprintf(stderr, "ERROR: can't get, index %"PRIu32" is beyond the max window size %d\n", index, max_wnd_size);
         return NULL;
@@ -360,7 +358,7 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     htonpkt((struct xtcphdr*)pkt);
 
     /* simulate packet loss on sends */
-    if(drand48() > pkt_loss_thresh) {
+    if(drand48() >= pkt_loss_thresh) {
         err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
         if (err < 0) {
             perror("xtcp.clisend()");
@@ -427,7 +425,7 @@ continue_with_select:
                 return -1;
             }
             /* not a FIN: try to drop it */
-            if(drand48() > pkt_loss_thresh){
+            if(drand48() >= pkt_loss_thresh){
                 /**
                 * keep the pkt:
                 * Pretend like the code after the "break;" is in here.
@@ -461,6 +459,7 @@ continue_with_select:
             _DEBUG("Check the ERROR codes here!! add_to_wnd() returned %d \n", err);
             return -2;
         }
+        advwin--;
         err = cli_ack(sockfd, wnd);
         if(err < 0){
             _DEBUG("cli_ack() returned %d\n", err);
@@ -489,6 +488,7 @@ continue_with_select:
             case 0:
                 /* send ACK, added correctly and for the first time */
                 _DEBUG("%s\n", "buffered new gap packet, calling cli_dup_ack()");
+                advwin--;
                 err = cli_dup_ack(sockfd);
                 if (err < 0) {
                     return -2;
@@ -520,8 +520,6 @@ continue_with_select:
 int cli_ack(int sockfd, char **wnd) {
     int err;
     /* update ack_seq, check to send a cumulative ACK */
-    /* todo: check this????? */
-    ++ack_seq;
     while(get_from_wnd(ack_seq, (const char**)wnd) != NULL) {
         ++ack_seq;
     }

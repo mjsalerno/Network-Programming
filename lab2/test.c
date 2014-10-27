@@ -30,40 +30,33 @@ static struct rtt_info rttinfo;
     return EXIT_SUCCESS;
 }*/
 
-
+int test_wnd(char **wnd, void *pkt, uint32_t seq){
+    int err;
+    pkt = malloc(MAX_PKT_SIZE);
+    make_pkt(pkt, ACK, advwin, NULL, 0);
+    print_hdr((struct xtcphdr*)pkt);
+    err = add_to_wnd(seq, pkt, (const char **)wnd);
+    if(err < 0) {
+        _DEBUG("%s\n", "ERROR");
+        free(wnd);
+        return err;
+    }
+    print_wnd((const char**)wnd);
+    return 0;
+}
 
 int main(void) {
     /* clientlist_test(); */
-    int err = 0;
-    int seq = 0;
+    int seq = 10;
     char *pkt1, *pkt2, *pkt3;
     char** wnd;
-    advwin = 3;
+    advwin = 2;
     wnd = init_wnd(seq);
+    print_wnd((const char**)wnd);
 
-    pkt1 = malloc(MAX_PKT_SIZE);
-    pkt2 = malloc(MAX_PKT_SIZE);
-    pkt3 = malloc(MAX_PKT_SIZE);
-    err = add_to_wnd(seq++, pkt1, (const char **)wnd);
-    if(err < 0) {
-        _DEBUG("%s\n", "ERR");
-        free(wnd);
-        return -1;
-    }
-
-    err = add_to_wnd(seq++, pkt2, (const char **)wnd);
-    if(err < 0) {
-        _DEBUG("%s\n", "ERR");
-        free(wnd);
-        return -1;
-    }
-
-    err = add_to_wnd(seq++, pkt3, (const char **)wnd);
-    if(err < 0) {
-        _DEBUG("%s\n", "ERR");
-        free(wnd);
-        return -1;
-    }
+    test_wnd(wnd, pkt1, seq++);
+    test_wnd(wnd, pkt2, seq++);
+    test_wnd(wnd, pkt3, seq++);
 
     free_wnd(wnd);
 
