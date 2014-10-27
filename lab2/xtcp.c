@@ -321,7 +321,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
     err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
     if(err < 0) {
         perror("xtcp.srvsend()");
-        remove_from_wnd(seq, (const char **)wnd);
+        remove_from_wnd((const char **)wnd);
         free(pkt);
         return -2;
     }
@@ -348,7 +348,8 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     }
 
     make_pkt(pkt, flags, advwin, data, datalen);
-    /*print_hdr((struct xtcphdr*)pkt);*/
+    _DEBUG("%s\n", "printing hdr to send");
+    print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
 
     /* simulate packet loss on sends */

@@ -514,7 +514,7 @@ int send_file(char* fname, int sock, char **wnd) {
         return EXIT_FAILURE;
     }
 
-    _DEBUG("data size: %zu\n", sizeof(data));
+    _DEBUG("data size: %lu\n", sizeof(data));
     for(EVER) {
         if(save_data) {
             _DEBUG("%s\n", "sending old data ...");
@@ -629,7 +629,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
                 return -1;
             }
 
-            tmp1 = remove_from_wnd(wnd_base, (const char**) wnd);        /* remove it */
+            tmp1 = remove_from_wnd((const char**) wnd);        /* remove it */
             if(tmp1 ==NULL) {
                 _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
                 return -1;
@@ -655,7 +655,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
                     return -1;
                 }
 
-                tmp1 = remove_from_wnd(wnd_base, (const char**) wnd);      /* remove it */
+                tmp1 = remove_from_wnd((const char**) wnd);      /* remove it */
                 _DEBUG("removing: %" PRIu32 "\n", wnd_base);
                 if(tmp1 ==NULL) {
                     _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
