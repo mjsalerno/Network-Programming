@@ -528,7 +528,7 @@ int send_file(char* fname, int sock, char **wnd) {
         perror(")");
         return EXIT_FAILURE;
     }
-    
+
     for(EVER) {
         if(save_data) {
             _DEBUG("%s\n", "sending old data ...");
@@ -638,9 +638,9 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
                 _DEBUG("%s\n", "ERROR: getting the pkt returned null");
                 return -1;
             }
-            if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {
+            if(((struct xtcphdr*) tmp2)->seq != pkt_ack) {
                 _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
-                        ((struct xtcphdr*) tmp2)->ack_seq,
+                        ((struct xtcphdr*) tmp2)->seq,
                         pkt_ack);
                 return -1;
             }
@@ -664,9 +664,9 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
                     _DEBUG("%s\n", "ERROR: getting the pkt returned null");
                     return -1;
                 }
-                if(((struct xtcphdr*) tmp2)->ack_seq != pkt_ack) {
+                if(((struct xtcphdr*) tmp2)->seq != pkt_ack) {
                     _DEBUG("got ack but removing wrong pkt mine: %" PRIu32 " his: %" PRIu32 "\n",
-                            ((struct xtcphdr*) tmp2)->ack_seq,
+                            ((struct xtcphdr*) tmp2)->seq,
                             pkt_ack);
                     return -1;
                 }

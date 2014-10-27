@@ -318,7 +318,9 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
             return -5;
     }
 
-    err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    do {
+        err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    } while(errno == EINTR);
     if(err < 0) {
         perror("xtcp.srvsend()");
         remove_from_wnd((const char **)wnd);
