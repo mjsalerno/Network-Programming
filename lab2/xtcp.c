@@ -66,6 +66,19 @@ void print_wnd(const char** wnd) {
     printf("\n");
 }
 
+/**
+* RETURNS: 1 if count is greater or equal to advwin.
+*
+*/
+int is_wnd_full(){
+    int full = 0;
+    if(wnd_count >= advwin){
+        full = 1;
+        _DEBUG("ERROR: (wnd_count) %d >= %d (max_wnd_size)\n", wnd_count, max_wnd_size);
+    }
+    return full;
+}
+
 int has_packet(uint32_t index, const char** wnd) {
     int n = dst_from_base_wnd(index);
     /* now we can mod by max_wnd_size */
