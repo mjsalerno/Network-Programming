@@ -9,6 +9,10 @@
 #include "rtt.h"
 static struct rtt_info rttinfo;
 
+int main() {
+    make_iface_list();
+}
+
 /*int mmmain(void) {
 
     struct client_list* list = NULL;
@@ -45,7 +49,7 @@ int test_wnd(char **wnd, void *pkt, uint32_t seq){
     return 0;
 }
 
-int main(void) {
+int mmain(void) {
     /* clientlist_test(); */
     int seq = 10;
     char *pkt1, *pkt2, *pkt3;

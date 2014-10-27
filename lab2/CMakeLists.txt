@@ -21,16 +21,25 @@ set(CLIENT_SOURCE_FILES
    client.c
    client.h)
 
+set(IFFY_SOURCE_FILES
+    get_ifi_info_plus.c
+    config.h
+    unp.h
+    unpifiplus.h)
+
 add_library(commonlib OBJECT ${COMMON_SOURCE_FILES})
 add_library(xtcplib OBJECT ${XTCP_SOURCE_FILES})
+add_library(iffylib OBJECT ${IFFY_SOURCE_FILES})
 
 add_executable(server
 	${SERVER_SOURCE_FILES}
+	$<TARGET_OBJECTS:xtcplib>
 	$<TARGET_OBJECTS:commonlib>
-	$<TARGET_OBJECTS:xtcplib>)
+	$<TARGET_OBJECTS:iffylib>)
 
 add_executable(client
 	${CLIENT_SOURCE_FILES}
+	$<TARGET_OBJECTS:xtcplib>
 	$<TARGET_OBJECTS:commonlib>
-	$<TARGET_OBJECTS:xtcplib>)
+	$<TARGET_OBJECTS:iffylib>)
 
