@@ -32,10 +32,17 @@ void print_hdr(struct xtcphdr *hdr) {
 
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
     struct xtcphdr *realhdr = (struct xtcphdr*)hdr;
+    if(hdr == NULL){
+        fprintf(stderr, "ERROR: make_pkt(): void *hdr == NULL\n");
+        return;
+    }
     realhdr->seq = seq;
     realhdr->flags = flags;
     realhdr->ack_seq = ack_seq;
     realhdr->advwin = advwin;
+    if(data == NULL || datalen == 0){
+        return;
+    }
     memcpy(( (char*)(hdr) + DATA_OFFSET), data, datalen);
 }
 
@@ -129,6 +136,10 @@ char** init_wnd(int first_seq_num) {
     wnd_base_seq = first_seq_num;
 
     rtn = malloc((size_t)(max_wnd_size * sizeof(char*)));
+    if(rtn == NULL){
+        perror("init_wnd().malloc()");
+        return NULL;
+    }
 
     for(i = 0; i < advwin; ++i)
         *(rtn+i) = 0;
@@ -335,6 +346,10 @@ This malloc()'s and free()'s space for data and a header.
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     ssize_t err;
     void *pkt = malloc(DATA_OFFSET + datalen);
+    if(pkt == NULL){
+        perror("clisend().malloc()");
+        return -1;
+    }
 
     make_pkt(pkt, flags, advwin, data, datalen);
     /*print_hdr((struct xtcphdr*)pkt);*/
@@ -366,6 +381,10 @@ int clirecv(int sockfd, char **wnd) {
     int err;
     fd_set rset;
     char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
+    if(pkt == NULL){
+        perror("clirecv().malloc()");
+        return -1;
+    }
     for(;;) {
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);

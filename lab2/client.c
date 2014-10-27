@@ -141,7 +141,7 @@ int main(void) {
             _DEBUG("%s\n", "Done getting file...");
             break;
         }
-
+        print_wnd((const char**)wnd);
         /* got actual data, loop back around for more */
         _DEBUG("%s\n", "clirecv() got actual data, loop back around for more");
     }
@@ -245,6 +245,9 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     /* move on to third handshake */
     /* init the window and the wnd_base_seq */
     wnd = init_wnd(ack_seq);
+    if(wnd == NULL){
+        return -1;
+    }
     wnd_base_seq = ack_seq;
 
     /* todo: back by ARQ */
