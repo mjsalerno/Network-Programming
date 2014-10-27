@@ -124,7 +124,7 @@ int dst_from_base_wnd(uint32_t n) {
 * Returns 1 if ack_seq_1 >= wnd_base_seq
 *         0 if not
 */
-int ge_base(uint32_t ack_seq_1){
+int ge_base(uint32_t ack_seq_1) {
     return (ack_seq_1 >= wnd_base_seq);
 }
 
@@ -318,7 +318,9 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
             return -5;
     }
 
-    err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    do {
+        err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    } while(errno == EINTR);
     if(err < 0) {
         perror("xtcp.srvsend()");
         remove_from_wnd((const char **)wnd);
