@@ -630,7 +630,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
 
     while(ge_base(pkt_ack -1)) {
         count++;
-        remove_from_wnd(wnd);
+        remove_from_wnd((const char **) wnd);
     }
 
     if(count == 0) count = -1;
