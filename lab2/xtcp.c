@@ -185,25 +185,16 @@ int can_add_to_wnd(uint32_t seq){
 * Adds packets that are already malloc()'d to the window
 * returns E_WASREMOVED   index used to be in the wnd, i.e. index < wnd_base_seq
 * returns E_CANTFIT      index cannot currently fit into the wnd, i.e. wnd_base_seq-index > advwin
-* returns E_INDEXTOOFAR  index would exceed the max_wnd_size
+* returns E_ISFULL index would exceed the max_wnd_size
 * returns E_OCCUPIED     if index was occupied
 * returns 0 on success fully added
 */
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     int n = dst_from_base_wnd(index);
     _DEBUG("n = %d, going to ifs\n", n);
-
-    if(n < 0){
-        _DEBUG("index: %"PRIu32" used to be in the wnd, n: %d\n", index, n);
-        return E_WASREMOVED;
-    }
-    else if(n > max_wnd_size){
-        _DEBUG("index %"PRIu32" tried to exceed max wnd size, n: %d\n", index, n);
-        return E_INDEXTOOFAR;
-    }
-    else if(n > advwin) {
-        _DEBUG("index %"PRIu32" cannot currently fit into the wnd, n: %d\n", index, n);
-        return E_CANTFIT;
+    if(!can_add_to_wnd(index)){
+        _DEBUG("ERROR: can_add_to_wnd(%"PRIu32") == 0, can't add.\n", index);
+        return E_ISFULL;
     }
 
     /* now we can mod by max_wnd_size */
@@ -211,7 +202,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     _DEBUG("(n + wnd_base_i) %% max_wnd_size = %d\n", n);
 
     if(wnd[n] != NULL) { /* sanity check */
-        fprintf(stderr, "ERROR: xtcp.add_to_wnd() wnd[%d] already ocupied, contains pkt->seq = %"PRIu32"\n", n, ((struct xtcphdr*)(wnd[n]))->seq);
+        _DEBUG("wnd[%d] already ocupied, contained pkt->seq = %"PRIu32"\n", n, ((struct xtcphdr*)(wnd[n]))->seq);
         return E_OCCUPIED;
     }
     wnd[n] = pkt;
@@ -295,28 +286,25 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
     printf("SENDING: ");
     print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
+    /* fixme: double check */
 
     /*todo: do WND/rtt stuff*/
-    err = add_to_wnd(seq, pkt, (const char**)wnd);
-    switch(err) {
-        case E_OCCUPIED:
-        case E_CANTFIT:
-        case E_INDEXTOOFAR:
+    if(can_add_to_wnd(seq)){
+        err = add_to_wnd(seq, pkt, (const char**)wnd);
+        if(err == E_OCCUPIED){
+            _DEBUG("ERROR: tried to re-insert seq: %"PRIu32"\n", seq);
+            free(pkt);
+            return -2;
+        }else if(err == E_ISFULL){
             _DEBUG("%s\n", "The window was full, not sending");
             free(pkt);
             return -1;
-        case -100:
-            _DEBUG("ERROR: %s\n", "out of bounds");
-            free(pkt);
-            return -3;
-        case 0:
+        }else if(err < 0){ /* some other error */
+            _DEBUG("ERROR: SOMETHING IS WRONG, err: %d", err);
+            return -6;
+        }else{ /* added to wnd correctly */
             _DEBUG("%s\n", "packet was added ...");
-            break;
-        case E_WASREMOVED:
-        default:
-            _DEBUG("ERROR: SOMETHING IS WRONG: %d\n", err);
-            free(pkt);
-            return -5;
+        }
     }
 
     do {
