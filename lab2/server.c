@@ -1,4 +1,5 @@
 #include <time.h>
+#include <err.h>
 #include "server.h"
 
 struct client_list* cliList;
@@ -100,14 +101,17 @@ int main(int argc, const char **argv) {
         }
         _DEBUG("%s\n", "a client is trying to connect");
 
+
         /*get filename*/
-        len = sizeof(cliaddr);
-        n = recvfrom(sockfd, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *)&cliaddr, &len);
-        if(n < -1) {
-            perror("server.recvfrom()");
-            fprintf(stderr, "continuing anyway\n");
-            continue;
-        }
+        do {
+            len = sizeof(cliaddr);
+            n = recvfrom(sockfd, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
+            if (n < 0 && errno != EINTR) {
+                perror("server.recvfrom()");
+                fprintf(stderr, "continuing ...\n");
+                continue;
+            }
+        } while(errno == EINTR);
 
         newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
         if(newCli == NULL) {
@@ -474,12 +478,15 @@ redo_hs2:
         exit(EXIT_FAILURE);
     }
 
-    n = recv(child_sock, pktbuf, sizeof(pktbuf), 0);
-    if(n < 0) {
-        perror("hs2.recvfrom()");
-        close(child_sock);
-        exit(EXIT_FAILURE);
-    }
+    do {
+        n = recv(child_sock, pktbuf, sizeof(pktbuf), 0);
+        if (n < 0 && errno != EINTR) {
+            perror("hs2.recvfrom()");
+            close(child_sock);
+            exit(EXIT_FAILURE);
+        }
+    } while(errno == EINTR);
+
     ntohpkt((struct xtcphdr*) pktbuf);
     print_hdr((struct xtcphdr *) pktbuf);
     if(((struct xtcphdr*) pktbuf)->flags != ACK
@@ -579,7 +586,9 @@ int get_aks(char** wnd, int sock, int always_block) {
             _DEBUG("%s\n", "wnd NOT full, recv WONT block");
         }
 
-        err = (int) recv(sock, pkt, sizeof(pkt), flag);
+        do {
+            err = (int) recv(sock, pkt, sizeof(pkt), flag);
+        } while(errno == EINTR);
         if (err <= 0) {
             if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
                 fprintf(stderr, "send_file.get_ack(%d", err);
