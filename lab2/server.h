@@ -22,5 +22,6 @@ int remove_client(struct client_list** head, pid_t pid);
 void proc_exit(int i);
 void send_fin(int sock);
 int handle_ack(struct xtcphdr* pkt, char** wnd);
+int get_aks(char** wnd, int sock, int always_block);
 
 #endif

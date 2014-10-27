@@ -233,6 +233,14 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         _DEBUG("%s\n", "Something went wrong while sending the file.");
     }
 
+    _DEBUG("%s\n", "waiting for unACKed pkts");
+    while(is_wnd_full()) {
+        err = get_aks(wnd, child_sock, 1);
+        if(err < 0) {
+            _DEBUG("%s\n", "there was a problem getting ACKs");
+        }
+    }
+
     _DEBUG("%s\n", "sending FIN");
     ++seq;
     /*srvsend(child_sock, FIN, NULL, 0, wnd);*/
@@ -491,11 +499,13 @@ redo_hs2:
 
 int send_file(char* fname, int sock, char **wnd) {
     FILE *file;
-    char data[MAX_PKT_SIZE] = {0};  /* buffer for sending file and getting ACKs */
+    char data[MAX_DATA_SIZE] = {0};  /* buffer for sending file and getting ACKs */
     size_t n;
-    int err, tally;
+    int err, tally, save_data;
 
+    save_data = 0;
     tally = 0;
+    n = 0;
 
     file = fopen(fname, "r");
     if(file == NULL) {
@@ -504,8 +514,12 @@ int send_file(char* fname, int sock, char **wnd) {
         return EXIT_FAILURE;
     }
 
-    _DEBUG("data size: %u\n", (unsigned int) MAX_DATA_SIZE);
+    _DEBUG("data size: %zu\n", sizeof(data));
     for(EVER) {
+        if(save_data) {
+            _DEBUG("%s\n", "sending old data ...");
+            goto saving_data;
+        }
         n = fread(data, 1, MAX_DATA_SIZE, file);
         tally += n;
         _DEBUG("send_file.fread(%lu)\n", (unsigned long)n);
@@ -515,39 +529,19 @@ int send_file(char* fname, int sock, char **wnd) {
             fclose(file);
             return EXIT_FAILURE;
         } else if(feof(file)) {
-            printf("File finished uploading ...");
+            printf("File finished uploading ...\n");
             break;
         } else {
+saving_data:
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
             ++seq;
             err = srvsend(sock, 0, data, n, wnd);
             if(err == -1) {                                                           /* the error code for full window */
-
-                /* todo: do this for real */
-                _DEBUG("%s\n", "window is full listening for ACK...");
-                for(EVER) {                                                           /* listen for ACKs */
-                    int acks = 0;
-
-                    err = (int) recv(sock, data, sizeof(data), MSG_DONTWAIT);
-                    if (err <= 0) {
-                        if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
-                            fprintf(stderr, "send_file.get_ack(%d", err);
-                            perror(")");
-                            return EXIT_FAILURE;
-                        } else {                                                       /* no ACKs */
-                            _DEBUG("ACKs recvd: %d\n", acks);
-                            break;
-                        }
-                    } else {                                                           /* got an ACK */
-                        _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32,
-                                ((struct xtcphdr *)data)->seq,
-                                ((struct xtcphdr *)data)->ack_seq);
-
-                        err = handle_ack((struct xtcphdr *)data, wnd);
-                        if(err < 0) {
-                            _DEBUG("%s\n", "There was something wrong woth client ACK");
-                        }
-                    }
+                save_data = 1;
+                err = get_aks(wnd, sock, 0);
+                if(err < 0) {
+                    _DEBUG("%s\n", "there is something wrong woth the AKS");
+                    return EXIT_FAILURE;
                 }
 
             } else if(err < 0) {
@@ -562,6 +556,58 @@ int send_file(char* fname, int sock, char **wnd) {
     return EXIT_SUCCESS;
 }
 
+int get_aks(char** wnd, int sock, int always_block) {
+    void* pkt;
+    int err;
+    int flag;
+    int acks = 0;
+
+    pkt = malloc(MAX_PKT_SIZE);
+    if(pkt == NULL) {
+        perror("get_aks(): ");
+        return -1;
+    }
+
+    _DEBUG("%s\n", "window is full listening for ACK...");
+    for(EVER) {                                                           /* listen for ACKs */
+
+        if(is_wnd_full() || always_block) {                                               /* see if we need to wait for the window */
+            flag = 0;
+            _DEBUG("%s\n", "wnd IS full or quitting, recv WILL block");
+        } else {
+            flag = MSG_DONTWAIT;
+            _DEBUG("%s\n", "wnd NOT full, recv WONT block");
+        }
+
+        err = (int) recv(sock, pkt, sizeof(pkt), flag);
+        if (err <= 0) {
+            if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
+                fprintf(stderr, "send_file.get_ack(%d", err);
+                perror(")");
+                free(pkt);
+                return -1;
+            } else {                                                       /* no ACKs */
+                _DEBUG("ACKs recvd: %d\n", acks);
+                break;
+            }
+        } else {                                                           /* got an ACK */
+            _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32,
+                    ((struct xtcphdr *)pkt)->seq,
+                    ((struct xtcphdr *)pkt)->ack_seq);
+
+            err = handle_ack((struct xtcphdr *)pkt, wnd);
+            if(err < 0) {
+                _DEBUG("%s\n", "There was something wrong with client ACK");
+                _DEBUG("ACKs recvd before error: %d\n", acks);
+                return -1;
+            }
+        }
+    }
+
+    free(pkt);
+    return acks;
+}
+
 int handle_ack(struct xtcphdr* pkt, char** wnd) {
     uint32_t pkt_ack = pkt->ack_seq;
     char* tmp1;
@@ -571,7 +617,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
         if(wnd_base == pkt_ack) {                                       /* the packet is at base */
             _DEBUG("%s\n", "ACK was at the base");
 
-            tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);                       /* check if correct pkt */
+            tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);            /* check if correct pkt */
             if(tmp2 == NULL) {
                 _DEBUG("%s\n", "ERROR: getting the pkt returned null");
                 return -1;
@@ -583,7 +629,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
                 return -1;
             }
 
-            tmp1 = remove_from_wnd(pkt_ack, (const char**) wnd);        /* remove it */
+            tmp1 = remove_from_wnd(wnd_base, (const char**) wnd);        /* remove it */
             if(tmp1 ==NULL) {
                 _DEBUG("%s\n", "trying to remove ACKed pkt, got null ...");
                 return -1;
@@ -597,7 +643,7 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
             _DEBUG("%s\n", "ACKing several pkts");
             for(; wnd_base <= pkt_ack; ++wnd_base) {
 
-                tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);                     /* check if correct pkt */
+                tmp2 = get_from_wnd(pkt_ack, (const char**)wnd);          /* check if correct pkt */
                 if(tmp2 == NULL) {
                     _DEBUG("%s\n", "ERROR: getting the pkt returned null");
                     return -1;
