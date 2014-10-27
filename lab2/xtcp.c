@@ -115,7 +115,7 @@ int has_packet(uint32_t index, const char** wnd) {
 */
 int dst_from_base_wnd(uint32_t n) {
     int rtn = n - wnd_base_seq;
-    _DEBUG("n: %-3" PRIu32 " wnd_base_seq: %-3d max: %-3d dst: %-3d\n", n, wnd_base_seq, max_wnd_size, rtn);
+    _DEBUG("n: %-3"PRIu32" wnd_base_seq: %-3"PRIu32" max: %-3d dst: %-3d\n", n, wnd_base_seq, max_wnd_size, rtn);
     return rtn;
 }
 
@@ -138,7 +138,7 @@ int ge_base(uint32_t ack_seq_1){
 * A malloc()'d pointer to the window, to be passed to the window funcs.
 * MUST be free_wnd()'d when done.
 **/
-char** init_wnd(int first_seq_num) {
+char** init_wnd(uint32_t first_seq_num) {
     char** rtn;
     int i;
     wnd_count = 0;
@@ -263,15 +263,15 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
 
     if(n > advwin) {
         /* change for congestion control? */
-        fprintf(stderr, "ERROR: can't get, index %d is beyond advwin %d\n", (int)index, advwin);
+        fprintf(stderr, "ERROR: can't get, index %"PRIu32" is beyond advwin %d\n", index, advwin);
         return NULL;
     }
     if(n > max_wnd_size) { /* sanity check */
-        fprintf(stderr, "ERROR: can't get, index %d is beyond the max window size %d\n", (int)index, max_wnd_size);
+        fprintf(stderr, "ERROR: can't get, index %"PRIu32" is beyond the max window size %d\n", index, max_wnd_size);
         return NULL;
     }
     if(wnd_count <= 0) { /* sanity check, should never happen */
-        fprintf(stderr, "ERROR: can't get, index %d, the wnd_count: %d\n", (int)index, wnd_count);
+        fprintf(stderr, "ERROR: can't get, index %"PRIu32", the wnd_count: %d\n", index, wnd_count);
         return NULL;
     }
 
@@ -384,6 +384,7 @@ int clirecv(int sockfd, char **wnd) {
         return -1;
     }
     for(;;) {
+continue_with_select:
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
 
@@ -407,14 +408,25 @@ int clirecv(int sockfd, char **wnd) {
             ntohpkt((struct xtcphdr *)pkt); /* host order please */
             pkt[bytes] = 0; /* NULL terminate the ASCII text */
 
-            /* if it's a FIN don't try to drop it, we're closing dirty! */
+            /* if it's a FIN or RST don't try to drop it, we're closing dirty! */
             if((((struct xtcphdr*)pkt)->flags & FIN) == FIN){
+                _DEBUG("%s\n", "clirecv()'d a FIN packet.");
                 free(pkt);
                 return 0;
             }
+            if((((struct xtcphdr*)pkt)->flags & RST) == RST){
+                _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
+                free(pkt);
+                return -1;
+            }
             /* not a FIN: try to drop it */
             if(drand48() > pkt_loss_thresh){
-                /* keep the pkt */
+                /**
+                * keep the pkt:
+                * Pretend like the code after the "break;" is in here.
+                * However, because it's not in here it will use a goto
+                * instead of a continue.
+                */
                 break;
             }else{
                 /* drop the pkt */
@@ -428,60 +440,74 @@ int clirecv(int sockfd, char **wnd) {
     }
     /* recv'ed a pkt, it is in host order, and we will put it in the window */
     printf("recv'd packet ");
-    /* if it's a RST then return */
-    if((((struct xtcphdr*)pkt)->flags & RST) == RST){
-        _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
-        free(pkt);
-        return -1;
-    }
-
     print_hdr((struct xtcphdr *) pkt);
     printf("packet contents:\n");
     printf("%s\n", pkt + DATA_OFFSET);
 
     /* do window stuff */
     pktseq = ((struct xtcphdr *)pkt)->seq;
-    if(pktseq == ack_seq){ /* everythings going fine */
+    if(pktseq == ack_seq) {
+        /* everythings going fine, send a new ACK */
+        _DEBUG("%s\n", "placing packet into the window will not fail.");
         err = add_to_wnd(ack_seq, pkt, (const char**)wnd);
+        if(err < 0){
+            _DEBUG("Check the ERROR codes here!! add_to_wnd() returned %d \n", err);
+            return -2;
+        }
+        err = cli_ack(sockfd, wnd);
+        if(err < 0){
+            _DEBUG("cli_ack() returned %d\n", err);
+            return -2;
+        }
+        /* the normal return value */
+        return (int)bytes;
     }
-
-    _DEBUG("%s\n", "placing packet into the window.");
-    err = add_to_wnd(((struct xtcphdr *)pkt)->seq, pkt, (const char**)wnd);
-    _DEBUG("add_to_wnd() returned: %d\n", err);
-    switch(err){
-        case 0:
-            /* send ACK, added correctly and for the first time */
-            err = cli_ack(sockfd, wnd);
-            if(err < 0){
-                return -2;
-            }
-            break;
-        case E_WASREMOVED:
-            /* send duplicate ACK */
-            err = cli_dup_ack(sockfd, wnd);
-            if(err < 0){
-                return -2;
-            }
-            break;
-        case E_OCCUPIED:
-            /* send duplicate ACK */
-            err = cli_dup_ack(sockfd, wnd);
-            if(err < 0){
-                return -2;
-            }
-            break;
-        case E_INDEXTOOFAR:
-            /* fixme: why don't ACK, instead does this mean bad flow control? */
-            /* don't ACK this, it's too far */
-            printf("not acking prev hdr because flow control bad? Plus I can't store it.\n");
-            break;
-        case E_CANTFIT:
-            /* i don't know */
-            break;
-        default:
-            _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
+    else if(pktseq < ack_seq){
+        /* send a duplicate ACK */
+        /* don't bother with window, it's in there */
+        _DEBUG("%s\n", "duplicate packet, calling cli_dup_ack()");
+        err = cli_dup_ack(sockfd);
+        if(err < 0){
+            _DEBUG("cli_dup_ack() returned %d\n", err);
+            return -2;
+        }
+        /* continue in this function!, pretend like this is a continue */
+        goto continue_with_select;
     }
-    return (int)bytes;
+    else if(pktseq > ack_seq) {
+        /* try to add to wnd, if it out of bounds then IGNORE, otherwise duplicate ACK */
+        err = add_to_wnd(pktseq, pkt, (const char **) wnd);
+        _DEBUG("add_to_wnd() returned: %d\n", err);
+        switch (err) {
+            case 0:
+                /* send ACK, added correctly and for the first time */
+                _DEBUG("%s\n", "buffered new gap packet, calling cli_dup_ack()");
+                err = cli_dup_ack(sockfd);
+                if (err < 0) {
+                    return -2;
+                }
+                return (int)bytes;
+            case E_OCCUPIED:
+                /* send duplicate ACK */
+                _DEBUG("%s\n", "duplicate gap packet, calling cli_dup_ack()");
+                err = cli_dup_ack(sockfd);
+                if (err < 0) {
+                    return -2;
+                }
+                goto continue_with_select;
+            case E_INDEXTOOFAR:
+            case E_CANTFIT:
+                /* don't ACK this, it's too far */
+                printf("not ACKing pkt because I can't store it! Just ignore it!\n");
+                break;
+            case E_WASREMOVED: /* shouldn't happen */
+            default:
+                _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
+                return -2;
+        }
+    }
+    abort();
+    return -2;
 }
 
 int cli_ack(int sockfd, char **wnd) {
@@ -492,14 +518,14 @@ int cli_ack(int sockfd, char **wnd) {
     while(get_from_wnd(ack_seq, (const char**)wnd) != NULL) {
         ++ack_seq;
     }
+    printf("cli_ack(): sending normal ACK, ack_num: %"PRIu32"\n", ack_seq);
     err = clisend(sockfd, ACK, NULL, 0);
     return (int)err;
 }
 
-int cli_dup_ack(int sockfd, char **wnd) {
+int cli_dup_ack(int sockfd) {
     int err;
-    /*todo: window stuff*/
-    wnd++;
+    printf("cli_dup_ack(): sending duplicate ACK, ack_num: %"PRIu32"\n", ack_seq);
     err = clisend(sockfd, ACK, NULL, 0);
     return err;
 }

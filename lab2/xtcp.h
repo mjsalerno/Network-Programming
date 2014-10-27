@@ -60,7 +60,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
 char* remove_from_wnd(const char** wnd);
 char* get_from_wnd(uint32_t index, const char** wnd);
 void free_wnd(char** wnd);
-char** init_wnd(int first_seq_num);
+char** init_wnd(uint32_t first_seq_num);
 int has_packet(uint32_t index, const char** wnd);
 int dst_from_base_wnd(uint32_t n);
 void print_wnd(const char** wnd);
@@ -76,16 +76,17 @@ int is_wnd_empty();
 * DESC:
 * Blocks until a packet is recv'ed from sockfd. If it's a FIN, immediately return 0.
 * If it's not a FIN then try to drop it based on pkt_loss_thresh.
-*     -if dropped, pretend it never happened and continue to block in select()
-*     -if kept:
-*         -if RST then return -1
-*         -else try to add to the window.
+* -if dropped, pretend it never happened and continue to block in select()
+* -if kept:
+*   -if RST then return -1
+*   -else ACK
 * NOTES:
 * Sends ACKs and duplicate ACKS.
+* If a dup_ack is sent go back to block in select().
 * NULL terminates the data sent.
 */
 int clirecv(int sockfd, char **wnd);
 int cli_ack(int sockfd, char **wnd);
-int cli_dup_ack(int sockfd, char **wnd);
+int cli_dup_ack(int sockfd);
 
 #endif /*XTCP_H*/

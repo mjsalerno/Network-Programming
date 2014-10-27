@@ -253,7 +253,8 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
 
     /* todo: back by ARQ */
     printf("try send hs3: \n");
-    err = cli_ack(serv_fd, wnd);
+    /* don't use cli_ack() here */
+    err = clisend(serv_fd, ACK, NULL, 0);
     if(err < 0){
         return -1;
     }
