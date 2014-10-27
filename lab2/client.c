@@ -5,8 +5,6 @@ extern uint32_t ack_seq; /* also used by wnd as next expected seq */
 extern uint16_t advwin;
 
 static char** wnd; /* will point to malloc()'d array from init_wnd()*/
-/* base of the window to start reading, once set it is only updated by the consumer */
-static uint32_t wnd_base_seq;
 
 /* packet loss percentage */
 extern double pkt_loss_thresh;
@@ -175,8 +173,12 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     /* todo: timeout  on oldest packet */
 
     sendagain: /* jump here if server doesn't respond */
-    printf("try to send hs1: ");
-    clisend(serv_fd, SYN, fname, strlen(fname));
+    printf("try send hs1\n");
+    err = clisend(serv_fd, SYN, fname, strlen(fname));
+    if(err < 0){
+        _DEBUG("handshakes.clisend() returned: %d\n", (int)err);
+        return -1;
+    }
     /* don't increment seq until we know this sent */
 
     _DEBUG("%s\n", "waiting for hs2...");
@@ -248,10 +250,9 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     if(wnd == NULL){
         return -1;
     }
-    wnd_base_seq = ack_seq;
 
     /* todo: back by ARQ */
-    printf("try send hs3: ");
+    printf("try send hs3: \n");
     err = cli_ack(serv_fd, wnd);
     if(err < 0){
         return -1;
