@@ -381,7 +381,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     struct timeval timer;
 
 
-    srand48((unsigned int)time(NULL));
+    srand48(1);
     seq = (uint32_t)lrand48();
 
     flags = SYN|ACK;

@@ -176,7 +176,11 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
 
     sendagain: /* jump here if server doesn't respond */
     printf("try to send hs1: ");
-    clisend(serv_fd, SYN, fname, strlen(fname));
+    err = clisend(serv_fd, SYN, fname, strlen(fname));
+    if(err < 0){
+        _DEBUG("handshakes.clisend() returned: %d\n", (int)err);
+        return -1;
+    }
     /* don't increment seq until we know this sent */
 
     _DEBUG("%s\n", "waiting for hs2...");
@@ -251,7 +255,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     wnd_base_seq = ack_seq;
 
     /* todo: back by ARQ */
-    printf("try send hs3: ");
+    printf("try send hs3: \n");
     err = cli_ack(serv_fd, wnd);
     if(err < 0){
         return -1;
