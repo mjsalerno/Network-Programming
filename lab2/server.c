@@ -116,10 +116,13 @@ int main(int argc, const char **argv) {
         newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
         if(newCli == NULL) {
             _DEBUG("%s\n", "Server: dup clinet, not doing anything");
+
+            ntohpkt((struct xtcphdr*)pkt);
+            printf("GOT: ");
+            print_hdr((struct xtcphdr *) pkt);
             continue;
         }
         ntohpkt((struct xtcphdr*)pkt);
-
         ack_seq = ((struct xtcphdr*)pkt)->seq;
 
         pkt[n] = 0;
@@ -268,6 +271,8 @@ void send_fin(int sock) {
     ssize_t err;
     void* pkt = malloc(sizeof(struct xtcphdr));
     make_pkt(pkt, FIN, advwin, NULL, 0);
+    printf("SENDING: ");
+    print_hdr(pkt);
     htonpkt(pkt);
     do {
         err = send(sock, pkt, sizeof(struct xtcphdr), 0);
@@ -500,6 +505,7 @@ redo_hs2:
     } while(errno == EINTR);
 
     ntohpkt((struct xtcphdr*) pktbuf);
+    printf("GOT: ");
     print_hdr((struct xtcphdr *) pktbuf);
     if(((struct xtcphdr*) pktbuf)->flags != ACK
             || ((struct xtcphdr*) pktbuf)->ack_seq != (seq + 1)
@@ -614,6 +620,8 @@ int get_aks(char** wnd, int sock, int always_block) {
             }
         } else {                                                           /* got an ACK */
             ntohpkt(pkt);
+            printf("GOT: ");
+            print_hdr(pkt);
             _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32 "\n",
                     ((struct xtcphdr *)pkt)->seq,
                     ((struct xtcphdr *)pkt)->ack_seq);

@@ -295,7 +295,9 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
     int err;
     void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
     make_pkt(pkt, flags, advwin, data, datalen);
-    /*print_hdr((struct xtcphdr*)pkt);*/
+
+    printf("SENDING: ");
+    print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
 
     /*todo: do WND/rtt stuff*/
