@@ -1,5 +1,4 @@
 #include <time.h>
-#include <err.h>
 #include "server.h"
 
 struct client_list* cliList;
@@ -105,13 +104,15 @@ int main(int argc, const char **argv) {
         /*get filename*/
         do {
             len = sizeof(cliaddr);
+            _DEBUG("%s\n", "waking up and going into recvfrom");
             n = recvfrom(sockfd, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
+            _DEBUG("out of recvfrom n: %d errno: %d\n", (int)n, errno);
             if (n < 0 && errno != EINTR) {
                 perror("server.recvfrom()");
                 fprintf(stderr, "continuing ...\n");
                 continue;
             }
-        } while(errno == EINTR);
+        } while(errno == EINTR && n < 0);
 
         newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
         if(newCli == NULL) {
@@ -276,7 +277,7 @@ void send_fin(int sock) {
     htonpkt(pkt);
     do {
         err = send(sock, pkt, sizeof(struct xtcphdr), 0);
-    } while(errno == EINTR);
+    } while(errno == EINTR && err < 0);
     if(err < 0) {
         perror("send_fin()");
     }
@@ -410,6 +411,9 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     flags = SYN|ACK;
     ++seq;
     ++ack_seq;
+
+    _DEBUG("child| ACK: %" PRIu32 " SEQ: %" PRIu32 "\n", ack_seq, seq);
+
     make_pkt(hdr, flags, advwin, &newport, 2);
     printf("sent hs2: ");
     print_hdr(hdr);
@@ -418,7 +422,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     len = sizeof(struct sockaddr_in);
     do {
         n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
-    } while(errno == EINTR);
+    } while(errno == EINTR && n < 0);
     if (n < 1) {
         perror("hs2.send(port)");
         free(hdr);
@@ -454,7 +458,7 @@ redo_hs1:
         len = sizeof(cliaddr);
         do {
             n = sendto(par_sock, hdr, sizeof(struct xtcphdr) + 2, 0, (struct sockaddr const *)&cliaddr, len);
-        } while(errno == EINTR);
+        } while(errno == EINTR && n < 0);
         if (n < 1) {
             perror("hs2.send(port)");
             free(hdr);
@@ -463,7 +467,7 @@ redo_hs1:
         /* child_sock connected to new_addr? */
         do {
             n = send(child_sock, hdr, sizeof(struct xtcphdr) + 2, 0);
-        } while(errno == EINTR);
+        } while(errno == EINTR && n < 1);
         if (n < 1) {
             perror("hs2.send(port)");
             free(hdr);
@@ -502,7 +506,7 @@ redo_hs2:
             close(child_sock);
             exit(EXIT_FAILURE);
         }
-    } while(errno == EINTR);
+    } while(errno == EINTR && n < 0);
 
     ntohpkt((struct xtcphdr*) pktbuf);
     printf("GOT: ");
@@ -560,7 +564,7 @@ int send_file(char* fname, int sock, char **wnd) {
 saving_data:
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
 
-            err = srvsend(sock, 0, data, n, wnd);
+            err = srvsend(sock, 0, data, n, wnd, !save_data);
             if(err == -1) {                                                           /* the error code for full window */
                 save_data = 1;
                 err = get_aks(wnd, sock, 0);
@@ -607,7 +611,7 @@ int get_aks(char** wnd, int sock, int always_block) {
 
         do {
             err = (int) recv(sock, pkt, sizeof(pkt), flag);
-        } while(errno == EINTR);
+        } while(errno == EINTR && err < 0);
         if (err < 0) {
             if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
                 fprintf(stderr, "send_file.get_ack(%d", err);

@@ -277,7 +277,7 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
 }
 
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new) {
 
     int err;
     void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
@@ -309,10 +309,12 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
 
     do {
         err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
-    } while(errno == EINTR);
+    } while(errno == EINTR && err < 0);
     if(err < 0) {
         perror("xtcp.srvsend()");
-        remove_from_wnd((const char **)wnd);
+        /* FIXME: fix this */
+        _DEBUG("%s\n", "ERROR ERROR: DOING BAD THINGS!!!!!");
+        /* remove_from_wnd((const char **)wnd); */
         free(pkt);
         return -2;
     }
