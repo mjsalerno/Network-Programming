@@ -257,6 +257,8 @@ void send_fin(int sock) {
     if(err < 0) {
         perror("send_fin()");
     }
+
+    free(pkt);
 }
 
 void proc_exit(int i) {
@@ -512,14 +514,17 @@ int send_file(char* fname, int sock, char **wnd) {
             clearerr(file);
             fclose(file);
             return EXIT_FAILURE;
+        } else if(feof(file)) {
+            printf("File finished uploading ...");
+            break;
         } else {
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
             ++seq;
             err = srvsend(sock, 0, data, n, wnd);
-            if(err == -1) {      /* the error code for full window */
+            if(err == -1) {                                                           /* the error code for full window */
 
                 /* todo: do this for real */
-                _DEBUG("%s\n", "window is full listening fosend_filer ACK...");
+                _DEBUG("%s\n", "window is full listening for ACK...");
                 for(EVER) {                                                           /* listen for ACKs */
                     int acks = 0;
 
@@ -547,9 +552,6 @@ int send_file(char* fname, int sock, char **wnd) {
 
             } else if(err < 0) {
                 printf("server.send_file(): there was an error sending the file\n");
-            } else if (feof(file)) {
-                printf("The file has finished uploading ...\n");
-                break;
             }
         }
     }
