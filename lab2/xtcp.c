@@ -176,18 +176,20 @@ int can_add_to_wnd(uint32_t seq){
     int can_add = 0;
     /* todo: add cwin to calc */
     if(wnd_base_seq <= seq && seq < (wnd_base_seq + max_wnd_size)){
-        can_add = 1;
+        /* if it's valid */
+        if(dst_from_base_wnd(seq) < max_wnd_size){
+            /* if we have space */
+            can_add = 1;
+        }
     }
     return can_add;
 }
 
 /**
-* Adds packets that are already malloc()'d to the window
-* returns E_WASREMOVED   index used to be in the wnd, i.e. index < wnd_base_seq
-* returns E_CANTFIT      index cannot currently fit into the wnd, i.e. wnd_base_seq-index > advwin
-* returns E_ISFULL index would exceed the max_wnd_size
+* Adds packets that are already malloc()'d, into the window
+* returns E_ISFULL       if can_add_to_wnd(index) returns 0
 * returns E_OCCUPIED     if index was occupied
-* returns 0 on success fully added
+* returns 0 on success
 */
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     int n = dst_from_base_wnd(index);
@@ -287,24 +289,32 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, 
     print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
     /* fixme: double check */
-
-    /*todo: do WND/rtt stuff*/
-    if(can_add_to_wnd(seq)){
-        err = add_to_wnd(seq, pkt, (const char**)wnd);
-        if(err == E_OCCUPIED){
-            _DEBUG("ERROR: tried to re-insert seq: %"PRIu32"\n", seq);
-            free(pkt);
-            return -2;
-        }else if(err == E_ISFULL){
-            _DEBUG("%s\n", "The window was full, not sending");
+    /* todo: do WND/rtt stuff */
+    if(is_new) {
+        if (can_add_to_wnd(seq)) {
+            err = add_to_wnd(seq, pkt, (const char **) wnd);
+            if (err == E_OCCUPIED) {
+                _DEBUG("ERROR: tried to re-insert seq: %"PRIu32"\n", seq);
+                free(pkt);
+                return -2;
+            } else if (err == E_ISFULL) {
+                _DEBUG("%s\n", "The window was full, not sending");
+                free(pkt);
+                return -1;
+            } else if (err < 0) { /* some other error */
+                _DEBUG("ERROR: SOMETHING IS WRONG, err: %d", err);
+                return -6;
+            } else { /* added to wnd correctly */
+                _DEBUG("%s\n", "packet was added ...");
+            }
+        } else {
+            _DEBUG("can't add to wnd with seq: %"PRIu32"\n", seq);
             free(pkt);
             return -1;
-        }else if(err < 0){ /* some other error */
-            _DEBUG("ERROR: SOMETHING IS WRONG, err: %d", err);
-            return -6;
-        }else{ /* added to wnd correctly */
-            _DEBUG("%s\n", "packet was added ...");
         }
+    }
+    else{
+        _DEBUG("%s\n", "sending old data...");
     }
 
     do {
@@ -490,20 +500,17 @@ continue_with_select:
                     return -2;
                 }
                 goto continue_with_select;
-            case E_INDEXTOOFAR:
-            case E_CANTFIT:
+            case E_ISFULL:
                 /* don't ACK this, it's too far */
                 printf("not ACKing pkt because I can't store it! Just ignore it!\n");
                 break;
-            case E_WASREMOVED: /* shouldn't happen */
             default:
                 _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
                 return -2;
         }
     }
     /* should never get here */
-    abort();
-    return -2;
+    assert(0 == 1);
 }
 
 int cli_ack(int sockfd, char **wnd) {
