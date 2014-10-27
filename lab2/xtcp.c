@@ -100,14 +100,6 @@ int is_wnd_empty(){
     return empty;
 }
 
-int has_packet(uint32_t index, const char** wnd) {
-    int n = dst_from_base_wnd(index);
-    /* now we can mod by max_wnd_size */
-    n = n % max_wnd_size;
-
-    return wnd[n] != NULL;
-}
-
 /**
 * Calc the distance from the current wnd_base_seq.
 * This gives the offset into the "continuous" buffer we have.
@@ -174,6 +166,19 @@ void free_wnd(char** wnd) {
 
     free(wnd);
     wnd_count = 0;
+}
+
+/**
+* RETURNS: 1 if you can call add_to_wnd(seq, wnd)
+*          0 otherwise
+*/
+int can_add_to_wnd(uint32_t seq, char **wnd){
+    int can_add = 0;
+    /* todo: add cwin to calc */
+    if(wnd_base_seq <= seq && seq < (wnd_base_seq + max_wnd_size)){
+        can_add = 1;
+    }
+    return can_add;
 }
 
 /**
@@ -430,7 +435,7 @@ continue_with_select:
                 * keep the pkt:
                 * Pretend like the code after the "break;" is in here.
                 * However, because it's not in here it will use a goto
-                * instead of a continue.
+                * instead of a continue later.
                 */
                 break;
             }else{
@@ -513,6 +518,7 @@ continue_with_select:
                 return -2;
         }
     }
+    /* should never get here */
     abort();
     return -2;
 }
