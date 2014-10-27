@@ -166,7 +166,7 @@ int add_to_wnd(uint32_t index, const char* pkt, const char** wnd) {
     }
     wnd[n] = pkt;
     wnd_count++;
-    _DEBUG("fine, stored at n: %d, new wnd_count: %d", n, wnd_count);
+    _DEBUG("fine, stored at n: %d, new wnd_count: %d\n", n, wnd_count);
     return 0;
     /* NOTE: don't try to update wnd_base_seq in here because the first
     * thing the client gets might not be the base of the wnd.
@@ -253,7 +253,7 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
 
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) {
 
-    ssize_t err;
+    int err;
     void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
     make_pkt(pkt, flags, advwin, data, datalen);
     /*print_hdr((struct xtcphdr*)pkt);*/
@@ -261,23 +261,28 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char** wnd) 
 
     /*todo: do WND/rtt stuff*/
     err = add_to_wnd(seq, pkt, (const char**)wnd);
-    if(err == -1) {          /* out of bounds */
-        _DEBUG("ERROR: %s\n", "out of bounds");
-        free(pkt);
-        return -3;
-
-    } else if(err == -2) {  /* full window */
-        _DEBUG("%s\n", "The window was full, not sending");
-        free(pkt);
-        return -1;
-
-    } else if (err == 1) {
-        _DEBUG("%s\n", "packet was added ...");
-    } else {
-        _DEBUG("ERROR: %s\n", "SOMETHING IS WRONG");
+    switch(err) {
+        case E_OCCUPIED:
+        case E_CANTFIT:
+        case E_INDEXTOOFAR:
+            _DEBUG("%s\n", "The window was full, not sending");
+            free(pkt);
+            return -1;
+        case -100:
+            _DEBUG("ERROR: %s\n", "out of bounds");
+            free(pkt);
+            return -3;
+        case 0:
+            _DEBUG("%s\n", "packet was added ...");
+            break;
+        case E_WASREMOVED:
+        default:
+            _DEBUG("ERROR: SOMETHING IS WRONG: %d\n", err);
+            free(pkt);
+            return -5;
     }
 
-    err = send(sockfd, pkt, DATA_OFFSET + datalen, 0);
+    err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
     if(err < 0) {
         perror("xtcp.srvsend()");
         remove_from_wnd(seq, (const char **)wnd);
