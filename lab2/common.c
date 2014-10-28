@@ -155,12 +155,24 @@ void free_iface_info(struct iface_info* info) {
 void print_iface_info(struct iface_info* info) {
     struct in_addr addr;
 
+    printf("=====================\n");
     addr.s_addr = htonl(info->ip);
     printf("IP: %s\n", inet_ntoa(addr));
     addr.s_addr = htonl(info->mask);
     printf("Mask: %s\n", inet_ntoa(addr));
     addr.s_addr = htonl(info->subnet);
     printf("Subnet: %s\n", inet_ntoa(addr));
+    printf("=====================\n");
+
+}
+
+void print_iface_list(struct iface_info* info) {
+    struct iface_info* ptr;
+    ptr = info;
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        print_iface_info(info);
+    }
 
 }
 

@@ -49,8 +49,9 @@ double double_from_config(FILE* file, const char* err_str);
 void str_from_config(FILE* file, char *line, int len, const char* err_str);
 void print_sock_name(int sockfd, struct sockaddr_in *addr);
 void print_sock_peer(int sockfd, struct sockaddr_in *addr);
-struct iface_info* make_iface_list();
+struct iface_info* make_iface_list(void);
 void free_iface_info(struct iface_info* info);
 void print_iface_info(struct iface_info* info);
+void print_iface_list(struct iface_info* info);
 
 #endif /* COMMON_H */
