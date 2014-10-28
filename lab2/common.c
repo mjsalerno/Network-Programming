@@ -55,6 +55,7 @@ void print_sock_name(int sockfd, struct sockaddr_in *addr) {
     memset((void *)addr, 0, len);
     err = getsockname(sockfd, (struct sockaddr *)addr, &len);
     if(err < 0) {
+        _DEBUG("socket: %d addr: %p\n", sockfd, addr);
         perror("common.print_sock_name.getsockname()");
         exit(EXIT_FAILURE);
     }
@@ -92,6 +93,7 @@ void print_sock_peer(int sockfd, struct sockaddr_in *addr) {
     printf("%s:%hu\n", ip4_str, ntohs(addr->sin_port));
 }
 
+/* creates the iface_list usinf steve iffy code */
 struct iface_info* make_iface_list(void) {
     struct iface_info* iface_head;
     struct iface_info* iface_ptr;
@@ -155,16 +157,21 @@ struct iface_info* make_iface_list(void) {
 
 }
 
+/* frees the iface_list and links, closes sockets, make sockets 0 if you already closed it */
 void free_iface_info(struct iface_info* info) {
     if(info == NULL) return;
 
     if(info->next != NULL)
         free_iface_info(info->next);
 
+    if(info->sock > 0)
+        close(info->sock);
+
     free(info);
 
 }
 
+/* prints one iface_info struct to stdout */
 void print_iface_info(struct iface_info* info) {
     struct in_addr addr;
 
@@ -182,6 +189,7 @@ void print_iface_info(struct iface_info* info) {
 
 }
 
+/* prints the whole iface_list to stdout */
 void print_iface_list(struct iface_info* info) {
     struct iface_info* ptr;
     ptr = info;
@@ -192,6 +200,7 @@ void print_iface_list(struct iface_info* info) {
 
 }
 
+/* binds all of the iface_info struct in the given list */
 int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
     struct iface_info* ptr;
     ptr = info;
@@ -202,6 +211,9 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
 
     for(; ptr != NULL; ptr = ptr->next) {
         sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if(sockfd < 1) {
+            perror("bind_to_iface_list()");
+        }
         bzero(&servaddr, sizeof(servaddr));
         servaddr.sin_family = AF_INET;
         servaddr.sin_port = htons(port);
@@ -212,13 +224,16 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
         if (err < 0) {
             fprintf(stderr, "bind_to_iface_list.bind(%d", err);
             perror(")");
+            close(sockfd);
             break;
         }
+        close(sockfd);
     }
 
     return err;
 }
 
+/* sets all of the fds in the fdset that are in the iface_list also returns the max fd*/
 int fd_set_iface_list(struct iface_info* info, fd_set* fdset) {
     struct iface_info* ptr;
     ptr = info;
@@ -243,6 +258,7 @@ int fd_set_iface_list(struct iface_info* info, fd_set* fdset) {
 
 }
 
+/* returns the pointer to the set iface_info that is set in the fdset */
 struct iface_info* fd_is_set_iface_list(struct iface_info* info, fd_set* fdset) {
     struct iface_info* ptr;
     ptr = info;
@@ -256,12 +272,14 @@ struct iface_info* fd_is_set_iface_list(struct iface_info* info, fd_set* fdset) 
     return NULL;
 }
 
+/* calls print_sock_name on all of the iface_info structs */
 void print_iface_list_sock_name(struct iface_info* info) {
     struct iface_info* ptr;
     ptr = info;
 
     for(; ptr != NULL; ptr = ptr->next) {
         /* fixme: figure out what to pass */
+        _DEBUG("passing socket: %d\n", ptr->sock);
         print_sock_name(ptr->sock, NULL);
     }
 }
