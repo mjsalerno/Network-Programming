@@ -17,7 +17,7 @@ int main(void) {
     char ip4_str[INET_ADDRSTRLEN];
     /* char buf[BUFF_SIZE + 1]; */
     /* config/xtcp vars */
-    uint16_t orig_win_size;
+    /*uint16_t orig_win_size;*/
     int seed;
     double u; /* (!!in ms!!) mean of the exponential distribution func */
 
@@ -64,7 +64,7 @@ int main(void) {
         "client.in:3: error getting transfer file name");
     /* 4. fill in file to transfer */
     advwin = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
-    orig_win_size = advwin;
+    /*orig_win_size = advwin;*/
     /* 5. fill in seed */
     seed = int_from_config(file, "client.in:5: error getting seed");
     /* 6. fill in seed */
@@ -72,6 +72,8 @@ int main(void) {
         "client.in:6: error getting packet loss percentage");
     /* 7. fill in seed */
     u = double_from_config(file, "client.in:7: error getting seed");
+    u++;
+    u--;
 
     /* close the config file */
     fclose(file);
