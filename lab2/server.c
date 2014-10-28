@@ -71,9 +71,8 @@ int main(int argc, const char **argv) {
 
     /* do iffy info */
     ifaces = make_iface_list();
-    print_iface_list(ifaces);
-
     bind_to_iface_list(ifaces, port);
+    print_iface_list(ifaces);
 
     /* print_sock_name(sockfd, &p_serveraddr); */
     print_iface_list_sock_name(ifaces);
@@ -177,6 +176,10 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     char** wnd;  /* the actual window */
 
     _DEBUG("%s\n", "In child");
+
+    _DEBUG("%s\n", "freeing all of the ifaces");
+    free_iface_info(ifaces);
+
     _DEBUG("child.filename: %s\n", fname);
     child_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
