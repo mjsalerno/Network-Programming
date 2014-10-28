@@ -203,11 +203,11 @@ void print_iface_list(struct iface_info* info) {
 /* binds all of the iface_info struct in the given list */
 int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
     struct iface_info* ptr;
-    ptr = info;
+    struct sockaddr_in servaddr;
 
     int sockfd, err;
     err = 0;
-    struct sockaddr_in servaddr;
+    ptr = info;
 
     for(; ptr != NULL; ptr = ptr->next) {
         sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -234,9 +234,9 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
 /* sets all of the fds in the fdset that are in the iface_list also returns the max fd*/
 int fd_set_iface_list(struct iface_info* info, fd_set* fdset) {
     struct iface_info* ptr;
-    ptr = info;
-    int max = -100;
     int cur_sock;
+    int max = -100;
+    ptr = info;
 
     FD_ZERO(fdset);
 

@@ -1,5 +1,5 @@
-CC=gcc
 CC=clang
+CC=gcc
 FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros -DDEBUG
 LIBS = -lnsl -lresolv -lsocket
 LIBS = 
