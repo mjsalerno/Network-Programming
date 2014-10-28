@@ -298,6 +298,20 @@ void print_iface_list_sock_name(struct iface_info* info) {
     }
 }
 
+struct iface_info* get_matching_iface(struct iface_info* info, in_addr_t ip) {
+    struct iface_info* ptr;
+    struct iface_info* long_ptr = NULL;
+    in_addr_t long_mask = 0;
+
+    for(ptr = info; ptr != NULL; ptr = ptr->next) {
+        if(((ptr->mask & ip) == ptr->subnet) && (long_mask < ptr->mask)) {
+            long_ptr = ptr;
+        }
+    }
+
+    return long_ptr;
+}
+
 char *sock_ntop_host(const struct sockaddr *sa, socklen_t salen) {
     static char str[128];        /* Unix domain is largest */
 
