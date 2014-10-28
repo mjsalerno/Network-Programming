@@ -112,9 +112,9 @@ struct iface_info* make_iface_list(void) {
     for (; ifi != NULL; ifi = ifi->ifi_next) {
 
         /* todo: check this, has to be up? */
-        if (!(ifi->ifi_flags & IFF_UP)) continue;
+        /*if (!(ifi->ifi_flags & IFF_UP)) continue;
         if (ifi->ifi_flags & IFF_BROADCAST) continue;
-        if (ifi->ifi_flags & IFF_MULTICAST) continue;
+        if (ifi->ifi_flags & IFF_MULTICAST) continue;*/
         /* if (ifi->ifi_flags & IFF_LOOPBACK) printf("LOOP "); */
         /* if (ifi->ifi_flags & IFF_POINTOPOINT) printf("P2P "); */
 
