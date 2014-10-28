@@ -24,6 +24,7 @@
 #include "unpifiplus.h"
 #include "unp.h"
 #include "config.h"
+#include "debug.h"
 
 #define BUFF_SIZE 512
 #define EVER ;;
@@ -36,9 +37,9 @@
 */
 struct iface_info {
     int sock;
-    char* ip;
-    uint32_t mask;
-    uint32_t subnet;
+    in_addr_t ip;
+    in_addr_t mask;
+    in_addr_t subnet;
     struct iface_info* next;
 };
 
@@ -49,5 +50,7 @@ void str_from_config(FILE* file, char *line, int len, const char* err_str);
 void print_sock_name(int sockfd, struct sockaddr_in *addr);
 void print_sock_peer(int sockfd, struct sockaddr_in *addr);
 struct iface_info* make_iface_list();
+void free_iface_info(struct iface_info* info);
+void print_iface_info(struct iface_info* info);
 
 #endif /* COMMON_H */

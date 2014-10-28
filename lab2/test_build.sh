@@ -6,6 +6,7 @@ make server.o
 make client.o
 make xtcp.o
 make common.o
+make get_ifi_info_plus.o
 gcc -g server.o common.o xtcp.o rtt.c get_ifi_info_plus.o test.c -o test
 
 sed -i s/notmain/main/g server.c 

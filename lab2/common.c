@@ -1,4 +1,5 @@
 #include "common.h"
+
 /* Because this is for the config these funcs exit() on failure*/
 
 int int_from_config(FILE* file, const char* err_str) {
@@ -78,10 +79,13 @@ void print_sock_peer(int sockfd, struct sockaddr_in *addr) {
 }
 
 struct iface_info* make_iface_list(void) {
-    /*struct iface_info* iface_head;
-    struct iface_info* iface_ptr;*/
+    struct iface_info* iface_head;
+    struct iface_info* iface_ptr;
     struct ifi_info *ifi, *ifihead;
     struct sockaddr *sa;
+
+    iface_head = NULL;
+    iface_ptr = NULL;
 
     ifihead = ifi = get_ifi_info_plus(AF_INET, 0);
     if (ifihead == NULL || ifi == NULL) {
@@ -98,29 +102,65 @@ struct iface_info* make_iface_list(void) {
         /* if (ifi->ifi_flags & IFF_LOOPBACK) printf("LOOP "); */
         /* if (ifi->ifi_flags & IFF_POINTOPOINT) printf("P2P "); */
 
+        if(iface_head == NULL) {
+            iface_head = malloc(sizeof(struct iface_info));
+            iface_ptr = iface_head;
+        } else {
+            iface_ptr->next = malloc(sizeof(struct iface_info));
+            iface_ptr = iface_ptr->next;
+            iface_ptr->next = NULL;
+        }
+
         if ((sa = ifi->ifi_addr) == NULL) {
-            fprintf(stderr, "Thee IP addr was null\n");
+            _DEBUG("%s\n", "Thee IP addr was null");
+            free_iface_info(iface_head);
             return NULL;
         }
-        printf("  IP addr: %s\n", sock_ntop_host(sa, sizeof(*sa)));
+        _DEBUG("IP addr: %s\n", sock_ntop_host(sa, sizeof(*sa)));
+        iface_ptr->ip = htonl(((struct sockaddr_in*)sa)->sin_addr.s_addr);
 
 /*=================== cse 533 Assignment 2 modifications ======================*/
 
-        if ((sa = ifi->ifi_ntmaddr) != NULL)
-            printf("  network mask: %s\n",
-                    sock_ntop_host(sa, sizeof(*sa)));
+        if ((sa = ifi->ifi_ntmaddr) == NULL) {
+            _DEBUG("%s\n", "can't find the network mask");
+            free_iface_info(iface_head);
+            return NULL;
+        }
+        _DEBUG("network mask: %s\n", sock_ntop_host(sa, sizeof(*sa)));
+        iface_ptr->mask = htonl(((struct sockaddr_in*)sa)->sin_addr.s_addr);
 
 /*=============================================================================*/
 
-        if ((sa = ifi->ifi_brdaddr) != NULL)
-            printf("  broadcast addr: %s\n",
-                    sock_ntop_host(sa, sizeof(*sa)));
-        if ((sa = ifi->ifi_dstaddr) != NULL)
-            printf("  destination addr: %s\n",
-                    sock_ntop_host(sa, sizeof(*sa)));
+        iface_ptr->sock = 0;
+        /* a bit-wise and between the IP address and its network mask */
+        iface_ptr->subnet = iface_ptr->ip & iface_ptr->mask;
+
+        print_iface_info(iface_ptr);
     }
     free_ifi_info_plus(ifihead);
-    exit(0);
+    return iface_head;
+
+}
+
+void free_iface_info(struct iface_info* info) {
+    if(info == NULL) return;
+
+    if(info->next != NULL)
+        free_iface_info(info->next);
+
+    free(info);
+
+}
+
+void print_iface_info(struct iface_info* info) {
+    struct in_addr addr;
+
+    addr.s_addr = htonl(info->ip);
+    printf("IP: %s\n", inet_ntoa(addr));
+    addr.s_addr = htonl(info->mask);
+    printf("Mask: %s\n", inet_ntoa(addr));
+    addr.s_addr = htonl(info->subnet);
+    printf("Subnet: %s\n", inet_ntoa(addr));
 
 }
 
