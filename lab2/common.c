@@ -55,7 +55,7 @@ void print_sock_name(int sockfd, struct sockaddr_in *addr) {
     memset((void *)addr, 0, len);
     err = getsockname(sockfd, (struct sockaddr *)addr, &len);
     if(err < 0) {
-        _DEBUG("socket: %d addr: %p\n", sockfd, addr);
+        _DEBUG("socket: %d addr: %p\n", sockfd, (void*)addr);
         perror("common.print_sock_name.getsockname()");
         exit(EXIT_FAILURE);
     }
