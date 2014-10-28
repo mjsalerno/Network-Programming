@@ -53,7 +53,7 @@ void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t dat
 void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new);
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new, uint16_t* cli_wnd);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 int print_wnd_check(const char **wnd);

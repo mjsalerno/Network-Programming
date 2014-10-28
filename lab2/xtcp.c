@@ -1,4 +1,3 @@
-#include <inttypes.h>
 #include <errno.h>
 #include "xtcp.h"
 #include "debug.h"
@@ -301,10 +300,21 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
 }
 
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new) {
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new, uint16_t* cli_wnd) {
 
     int err;
-    void *pkt = malloc(sizeof(struct xtcphdr) + datalen);
+    void *pkt;
+
+    if(*cli_wnd < 1) {
+        if(!is_wnd_empty()) {
+            _DEBUG("%s\n", "The client window was too small, pretending like my window is full ...");
+            return -1;
+        } else {
+            _DEBUG("%s\n", "The client window was too small, but there isnothing to be ACKed... WHAT DO?");
+        }
+    }
+
+    pkt = malloc(sizeof(struct xtcphdr) + datalen);
     make_pkt(pkt, flags, advwin, data, datalen);
 
     printf("SENDING: ");
@@ -351,6 +361,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, 
         return -2;
     }
 
+    (*cli_wnd)--;
     print_wnd((const char**)wnd);
 
     return 1;
@@ -549,6 +560,7 @@ int cli_ack(int sockfd, char **wnd) {
     }
     printf("cli_ack(): sending normal ACK, ack_num: %"PRIu32"\n", ack_seq);
     err = clisend(sockfd, ACK, NULL, 0);
+
     return (int)err;
 }
 
@@ -556,5 +568,6 @@ int cli_dup_ack(int sockfd) {
     int err;
     printf("cli_dup_ack(): sending duplicate ACK, ack_num: %"PRIu32"\n", ack_seq);
     err = clisend(sockfd, ACK, NULL, 0);
+
     return err;
 }

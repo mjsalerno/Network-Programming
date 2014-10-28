@@ -8,6 +8,7 @@ extern uint32_t ack_seq;
 extern uint16_t advwin;
 
 static uint32_t start_seq;
+static uint16_t cli_wnd;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -134,6 +135,7 @@ int main(int argc, const char **argv) {
 
         /* pick the smallest advwin */
         advwin = ((struct xtcphdr*)pkt)->advwin < advwin ? ((struct xtcphdr*)pkt)->advwin : advwin;
+        cli_wnd = advwin;
         _DEBUG("new advwin: %d\n", advwin);
 
         print_hdr((struct xtcphdr *) pkt);
@@ -564,7 +566,7 @@ int send_file(char* fname, int sock, char **wnd) {
 saving_data:
             _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
 
-            err = srvsend(sock, 0, data, n, wnd, !save_data);
+            err = srvsend(sock, 0, data, n, wnd, !save_data, &cli_wnd);
             if(err == -1) {                                                           /* the error code for full window */
                 save_data = 1;
                 err = get_aks(wnd, sock, 0);
@@ -650,6 +652,9 @@ int handle_ack(struct xtcphdr* pkt, char** wnd) {
     while(ge_base(pkt_ack -1)) {
         count++;
         _DEBUG("eating pkts until SEQ: %" PRIu32 "\n",  pkt_ack);
+        cli_wnd = pkt->advwin;
+        _DEBUG("Reset cli_wnd: %" PRIu16 "\n",  cli_wnd);
+
         remove_from_wnd((const char **) wnd);
     }
 
