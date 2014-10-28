@@ -1,15 +1,15 @@
 CC=clang
 CC=gcc
 FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros -DDEBUG
-LIBS = -lnsl -lresolv -lsocket
-LIBS = 
+LIBS = -lnsl -lresolv -lsocket -lm -lrt
+LIBS = -lm -pthread
 
 all: client server
 
 %: %.c
 
 %: %.o common.o xtcp.o get_ifi_info_plus.o
-	$(CC) $(FLAGS) $(LIBS) $^ -o $@
+	$(CC) $(FLAGS) $^ $(LIBS) -o $@
 
 %.o: %.c %.h debug.h
 	$(CC) $(FLAGS) -c $< -o $@

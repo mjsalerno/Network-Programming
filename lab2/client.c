@@ -6,8 +6,9 @@ extern uint16_t advwin;
 
 static char** wnd; /* will point to malloc()'d array from init_wnd()*/
 
-/* packet loss percentage */
-extern double pkt_loss_thresh;
+extern double pkt_loss_thresh; /* packet loss percentage */
+
+static double u; /* (!!in ms!!) mean of the exponential distribution func */
 
 int main(void) {
     ssize_t err; /* for error checking */
@@ -19,7 +20,8 @@ int main(void) {
     /* config/xtcp vars */
     uint16_t orig_win_size;
     int seed;
-    double u; /* (!!in ms!!) mean of the exponential distribution func */
+
+    pthread_t consumer_tid;
 
     /* serv_fd -- the main server connection socket, reconnected later */
     int serv_fd;
@@ -73,10 +75,8 @@ int main(void) {
     /* 6. fill in seed */
     pkt_loss_thresh = double_from_config(file,
         "client.in:6: error getting packet loss percentage");
-    /* 7. fill in seed */
-    u = double_from_config(file, "client.in:7: error getting seed");
-    u++;
-    u--;
+    /* 7. fill in mean */
+    u = double_from_config(file, "client.in:7: error getting mean");
 
     /* close the config file */
     fclose(file);
@@ -124,7 +124,17 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
     /* connected to file transfer port */
-    /* todo: pthread_create consumer thread */
+
+    /* pthread_create consumer thread */
+    /* todo: atttr not NULL */
+    _DEBUG("%s\n", "creating pthread for consumer...");
+    err = pthread_create(&consumer_tid, NULL, &consumer_main, (void *)wnd);
+    if(0 > err){
+        errno = (int)err;
+        perror("ERROR: consumer pthread_create()");
+        close(serv_fd);
+        exit(EXIT_FAILURE);
+    }
 
 
     _DEBUG("%s\n", "waiting for the file ...");
@@ -150,6 +160,7 @@ int main(void) {
     }
 
     /* wake up when the window is empty */
+    /* todo: prthead_join */
     while(!is_wnd_empty()) {
         _DEBUG("%s\n", "waiting for consumer to read the file. ");
         sleep(1);
@@ -289,8 +300,24 @@ int validate_hs2(struct xtcphdr* hdr, int len){
     }
     return 0;
 }
-/*
-void consumer_thread(void *){
 
-}*/
+void *consumer_main(void *wnd) {
+    struct timespec sleep_ts = {0};
+    double msecs_d;
+    unsigned long int msecs_int;
+
+    /* u is in milliseconds ms! not us, not ns*/
+    msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
+
+    msecs_int = (unsigned long int)round(msecs_d);
+    _DEBUG("CONSUMER: msecs is %f, we rounded to: %ld", msecs_d, msecs_int);
+    msecs_int++;
+
+    /* this won't be interrupted so sec timespec NULL*/
+    nanosleep((const struct timespec*)&sleep_ts, NULL);
+    /* todo: read from wnd */
+
+    /* todo: change */
+    return wnd;
+}
 
