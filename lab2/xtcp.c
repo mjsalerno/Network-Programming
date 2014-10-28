@@ -443,7 +443,7 @@ int clirecv(int sockfd, char **wnd) {
                 free(pkt);
                 return -2;
             }else if(bytes < 12){
-                _DEBUG("clirecv().recv() not long enough to be pkt: %d\n", bytes);
+                _DEBUG("clirecv().recv() not long enough to be pkt: %d\n", (int)bytes);
             }
             ntohpkt((struct xtcphdr *)pkt); /* host order please */
             pkt[bytes] = 0; /* NULL terminate the ASCII text */
@@ -488,7 +488,7 @@ int clirecv(int sockfd, char **wnd) {
     pktseq = ((struct xtcphdr *)pkt)->seq;
     if(pktseq == ack_seq) {
         /* everythings going fine, send a new ACK */
-        _DEBUG("%s\n", "pktseq: "PRIu32" == "PRIu32" :ack_seq, good but check wnd not full", pktseq, ack_seq);
+        _DEBUG("pktseq: %" PRIu32 " == %" PRIu32 " :ack_seq, good but check wnd not full", pktseq, ack_seq);
         err = add_to_wnd(ack_seq, pkt, (const char**)wnd);
         if(err < 0){
             _DEBUG("just ignore pkt, wnd must be full add_to_wnd() returned %d \n", err);
