@@ -31,6 +31,9 @@
 *.x86_64
 *.hex
 
+# Core Dumps cuz we cant program
+*core*
+
 
 ### vim ###
 [._]*.s[a-w][a-z]

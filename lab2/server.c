@@ -9,6 +9,7 @@ extern uint16_t advwin;
 
 static uint32_t start_seq;
 static uint16_t cli_wnd;
+static struct iface_info* ifaces;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -27,6 +28,8 @@ int main(int argc, const char **argv) {
     char pkt[MAX_PKT_SIZE + 1];
 
     cliList = NULL;
+    ifaces = make_iface_list();
+    print_iface_list(ifaces);
 
     if(argc < 2) {
         path = "./server.in";

@@ -105,6 +105,7 @@ struct iface_info* make_iface_list(void) {
         if(iface_head == NULL) {
             iface_head = malloc(sizeof(struct iface_info));
             iface_ptr = iface_head;
+            iface_head->next = NULL;
         } else {
             iface_ptr->next = malloc(sizeof(struct iface_info));
             iface_ptr = iface_ptr->next;
@@ -134,8 +135,6 @@ struct iface_info* make_iface_list(void) {
         iface_ptr->sock = 0;
         /* a bit-wise and between the IP address and its network mask */
         iface_ptr->subnet = iface_ptr->ip & iface_ptr->mask;
-
-        print_iface_info(iface_ptr);
     }
     free_ifi_info_plus(ifihead);
     return iface_head;
@@ -155,14 +154,17 @@ void free_iface_info(struct iface_info* info) {
 void print_iface_info(struct iface_info* info) {
     struct in_addr addr;
 
-    printf("=====================\n");
+    printf("======================\n");
     addr.s_addr = htonl(info->ip);
-    printf("IP: %s\n", inet_ntoa(addr));
+    printf("|IP: %15s |\n", inet_ntoa(addr));
     addr.s_addr = htonl(info->mask);
-    printf("Mask: %s\n", inet_ntoa(addr));
+    printf("|Mask: %13s |\n", inet_ntoa(addr));
     addr.s_addr = htonl(info->subnet);
-    printf("Subnet: %s\n", inet_ntoa(addr));
-    printf("=====================\n");
+    printf("|Subnet: %11s |\n", inet_ntoa(addr));
+    printf("|Socket: %11d |\n", info->sock);
+    printf("|Next: %13p |\n", info->next);
+    printf("|This: %13p |\n", info);
+    printf("======================\n");
 
 }
 
