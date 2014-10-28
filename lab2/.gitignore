@@ -2,3 +2,5 @@ server
 client
 test
 *.in
+config.h
+*file
