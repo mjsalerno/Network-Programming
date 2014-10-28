@@ -43,6 +43,14 @@ void print_sock_name(int sockfd, struct sockaddr_in *addr) {
     int err;
     socklen_t len;
     char ip4_str[INET_ADDRSTRLEN];
+    int was_null = 0;
+
+    if(addr == NULL) {
+        _DEBUG("%s\n", "was passed a NULL addr, making my own");
+        addr = malloc(sizeof(struct sockaddr_in));
+        was_null = 1;
+    }
+
     len = sizeof(struct sockaddr_in);
     memset((void *)addr, 0, len);
     err = getsockname(sockfd, (struct sockaddr *)addr, &len);
@@ -56,6 +64,12 @@ void print_sock_name(int sockfd, struct sockaddr_in *addr) {
         exit(EXIT_FAILURE);
     }
     printf("%s:%hu\n", ip4_str, ntohs(addr->sin_port));
+
+    if(was_null) {
+        _DEBUG("%s\n", "freeing my addr");
+        free(addr);
+        addr = NULL;
+    }
 }
 
 /* pass a connect'ed socket and a pointer to sockaddr_in addr */
@@ -203,6 +217,53 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
     }
 
     return err;
+}
+
+int fd_set_iface_list(struct iface_info* info, fd_set* fdset) {
+    struct iface_info* ptr;
+    ptr = info;
+    int max = -100;
+    int cur_sock;
+
+    FD_ZERO(fdset);
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        cur_sock = ptr->sock;
+
+        if(cur_sock < 1) {
+            _DEBUG("found an invalid socket in the iface struct: %d", cur_sock);
+            return cur_sock;
+        }
+
+        FD_SET(cur_sock, fdset);
+        max = MAX(max, cur_sock);
+    }
+
+    return max;
+
+}
+
+struct iface_info* fd_is_set_iface_list(struct iface_info* info, fd_set* fdset) {
+    struct iface_info* ptr;
+    ptr = info;
+
+    for (; ptr != NULL; ptr = ptr->next) {
+        if(FD_ISSET(ptr->sock, fdset)) {
+            return ptr;
+        }
+    }
+
+    return NULL;
+}
+
+void print_iface_list_sock_name(struct iface_info* info) {
+    struct iface_info* ptr;
+    ptr = info;
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        /* fixme: figure out what to pass */
+        print_sock_name(ptr->sock, NULL);
+    }
 }
 
 char *sock_ntop_host(const struct sockaddr *sa, socklen_t salen) {
