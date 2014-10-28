@@ -224,10 +224,8 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
         if (err < 0) {
             fprintf(stderr, "bind_to_iface_list.bind(%d", err);
             perror(")");
-            close(sockfd);
             break;
         }
-        close(sockfd);
     }
 
     return err;
