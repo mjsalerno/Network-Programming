@@ -19,11 +19,13 @@ int main(int argc, const char **argv) {
     fd_set fdset;
     int pid;
     int err;
+    int max_fd;
+    int cur_sock;
     ssize_t n;
     struct client_list* newCli;
+    struct iface_info* ptr;
 
-    int sockfd;
-    struct sockaddr_in servaddr, cliaddr, p_serveraddr;/*, p_cliaddr;*/
+    struct sockaddr_in cliaddr;/*, servaddr, p_serveraddr, p_cliaddr;*/
     socklen_t len;
     char pkt[MAX_PKT_SIZE + 1];
 
@@ -71,20 +73,11 @@ int main(int argc, const char **argv) {
     ifaces = make_iface_list();
     print_iface_list(ifaces);
 
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    bzero(&servaddr, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(port);
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    /*inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);*/
+    bind_to_iface_list(ifaces, port);
 
-    err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
-    if (err < 0) {
-        perror("server.bind()");
-        exit(EXIT_FAILURE);
-    }
+    /* print_sock_name(sockfd, &p_serveraddr); */
+    print_iface_list_sock_name(ifaces);
 
-    print_sock_name(sockfd, &p_serveraddr);
     if(SIG_ERR == signal(SIGCHLD, proc_exit)) {
         perror("server.signal()");
     }
@@ -92,10 +85,8 @@ int main(int argc, const char **argv) {
 
     for(EVER) {
 
-        FD_ZERO(&fdset);
-        FD_SET(sockfd, &fdset);
-        err = select(sockfd + 1, &fdset, NULL, NULL, NULL);
-
+        max_fd = fd_set_iface_list(ifaces, &fdset);
+        err = select(max_fd + 1, &fdset, NULL, NULL, NULL);
         if (err < 0) {
             if(errno == EINTR) {
                 _DEBUG("%s\n", "select interupted, continue ...");
@@ -112,7 +103,16 @@ int main(int argc, const char **argv) {
         do {
             len = sizeof(cliaddr);
             _DEBUG("%s\n", "waking up and going into recvfrom");
-            n = recvfrom(sockfd, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
+
+            ptr = fd_is_set_iface_list(ifaces, &fdset);
+            if(ptr == NULL) {
+                fprintf(stderr, "There was a problem getting the set socket in select\n");
+                exit(EXIT_FAILURE);
+            }
+
+            cur_sock = ptr->sock;
+
+            n = recvfrom(cur_sock, pkt, MAX_PKT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
             _DEBUG("out of recvfrom n: %d errno: %d\n", (int)n, errno);
             if (n < 0 && errno != EINTR) {
                 perror("server.recvfrom()");
@@ -158,7 +158,7 @@ int main(int argc, const char **argv) {
 
         /*in child*/
         if (pid == 0) {
-            child(pkt + DATA_OFFSET, sockfd, cliaddr);
+            child(pkt + DATA_OFFSET, cur_sock, cliaddr);
             /* we should never get here */
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
