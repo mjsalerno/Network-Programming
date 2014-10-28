@@ -178,6 +178,33 @@ void print_iface_list(struct iface_info* info) {
 
 }
 
+int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
+    struct iface_info* ptr;
+    ptr = info;
+
+    int sockfd, err;
+    err = 0;
+    struct sockaddr_in servaddr;
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        bzero(&servaddr, sizeof(servaddr));
+        servaddr.sin_family = AF_INET;
+        servaddr.sin_port = htons(port);
+        servaddr.sin_addr.s_addr = htonl(ptr->ip);
+        ptr->sock = sockfd;
+
+        err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+        if (err < 0) {
+            fprintf(stderr, "bind_to_iface_list.bind(%d", err);
+            perror(")");
+            break;
+        }
+    }
+
+    return err;
+}
+
 char *sock_ntop_host(const struct sockaddr *sa, socklen_t salen) {
     static char str[128];        /* Unix domain is largest */
 

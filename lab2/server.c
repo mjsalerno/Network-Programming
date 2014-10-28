@@ -28,8 +28,7 @@ int main(int argc, const char **argv) {
     char pkt[MAX_PKT_SIZE + 1];
 
     cliList = NULL;
-    ifaces = make_iface_list();
-    print_iface_list(ifaces);
+    ifaces = NULL;
 
     if(argc < 2) {
         path = "./server.in";
@@ -67,6 +66,10 @@ int main(int argc, const char **argv) {
     if(err < 0) {
         perror("server.fclose()");
     }
+
+    /* do iffy info */
+    ifaces = make_iface_list();
+    print_iface_list(ifaces);
 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     bzero(&servaddr, sizeof(servaddr));
