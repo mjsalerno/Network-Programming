@@ -112,9 +112,9 @@ struct iface_info* make_iface_list(void) {
     for (; ifi != NULL; ifi = ifi->ifi_next) {
 
         /* todo: check this, has to be up? */
-        if (!(ifi->ifi_flags & IFF_UP)) continue;
+        /*if (!(ifi->ifi_flags & IFF_UP)) continue;
         if (ifi->ifi_flags & IFF_BROADCAST) continue;
-        if (ifi->ifi_flags & IFF_MULTICAST) continue;
+        if (ifi->ifi_flags & IFF_MULTICAST) continue;*/
         /* if (ifi->ifi_flags & IFF_LOOPBACK) printf("LOOP "); */
         /* if (ifi->ifi_flags & IFF_POINTOPOINT) printf("P2P "); */
 
@@ -175,17 +175,17 @@ void free_iface_info(struct iface_info* info) {
 void print_iface_info(struct iface_info* info) {
     struct in_addr addr;
 
-    printf("======================\n");
+    printf("==========================\n");
     addr.s_addr = info->ip;
-    printf("|IP: %15s |\n", inet_ntoa(addr));
+    printf("|IP:     %15s |\n", inet_ntoa(addr));
     addr.s_addr = info->mask;
-    printf("|Mask: %13s |\n", inet_ntoa(addr));
+    printf("|Mask:   %15s |\n", inet_ntoa(addr));
     addr.s_addr = info->subnet;
-    printf("|Subnet: %11s |\n", inet_ntoa(addr));
-    printf("|Socket: %11d |\n", info->sock);
-    printf("|Next: %13p |\n", (void *)info->next);
-    printf("|This: %13p |\n", (void *)info);
-    printf("======================\n");
+    printf("|Subnet: %15s |\n", inet_ntoa(addr));
+    printf("|Socket: %15d |\n", info->sock);
+    printf("|Next:   %15p |\n", (void *)info->next);
+    printf("|This:   %15p |\n", (void *)info);
+    printf("==========================\n");
 
 }
 
@@ -195,7 +195,7 @@ void print_iface_list(struct iface_info* info) {
     ptr = info;
 
     for(; ptr != NULL; ptr = ptr->next) {
-        print_iface_info(info);
+        print_iface_info(ptr);
     }
 
 }
@@ -270,6 +270,22 @@ struct iface_info* fd_is_set_iface_list(struct iface_info* info, fd_set* fdset) 
     return NULL;
 }
 
+struct iface_info* get_iface_from_sock(struct iface_info* info, int sock) {
+    struct  iface_info* ptr;
+    ptr = info;
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        if(ptr->sock == sock)
+            break;
+    }
+
+    if(ptr == NULL) {
+        _DEBUG("%s\n", "Could not find iface with that socket");
+    }
+
+    return ptr;
+}
+
 /* calls print_sock_name on all of the iface_info structs */
 void print_iface_list_sock_name(struct iface_info* info) {
     struct iface_info* ptr;
@@ -280,6 +296,20 @@ void print_iface_list_sock_name(struct iface_info* info) {
         _DEBUG("passing socket: %d\n", ptr->sock);
         print_sock_name(ptr->sock, NULL);
     }
+}
+
+struct iface_info* get_matching_iface(struct iface_info* info, in_addr_t ip) {
+    struct iface_info* ptr;
+    struct iface_info* long_ptr = NULL;
+    in_addr_t long_mask = 0;
+
+    for(ptr = info; ptr != NULL; ptr = ptr->next) {
+        if(((ptr->mask & ip) == ptr->subnet) && (long_mask < ptr->mask)) {
+            long_ptr = ptr;
+        }
+    }
+
+    return long_ptr;
 }
 
 char *sock_ntop_host(const struct sockaddr *sa, socklen_t salen) {
