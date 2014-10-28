@@ -610,7 +610,7 @@ int get_aks(char** wnd, int sock, int always_block) {
         }
 
         do {
-            err = (int) recv(sock, pkt, sizeof(pkt), flag);
+            err = (int) recv(sock, pkt, MAX_PKT_SIZE, flag);
         } while(errno == EINTR && err < 0);
         if (err < 0) {
             if(errno != EWOULDBLOCK) {                                     /* there was actually an error */

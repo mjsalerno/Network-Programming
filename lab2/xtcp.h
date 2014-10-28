@@ -22,10 +22,10 @@
 
 #define TIME_OUT 2
 
-#define E_INDEXTOOFAR   -4
-#define E_WASREMOVED    -3
-#define E_CANTFIT       -2
-#define E_OCCUPIED      -1
+#define E_ISFULL   -4
+/*#define E_WASREMOVED    -3*/
+/*#define E_CANTFIT       -2*/
+#define E_OCCUPIED -1
 
 /* for extern'ing in client and server */
 uint32_t seq;           /* SEQ number */
@@ -56,6 +56,7 @@ void htonpkt(struct xtcphdr *hdr);
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
+int print_wnd_check(const char **wnd);
 int can_add_to_wnd(uint32_t seq);
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
 char* remove_from_wnd(const char** wnd);
