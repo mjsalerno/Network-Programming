@@ -183,8 +183,8 @@ void print_iface_info(struct iface_info* info) {
     addr.s_addr = info->subnet;
     printf("|Subnet: %11s |\n", inet_ntoa(addr));
     printf("|Socket: %11d |\n", info->sock);
-    printf("|Next: %13p |\n", info->next);
-    printf("|This: %13p |\n", info);
+    printf("|Next: %13p |\n", (void *)info->next);
+    printf("|This: %13p |\n", (void *)info);
     printf("======================\n");
 
 }
