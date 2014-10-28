@@ -175,17 +175,17 @@ void free_iface_info(struct iface_info* info) {
 void print_iface_info(struct iface_info* info) {
     struct in_addr addr;
 
-    printf("======================\n");
+    printf("==========================\n");
     addr.s_addr = info->ip;
-    printf("|IP: %15s |\n", inet_ntoa(addr));
+    printf("|IP:     %15s |\n", inet_ntoa(addr));
     addr.s_addr = info->mask;
-    printf("|Mask: %13s |\n", inet_ntoa(addr));
+    printf("|Mask:   %15s |\n", inet_ntoa(addr));
     addr.s_addr = info->subnet;
-    printf("|Subnet: %11s |\n", inet_ntoa(addr));
-    printf("|Socket: %11d |\n", info->sock);
-    printf("|Next: %13p |\n", (void *)info->next);
-    printf("|This: %13p |\n", (void *)info);
-    printf("======================\n");
+    printf("|Subnet: %15s |\n", inet_ntoa(addr));
+    printf("|Socket: %15d |\n", info->sock);
+    printf("|Next:   %15p |\n", (void *)info->next);
+    printf("|This:   %15p |\n", (void *)info);
+    printf("==========================\n");
 
 }
 
