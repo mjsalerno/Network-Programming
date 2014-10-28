@@ -134,7 +134,7 @@ struct iface_info* make_iface_list(void) {
             return NULL;
         }
         _DEBUG("IP addr: %s\n", sock_ntop_host(sa, sizeof(*sa)));
-        iface_ptr->ip = htonl(((struct sockaddr_in*)sa)->sin_addr.s_addr);
+        iface_ptr->ip = ((struct sockaddr_in*)sa)->sin_addr.s_addr;
 
 /*=================== cse 533 Assignment 2 modifications ======================*/
 
@@ -144,7 +144,7 @@ struct iface_info* make_iface_list(void) {
             return NULL;
         }
         _DEBUG("network mask: %s\n", sock_ntop_host(sa, sizeof(*sa)));
-        iface_ptr->mask = htonl(((struct sockaddr_in*)sa)->sin_addr.s_addr);
+        iface_ptr->mask = ((struct sockaddr_in*)sa)->sin_addr.s_addr;
 
 /*=============================================================================*/
 
@@ -176,11 +176,11 @@ void print_iface_info(struct iface_info* info) {
     struct in_addr addr;
 
     printf("======================\n");
-    addr.s_addr = htonl(info->ip);
+    addr.s_addr = info->ip;
     printf("|IP: %15s |\n", inet_ntoa(addr));
-    addr.s_addr = htonl(info->mask);
+    addr.s_addr = info->mask;
     printf("|Mask: %13s |\n", inet_ntoa(addr));
-    addr.s_addr = htonl(info->subnet);
+    addr.s_addr = info->subnet;
     printf("|Subnet: %11s |\n", inet_ntoa(addr));
     printf("|Socket: %11d |\n", info->sock);
     printf("|Next: %13p |\n", info->next);
@@ -217,7 +217,7 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
         bzero(&servaddr, sizeof(servaddr));
         servaddr.sin_family = AF_INET;
         servaddr.sin_port = htons(port);
-        servaddr.sin_addr.s_addr = htonl(ptr->ip);
+        servaddr.sin_addr.s_addr = ptr->ip;
         ptr->sock = sockfd;
 
         err = bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));

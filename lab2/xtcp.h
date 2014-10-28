@@ -9,7 +9,6 @@
 
 #include "common.h"
 
-#define DEBUG
 
 #define FIN 0x1
 #define SYN 0x2

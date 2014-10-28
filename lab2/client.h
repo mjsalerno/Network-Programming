@@ -3,7 +3,6 @@
 
 #include "common.h"
 
-#define DEBUG
 #include "debug.h"
 
 /*

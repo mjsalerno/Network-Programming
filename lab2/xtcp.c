@@ -1,6 +1,5 @@
 #include <errno.h>
 #include "xtcp.h"
-#include "debug.h"
 
 static int max_wnd_size;   /* initialized by init_wnd() */
 
