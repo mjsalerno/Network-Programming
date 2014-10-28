@@ -22,6 +22,7 @@ int main(void) {
     int seed;
 
     pthread_t consumer_tid;
+    void *consumer_rtn;
 
     /* serv_fd -- the main server connection socket, reconnected later */
     int serv_fd;
@@ -160,16 +161,18 @@ int main(void) {
     }
 
     /* wake up when the window is empty */
-    /* todo: prthead_join */
-    while(!is_wnd_empty()) {
-        _DEBUG("%s\n", "waiting for consumer to read the file. ");
-        sleep(1);
+    _DEBUG("%s\n", "joining on consumer thread.....");
+    err = pthread_join(consumer_tid, &consumer_rtn);
+    if(err > 0) {
+        errno = (int)err;
+        perror("ERROR: pthread_join()");
+        close(serv_fd);
+        exit(EXIT_FAILURE);
     }
-    _DEBUG("%s\n", "the window is empty");
+    /* todo: use consumer_rtn ??*/
 
-    _DEBUG("%s\n", "closing serv_fd then exit(EXIT_SUCCESS)");
+    _DEBUG("%s\n", "success! closing serv_fd then exiting...");
     close(serv_fd);
-
     return EXIT_SUCCESS;
 }
 
@@ -302,20 +305,23 @@ int validate_hs2(struct xtcphdr* hdr, int len){
 }
 
 void *consumer_main(void *wnd) {
-    struct timespec sleep_ts = {0};
     double msecs_d;
-    unsigned long int msecs_int;
-
+    unsigned int usecs;
+    int fin_found = 5;
+    srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
-    msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
 
-    msecs_int = (unsigned long int)round(msecs_d);
-    _DEBUG("CONSUMER: msecs is %f, we rounded to: %ld", msecs_d, msecs_int);
-    msecs_int++;
+    while(fin_found--) {
+        msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
 
-    /* this won't be interrupted so sec timespec NULL*/
-    nanosleep((const struct timespec*)&sleep_ts, NULL);
-    /* todo: read from wnd */
+        usecs = 1000 * (unsigned int) round(msecs_d);
+        _DEBUG("CONSUMER: sleeping for:  %fms\n", msecs_d);
+        _DEBUG("CONSUMER: we rounded to: %uus\n", usecs);
+
+        usleep(usecs);
+
+        /* todo: read from wnd */
+    }
 
     /* todo: change */
     return wnd;
