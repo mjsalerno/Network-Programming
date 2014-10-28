@@ -56,6 +56,7 @@ void htonpkt(struct xtcphdr *hdr);
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
+int print_wnd_check(const char **wnd);
 int can_add_to_wnd(uint32_t seq);
 int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
 char* remove_from_wnd(const char** wnd);

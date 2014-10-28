@@ -624,7 +624,7 @@ int get_aks(char** wnd, int sock, int always_block) {
             }
         } else {                                                           /* got an ACK */
             ntohpkt(pkt);
-            printf("server.c:627 GOT: ");
+            printf("GOT: ");
             print_hdr(pkt);
             _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32 "\n",
                     ((struct xtcphdr *)pkt)->seq,

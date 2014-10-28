@@ -75,6 +75,31 @@ void print_wnd(const char** wnd) {
 }
 
 /**
+* RETURNS 0 if the wnd seems to be correct
+*        -1 otherwise
+*/
+int print_wnd_check(const char **wnd){
+    int x = 0, rtn = 0, numfound = 0;
+    struct xtcphdr* pkt;
+    _DEBUG("%s\n", "doing wnd check...");
+    for(;x < max_wnd_size; x++){
+        pkt = (struct xtcphdr*)wnd[wnd_base_i + x];
+        if(pkt == NULL){
+            continue;
+        }else if(pkt->seq == (wnd_base_seq + x)){
+            numfound++;
+        }else{
+            _DEBUG("BAD: wnd[%d]->seq is: %"PRIi32", expected: %"PRIi32"\n", wnd_base_i + x, pkt->seq, wnd_base_seq + x);
+            rtn = -1;
+        }
+    }
+    if(numfound != wnd_count){
+        _DEBUG("BAD: found %d pkts in wnd, expected %d\n", numfound, wnd_count);
+    }
+    return rtn;
+}
+
+/**
 * RETURNS: 1 if wnd_count == advwin (also when > advwin)
 *
 */
