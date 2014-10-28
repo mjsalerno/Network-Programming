@@ -270,6 +270,22 @@ struct iface_info* fd_is_set_iface_list(struct iface_info* info, fd_set* fdset) 
     return NULL;
 }
 
+struct iface_info* get_iface_from_sock(struct iface_info* info, int sock) {
+    struct  iface_info* ptr;
+    ptr = info;
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        if(ptr->sock == sock)
+            break;
+    }
+
+    if(ptr == NULL) {
+        _DEBUG("%s\n", "Could not find iface with that socket");
+    }
+
+    return ptr;
+}
+
 /* calls print_sock_name on all of the iface_info structs */
 void print_iface_list_sock_name(struct iface_info* info) {
     struct iface_info* ptr;

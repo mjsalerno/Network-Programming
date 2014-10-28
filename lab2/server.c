@@ -170,12 +170,21 @@ int main(int argc, const char **argv) {
 
 int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     struct sockaddr_in childaddr;
+    struct iface_info* iface_ptr;
     int err;
     int child_sock;
     socklen_t len;
     char** wnd;  /* the actual window */
 
     _DEBUG("%s\n", "In child");
+
+    iface_ptr = get_iface_from_sock(ifaces, par_sock);
+    if(iface_ptr == NULL) {
+        _DEBUG("%s\n", "could not find the iface with that socket");
+        return -1;
+    }
+
+    iface_ptr->sock = -1;
 
     _DEBUG("%s\n", "freeing all of the ifaces");
     free_iface_info(ifaces);

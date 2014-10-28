@@ -62,6 +62,7 @@ void print_iface_list(struct iface_info* info);
 void print_iface_list_sock_name(struct iface_info* info);
 int fd_set_iface_list(struct iface_info* info, fd_set* fdset);
 struct iface_info* fd_is_set_iface_list(struct iface_info* info, fd_set* fdset);
+struct iface_info* get_iface_from_sock(struct iface_info* info, int sock);
 
 
 #endif /* COMMON_H */
