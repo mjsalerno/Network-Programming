@@ -536,6 +536,7 @@ continue_with_select:
     }
     /* should never get here */
     assert(0 == 1);
+    return -5;
 }
 
 int cli_ack(int sockfd, char **wnd) {
