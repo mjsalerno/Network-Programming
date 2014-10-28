@@ -29,6 +29,10 @@
 #define BUFF_SIZE 512
 #define EVER ;;
 
+#ifndef MAX
+# define MAX(x, y) (((x)>(y))?(x):(y))
+#endif
+
 /**
 * sockfd
 * IP address bound to the socket
