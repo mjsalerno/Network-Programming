@@ -94,7 +94,7 @@ int print_wnd_check(const char **wnd){
         }
     }
     if(numfound != wnd_count){
-        _DEBUG("BAD: found %d pkts in wnd, expected %d\n", numfound, wnd_count);
+        _DEBUG("BAD: found %d pkts in wnd, expected %d\n", numfound, wnd_count);/*fixme: rtn = -1 */
     }
     return rtn;
 }
@@ -202,10 +202,7 @@ int can_add_to_wnd(uint32_t seq){
     /* todo: add cwin to calc */
     if(wnd_base_seq <= seq && seq < (wnd_base_seq + max_wnd_size)){
         /* if it's valid */
-        if(dst_from_base_wnd(seq) < max_wnd_size){
-            /* if we have space */
-            can_add = 1;
-        }
+        can_add = 1;
     }
     return can_add;
 }
@@ -282,8 +279,8 @@ char* get_from_wnd(uint32_t index, const char** wnd) {
     const char* tmp;
 
     /* change for congestion control? */
-    if(n > max_wnd_size) { /* sanity check */
-        fprintf(stderr, "ERROR: can't get, index %"PRIu32" is beyond the max window size %d\n", index, max_wnd_size);
+    if(n >= max_wnd_size) { /* sanity check */
+        _DEBUG("you wanted index %"PRIu32", but it's beyond the window %d\n", index, max_wnd_size);
         return NULL;
     }
     if(wnd_count <= 0) { /* sanity check, should never happen */
@@ -412,7 +409,10 @@ int clirecv(int sockfd, char **wnd) {
         return -1;
     }
     for(;;) {
-continue_with_select:
+        continue_with_select:
+        /* todo: remove this print? */
+        _DEBUG("%s\n", "select() for ever loop");
+        print_wnd((const char **)wnd);
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
 
@@ -432,6 +432,8 @@ continue_with_select:
                 perror("clirecv().recv()");
                 free(pkt);
                 return -2;
+            }else if(bytes < 12){
+                _DEBUG("clirecv().recv() not long enough to be pkt: %d\n", bytes);
             }
             ntohpkt((struct xtcphdr *)pkt); /* host order please */
             pkt[bytes] = 0; /* NULL terminate the ASCII text */
@@ -476,11 +478,11 @@ continue_with_select:
     pktseq = ((struct xtcphdr *)pkt)->seq;
     if(pktseq == ack_seq) {
         /* everythings going fine, send a new ACK */
-        _DEBUG("%s\n", "placing packet into the window will not fail.");
+        _DEBUG("%s\n", "pktseq: "PRIu32" == "PRIu32" :ack_seq, good but check wnd not full", pktseq, ack_seq);
         err = add_to_wnd(ack_seq, pkt, (const char**)wnd);
         if(err < 0){
-            _DEBUG("Check the ERROR codes here!! add_to_wnd() returned %d \n", err);
-            return -2;
+            _DEBUG("just ignore pkt, wnd must be full add_to_wnd() returned %d \n", err);
+            goto continue_with_select;
         }
         advwin--;
         err = cli_ack(sockfd, wnd);
@@ -528,7 +530,7 @@ continue_with_select:
             case E_ISFULL:
                 /* don't ACK this, it's too far */
                 printf("not ACKing pkt because I can't store it! Just ignore it!\n");
-                break;
+                goto continue_with_select;
             default:
                 _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
                 return -2;

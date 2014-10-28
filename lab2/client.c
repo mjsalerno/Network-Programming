@@ -284,4 +284,8 @@ int validate_hs2(struct xtcphdr* hdr, int len){
     }
     return 0;
 }
+/*
+void consumer_thread(void *){
+
+}*/
 
