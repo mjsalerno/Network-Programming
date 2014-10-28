@@ -195,7 +195,7 @@ void print_iface_list(struct iface_info* info) {
     ptr = info;
 
     for(; ptr != NULL; ptr = ptr->next) {
-        print_iface_info(info);
+        print_iface_info(ptr);
     }
 
 }
