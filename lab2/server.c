@@ -174,6 +174,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     int err;
     int child_sock;
     socklen_t len;
+
     char** wnd;  /* the actual window */
 
     _DEBUG("%s\n", "In child");
@@ -184,10 +185,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         return -1;
     }
 
+    /* dont clost the par_sock */
     iface_ptr->sock = -1;
-
-    _DEBUG("%s\n", "freeing all of the ifaces");
-    free_iface_info(ifaces);
 
     _DEBUG("child.filename: %s\n", fname);
     child_sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -196,6 +195,24 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     childaddr.sin_family = AF_INET;
     childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     childaddr.sin_port = htons(0);
+
+    iface_ptr = get_matching_iface(ifaces, cliaddr.sin_addr.s_addr);
+    if(iface_ptr == NULL) {
+        _DEBUG("%s\n", "could not find the correct iface");
+        childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    } else {
+        int optval = 1;
+        _DEBUG("%s\n", "found local iface, using SO_DONTROUTE");
+        err = setsockopt(child_sock, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(int));
+
+        if(err < 0) {
+            perror("child.setsockopt()");
+            return -1;
+        }
+        childaddr.sin_addr.s_addr = iface_ptr->ip;
+        _DEBUG("will bind to: %s\n", inet_ntoa(childaddr.sin_addr));
+    }
 
     /*TODO: pass in ip i want*/
     err = bind(child_sock, (struct sockaddr *) &childaddr, sizeof(childaddr));

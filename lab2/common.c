@@ -303,12 +303,19 @@ struct iface_info* get_matching_iface(struct iface_info* info, in_addr_t ip) {
     struct iface_info* long_ptr = NULL;
     in_addr_t long_mask = 0;
 
+    _DEBUG("given: %X\n", ip);
+
     for(ptr = info; ptr != NULL; ptr = ptr->next) {
+        _DEBUG("lookign at ip: %X\n", ptr->ip);
+        _DEBUG("lookign at mask: %X\n", ptr->mask);
+        _DEBUG("lookign at subnet: %X\n", ptr->subnet);
         if(((ptr->mask & ip) == ptr->subnet) && (long_mask < ptr->mask)) {
+            _DEBUG("%s\n", "this is the longest matching so far");
             long_ptr = ptr;
         }
     }
 
+    _DEBUG("LONGEST MASK: %X\n", long_ptr->mask);
     return long_ptr;
 }
 
