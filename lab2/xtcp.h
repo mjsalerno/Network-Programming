@@ -45,6 +45,7 @@ struct xtcphdr {
 struct win_node {
     int datalen;
     struct xtcphdr* pkt;
+    struct win_node* next;
 };
 
 struct window {
@@ -98,5 +99,8 @@ void clisend_lossy(int sockfd, void *pkt, size_t datalen);
 int cli_ack(int sockfd, char **wnd);
 int cli_dup_ack(int sockfd);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
+
+void free_window(struct win_node* head);
+struct win_node* alloc_window(size_t n);
 
 #endif /*XTCP_H*/
