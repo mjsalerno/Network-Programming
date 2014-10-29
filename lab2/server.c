@@ -355,6 +355,11 @@ void proc_exit(int i) {
 */
 struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t port) {
 
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGALRM);
+    sigprocmask(SIG_BLOCK, &sigset, NULL);
+
     /*first client*/
     if(*cl == NULL) {
         _DEBUG("%s\n", "add_client: first client in the list");
@@ -367,6 +372,7 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
         (*cl)->ip = ip;
         (*cl)->next = NULL;
         (*cl)->pid = -1;
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
         return *cl;
     } else {
         /*not the first client*/
@@ -392,9 +398,9 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
         p->next = NULL;
         p->pid = -1;
         prev->next = p;
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
         return p;
     }
-
 }
 
 void free_clients(struct client_list* head) {
