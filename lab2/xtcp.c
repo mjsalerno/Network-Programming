@@ -49,6 +49,52 @@ void *alloc_pkt(uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
     memcpy(( (char*)(pkt) + DATA_OFFSET), data, datalen);
 }
 
+struct win_node* alloc_window(size_t n) {
+    struct win_node* head;
+    struct win_node* ptr;
+
+    if(n < 1) {
+        _DEBUG("passed invalid size: %d\n", (int)n);
+        return NULL;
+    }
+
+    head = malloc(sizeof(struct win_node));
+    if(head == NULL) {
+        perror("alloc_window(): malloc failed");
+        exit(EXIT_FAILURE);
+    }
+    head->datalen = -1;
+    head->pkt = NULL;
+    ptr = head->next;
+
+    for(n -= 1; n > 0; --n) {
+        ptr = malloc(sizeof(struct win_node));
+        if(ptr == NULL) {
+            perror("alloc_window(): malloc failed");
+            exit(EXIT_FAILURE);
+        }
+        ptr->datalen = -1;
+        ptr->pkt = NULL;
+        ptr = ptr->next;
+    }
+
+    ptr->next = head;
+    return head;
+}
+
+void free_window(struct win_node* head) {
+    struct win_node* ptr1;
+    struct win_node* ptr2;
+    ptr2 = head->next;
+    ptr1 = ptr2->next;
+
+    for(; ptr2 != head; ptr2 = ptr1, ptr1=ptr1->next) {
+        free(ptr2);
+    }
+
+    free(head);
+}
+
 void ntohpkt(struct xtcphdr *hdr) {
     hdr->seq = ntohl(hdr->seq);
     hdr->ack_seq = ntohl(hdr->ack_seq);
