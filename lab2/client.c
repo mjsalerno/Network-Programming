@@ -362,7 +362,6 @@ void *consumer_main(void *wnd) {
 
         usecs = 1000 * (unsigned int) round(msecs_d);
         _DEBUG("CONSUMER: sleeping for:  %fms\n", msecs_d);
-        _DEBUG("CONSUMER: we rounded to: %uus\n", usecs);
 
         usleep(usecs);
         err = pthread_mutex_lock(&wnd_mutex);

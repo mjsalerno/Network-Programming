@@ -24,6 +24,7 @@ int main(int argc, const char **argv) {
     ssize_t n;
     struct client_list* newCli;
     struct iface_info* ptr;
+    sigset_t sigset;
 
     struct sockaddr_in cliaddr;/*, servaddr, p_serveraddr, p_cliaddr;*/
     socklen_t len;
@@ -120,6 +121,11 @@ int main(int argc, const char **argv) {
             }
         } while(errno == EINTR && n < 0);
 
+        /* block SIGCHLD */
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGCHLD);
+        sigprocmask(SIG_BLOCK, &sigset, NULL);
+
         newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
         if(newCli == NULL) {
             _DEBUG("%s\n", "Server: dup clinet, not doing anything");
@@ -153,7 +159,9 @@ int main(int argc, const char **argv) {
             exit(EXIT_FAILURE);
         }
         _DEBUG("pid: %d\n", pid);
-        newCli->pid = pid;
+
+        /* unblock SIGCHLD */
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
 
         /*in child*/
         if (pid == 0) {
@@ -354,25 +362,19 @@ void proc_exit(int i) {
 * returns the pointer to the struct added
 */
 struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t port) {
-
-    sigset_t sigset;
-    sigemptyset(&sigset);
-    sigaddset(&sigset, SIGALRM);
-    sigprocmask(SIG_BLOCK, &sigset, NULL);
-
     /*first client*/
     if(*cl == NULL) {
         _DEBUG("%s\n", "add_client: first client in the list");
         *cl = malloc(sizeof(struct client_list));
         if(*cl == NULL) {
             perror("add_client.malloc()");
+            exit(EXIT_FAILURE);
         }
 
         (*cl)->port = port;
         (*cl)->ip = ip;
         (*cl)->next = NULL;
         (*cl)->pid = -1;
-        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
         return *cl;
     } else {
         /*not the first client*/
@@ -393,12 +395,15 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
 
         _DEBUG("%s\n", "add_client: adding client to the list");
         p = malloc(sizeof(struct client_list));
+        if(p == NULL) {
+            perror("add_client.malloc()");
+            exit(EXIT_FAILURE);
+        }
         p->port = port;
         p->ip = ip;
         p->next = NULL;
         p->pid = -1;
         prev->next = p;
-        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
         return p;
     }
 }
