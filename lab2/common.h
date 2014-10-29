@@ -33,6 +33,10 @@
 # define MAX(x, y) (((x)>(y))?(x):(y))
 #endif
 
+#ifndef MIN
+# define MIN(x, y) (((x)<(y))?(x):(y))
+#endif
+
 /**
 * sockfd
 * IP address bound to the socket

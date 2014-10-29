@@ -499,7 +499,7 @@ redo_hs1:
 
     _DEBUG("select(): %d\n", err);
 
-    while(!FD_ISSET(child_sock, &rset) && count < 4) {
+    while(!FD_ISSET(child_sock, &rset) && count < 12) {
         count++;
         _DEBUG("%s\n", "hs2 time out, re-sending over both sockets ...");
 
@@ -524,8 +524,8 @@ redo_hs1:
         _DEBUG("%s\n", "waiting to get reply on new child port ...");
 
 redo_hs2:
-        timer.tv_sec = 2;
-        timer.tv_usec = 0;
+        timer.tv_sec = 0;
+        timer.tv_usec = 50000 * MIN(count, 6);
         FD_ZERO(&rset);
         FD_SET(child_sock, &rset);
         err = select(child_sock + 1, &rset, NULL, NULL, &timer);
