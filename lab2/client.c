@@ -6,7 +6,7 @@ extern uint16_t advwin;
 
 static char** wnd; /* will point to malloc()'d array from init_wnd()*/
 
-extern double pkt_loss_thresh; /* packet loss percentage */
+double pkt_loss_thresh; /* packet loss percentage */
 
 static double u; /* (!!in ms!!) mean of the exponential distribution func */
 

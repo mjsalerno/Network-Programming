@@ -32,7 +32,7 @@ uint32_t ack_seq;       /* ACK number */
 
 uint16_t advwin;        /* current advwin */
 
-double pkt_loss_thresh; /* packet loss percentage */
+extern double pkt_loss_thresh; /* packet loss percentage */
 
 struct xtcphdr {
     uint32_t seq;
@@ -49,25 +49,29 @@ struct win_node {
 
 struct window {
     int maxsize;
+    uint32_t servlastackrecv;
+    uint32_t servlastpktsent;
     int cwin;
     int ssthresh;
     int dupacks;
+    uint32_t clitopaccptpkt;
+    uint32_t clilastpktrecv;
     struct win_node *base;
 };
+
+void ackrecvd(struct window*, struct xtcphdr*);
 
 
 
 void print_hdr(struct xtcphdr *hdr);
-/*
-Example:
-void *packet = malloc(sizeof(struct xtcphdr) + datalen)
-make_pkt(packet, .....)
- */
-void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn,
+        uint16_t flags, uint16_t adv_win, void *data, size_t datalen);
+
 void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new, uint16_t* cli_wnd);
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen,
+        char **wnd, int is_new, uint16_t* cli_wnd);
 
 
 /**
@@ -90,7 +94,7 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, 
 */
 int clirecv(int sockfd, char **wnd);
 
-void send_lossy(int sockfd, void *pkt, size_t datalen);
+void clisend_lossy(int sockfd, void *pkt, size_t datalen);
 int cli_ack(int sockfd, char **wnd);
 int cli_dup_ack(int sockfd);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);

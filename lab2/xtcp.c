@@ -29,24 +29,25 @@ void print_hdr(struct xtcphdr *hdr) {
     printf(", advwin:%u }>>>\n", hdr->advwin);
 }
 
-void *alloc_pkt(uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
+/**
+* malloc's a pkt for you
+*/
+void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_win, void *data, size_t datalen) {
     struct xtcphdr *pkt;
-    if(data == NULL || datalen == 0){
-        return;
+    if(data == NULL || datalen <= 0){
+        datalen = 0;
     }
     pkt= malloc(DATA_OFFSET + datalen);
     if(pkt == NULL){
-        fprintf(stderr, "ERROR: make_pkt(): void *hdr == NULL\n");
-        return;
+        perror("ERROR: alloc_pkt().malloc()");
+        exit(EXIT_FAILURE);
     }
-    pkt->seq = seq;
+    pkt->seq = seqn;
     pkt->flags = flags;
-    pkt->ack_seq = ack_seq;
-    pkt->advwin = advwin;
-    if(data == NULL || datalen == 0){
-        return;
-    }
+    pkt->ack_seq = ack_seqn;
+    pkt->advwin = adv_win;
     memcpy(( (char*)(pkt) + DATA_OFFSET), data, datalen);
+    return pkt;
 }
 
 void ntohpkt(struct xtcphdr *hdr) {
@@ -61,6 +62,21 @@ void htonpkt(struct xtcphdr *hdr) {
     hdr->ack_seq = htonl(hdr->ack_seq);
     hdr->flags = htons(hdr->flags);
     hdr->advwin = htons(hdr->advwin);
+}
+
+/**
+*
+*/
+void ackrecvd(struct window *window, struct xtcphdr *pkt){
+    if(window->cwin < window->ssthresh) {
+        /* slow start */
+        window->cwin = window->cwin + 1;
+    }
+    else{
+        /* congestion cntrl */
+        /* count num acks, if acks == cwin then cwin++ */
+        window->cwin = window->cwin;
+    }
 }
 
 
@@ -151,13 +167,13 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
 
-    send_lossy(sockfd, pkt, datalen);
+    clisend_lossy(sockfd, pkt, datalen);
 
     free(pkt);
     return 0;
 }
 
-void send_lossy(int sockfd, void *pkt, size_t datalen){
+void clisend_lossy(int sockfd, void *pkt, size_t datalen){
     ssize_t err;
     /* simulate packet loss on sends */
     if(drand48() >= pkt_loss_thresh) {
