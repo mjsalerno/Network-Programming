@@ -174,6 +174,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     int err;
     int child_sock;
     socklen_t len;
+
     char** wnd;  /* the actual window */
 
     _DEBUG("%s\n", "In child");
@@ -184,10 +185,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         return -1;
     }
 
+    /* dont clost the par_sock */
     iface_ptr->sock = -1;
-
-    _DEBUG("%s\n", "freeing all of the ifaces");
-    free_iface_info(ifaces);
 
     _DEBUG("child.filename: %s\n", fname);
     child_sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -196,6 +195,24 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     childaddr.sin_family = AF_INET;
     childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     childaddr.sin_port = htons(0);
+
+    iface_ptr = get_matching_iface(ifaces, cliaddr.sin_addr.s_addr);
+    if(iface_ptr == NULL) {
+        _DEBUG("%s\n", "could not find the correct iface");
+        childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    } else {
+        int optval = 1;
+        _DEBUG("%s\n", "found local iface, using SO_DONTROUTE");
+        err = setsockopt(child_sock, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(int));
+
+        if(err < 0) {
+            perror("child.setsockopt()");
+            return -1;
+        }
+        childaddr.sin_addr.s_addr = iface_ptr->ip;
+        _DEBUG("will bind to: %s\n", inet_ntoa(childaddr.sin_addr));
+    }
 
     /*TODO: pass in ip i want*/
     err = bind(child_sock, (struct sockaddr *) &childaddr, sizeof(childaddr));
@@ -338,6 +355,11 @@ void proc_exit(int i) {
 */
 struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t port) {
 
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGALRM);
+    sigprocmask(SIG_BLOCK, &sigset, NULL);
+
     /*first client*/
     if(*cl == NULL) {
         _DEBUG("%s\n", "add_client: first client in the list");
@@ -350,6 +372,7 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
         (*cl)->ip = ip;
         (*cl)->next = NULL;
         (*cl)->pid = -1;
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
         return *cl;
     } else {
         /*not the first client*/
@@ -375,9 +398,9 @@ struct client_list* add_client(struct client_list** cl, in_addr_t ip, uint16_t p
         p->next = NULL;
         p->pid = -1;
         prev->next = p;
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
         return p;
     }
-
 }
 
 void free_clients(struct client_list* head) {
