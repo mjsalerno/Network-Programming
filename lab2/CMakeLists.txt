@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(lab2)
+find_package (Threads)
 
 set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros")
 
@@ -42,4 +43,10 @@ add_executable(client
 	$<TARGET_OBJECTS:xtcplib>
 	$<TARGET_OBJECTS:commonlib>
 	$<TARGET_OBJECTS:iffylib>)
+
+target_link_libraries(client ${CMAKE_THREAD_LIBS_INIT})
+if(UNIX)
+  target_link_libraries(client m)
+endif(UNIX)
+
 
