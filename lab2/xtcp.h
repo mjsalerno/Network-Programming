@@ -42,6 +42,21 @@ struct xtcphdr {
     /*uint16_t datalen;*/
 };
 
+struct win_node {
+    int datalen;
+    struct xtcphdr* pkt;
+};
+
+struct window {
+    int maxsize;
+    int cwin;
+    int ssthresh;
+    int dupacks;
+    struct win_node *base;
+};
+
+
+
 void print_hdr(struct xtcphdr *hdr);
 /*
 Example:
@@ -53,7 +68,6 @@ void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
 
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new, uint16_t* cli_wnd);
-int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 int print_wnd_check(const char **wnd);
 int can_add_to_wnd(uint32_t seq);
@@ -87,7 +101,9 @@ int is_wnd_empty();
 * NULL terminates the data sent.
 */
 int clirecv(int sockfd, char **wnd);
+void send_lossy(int sockfd, void *pkt, size_t datalen);
 int cli_ack(int sockfd, char **wnd);
 int cli_dup_ack(int sockfd);
+int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 #endif /*XTCP_H*/

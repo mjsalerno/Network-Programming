@@ -375,11 +375,10 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, 
 *
 */
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
-    ssize_t err;
     void *pkt = malloc(DATA_OFFSET + datalen);
     if(pkt == NULL){
         perror("clisend().malloc()");
-        return -1;
+        exit(EXIT_FAILURE);
     }
 
     make_pkt(pkt, flags, advwin, data, datalen);
@@ -387,24 +386,27 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
 
+    send_lossy(sockfd, pkt, datalen);
+
+    free(pkt);
+    return 0;
+}
+
+void send_lossy(int sockfd, void *pkt, size_t datalen){
+    ssize_t err;
     /* simulate packet loss on sends */
     if(drand48() >= pkt_loss_thresh) {
         err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
         if (err < 0) {
-            perror("xtcp.clisend()");
-            free(pkt);
-            return -1;
+            perror("xtcp.send_lossy()");
+            exit(EXIT_FAILURE);
         }
     }
     else {
-        /* fixme: remove prints? */
-        printf("DROPPED PKT: ");
+        printf("DROPPED SEND'ing PKT: ");
         ntohpkt((struct xtcphdr*)pkt);
         print_hdr((struct xtcphdr *) pkt);
     }
-
-    free(pkt);
-    return 0;
 }
 
 
@@ -471,7 +473,7 @@ int clirecv(int sockfd, char **wnd) {
             }else{
                 /* drop the pkt */
                 /* fixme: remove prints? */
-                printf("DROPPED PKT: ");
+                printf("DROPPED RECV'ing PKT: ");
                 print_hdr((struct xtcphdr *) pkt);
                 continue;
             }
