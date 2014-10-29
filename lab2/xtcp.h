@@ -101,6 +101,7 @@ int cli_dup_ack(int sockfd);
 int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 void free_window(struct win_node* head);
-struct win_node* alloc_window(size_t n);
+struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
+        uint32_t cli_top_accept_seqn, uint32_t cli_last_seqn_recvd);
 
 #endif /*XTCP_H*/

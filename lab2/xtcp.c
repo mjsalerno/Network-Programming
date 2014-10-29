@@ -50,7 +50,7 @@ void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_w
     return pkt;
 }
 
-struct win_node* alloc_window(size_t n) {
+struct win_node* alloc_window_nodes(size_t n) {
     struct win_node* head;
     struct win_node* ptr;
 
@@ -82,6 +82,46 @@ struct win_node* alloc_window(size_t n) {
     ptr->next = head;
     return head;
 }
+
+struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
+        uint32_t cli_top_accept_seqn, uint32_t cli_last_seqn_recvd){
+
+    struct window* w;
+    w = malloc(sizeof(struct window));
+    if(w == NULL){
+        perror("ERROR init_window().malloc()");
+        exit(EXIT_FAILURE);
+    }
+    w->maxsize = maxsize;
+    w->servlastackrecv = srv_last_ack_seq_recvd;
+    w->servlastpktsent = srv_last_seq_sent;
+    /* todo: change to 1 */
+    w->cwin = 65536;
+    w->ssthresh = 65536;
+    w->dupacks = 0;
+    w->clitopaccptpkt = cli_top_accept_seqn;
+    w->clilastpktrecv = cli_last_seqn_recvd;
+    w->base = alloc_window_nodes((size_t)maxsize);
+    if(w->base == NULL){
+        perror("init_window().alloc_window()");
+        exit(EXIT_FAILURE);
+    }
+    return w;
+}
+
+
+/**
+* srv_send_recv(){
+*
+*
+*   send until full
+*
+*   recv with BLOCK
+*   recv with MSG_DONTWAIT until you get EWOULDBLOCK
+*       check 
+*
+*
+*/
 
 void free_window(struct win_node* head) {
     struct win_node* ptr1;
@@ -118,10 +158,13 @@ void ackrecvd(struct window *window, struct xtcphdr *pkt){
         /* slow start */
         window->cwin = window->cwin + 1;
     }
-    else{
-        /* congestion cntrl */
-        /* count num acks, if acks == cwin then cwin++ */
-        window->cwin = window->cwin;
+    else {
+        /** todo: congestion cntrl
+        *  count numacks
+        *  if numacks == cwin
+        *  then cwin++, num acks = 0
+        **/
+        window->cwin = window->cwin; /*    +1/cwin     */
     }
 }
 
