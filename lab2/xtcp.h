@@ -69,18 +69,6 @@ void htonpkt(struct xtcphdr *hdr);
 
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new, uint16_t* cli_wnd);
 
-int print_wnd_check(const char **wnd);
-int can_add_to_wnd(uint32_t seq);
-int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
-char* remove_from_wnd(const char** wnd);
-char* get_from_wnd(uint32_t index, const char** wnd);
-void free_wnd(char** wnd);
-char** init_wnd(uint32_t first_seq_num);
-int dst_from_base_wnd(uint32_t n);
-void print_wnd(const char** wnd);
-int ge_base(uint32_t ack_seq_1);
-int is_wnd_full();
-int is_wnd_empty();
 
 /**
 * clirecv -- for the client/receiver/acker
@@ -101,6 +89,7 @@ int is_wnd_empty();
 * NULL terminates the data sent.
 */
 int clirecv(int sockfd, char **wnd);
+
 void send_lossy(int sockfd, void *pkt, size_t datalen);
 int cli_ack(int sockfd, char **wnd);
 int cli_dup_ack(int sockfd);
