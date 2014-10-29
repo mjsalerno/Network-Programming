@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include <math.h>
+#include <pthread.h>
 
 #include "debug.h"
 
@@ -14,5 +15,6 @@ Returns -1 on failure with perror() printed
 int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname);
 int validate_hs2(struct xtcphdr* hdr, int len);
 void *consumer_main(void *);
+int init_wnd_mutex(void);
 
 #endif

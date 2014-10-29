@@ -10,6 +10,8 @@ extern double pkt_loss_thresh; /* packet loss percentage */
 
 static double u; /* (!!in ms!!) mean of the exponential distribution func */
 
+pthread_mutex_t wnd_mutex;
+
 int main(void) {
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
@@ -118,16 +120,22 @@ int main(void) {
     printf("connect()'ed to -- ");
     print_sock_peer(serv_fd, &peer_addr);
 
+    _DEBUG("%s\n", "creating wnd mutex...");
+    err = init_wnd_mutex();
+    if(err < 0) {
+        fprintf(stderr, "ERROR: failed to make wnd mutex due to above error\n");
+        close(serv_fd);
+        exit(EXIT_FAILURE);
+    }
+
     err = handshakes(serv_fd, &serv_addr, fname);
     if(err != 0){
-        /* todo: clean up, close?, free?*/
         close(serv_fd);
         exit(EXIT_FAILURE);
     }
     /* connected to file transfer port */
 
     /* pthread_create consumer thread */
-    /* todo: atttr not NULL */
     _DEBUG("%s\n", "creating pthread for consumer...");
     err = pthread_create(&consumer_tid, NULL, &consumer_main, (void *)wnd);
     if(0 > err){
@@ -173,7 +181,7 @@ int main(void) {
 
     _DEBUG("%s\n", "success! closing serv_fd then exiting...");
     close(serv_fd);
-    return EXIT_SUCCESS;
+    exit(EXIT_SUCCESS);
 }
 
 
@@ -245,7 +253,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
         return -1;
     }
 
-    printf("recv'd hs2: ");
+
     print_hdr(hdr);
     ack_seq = hdr->seq + 1; /* we expect their seq + 1 */
 
@@ -304,10 +312,48 @@ int validate_hs2(struct xtcphdr* hdr, int len){
     return 0;
 }
 
+/**
+* init the wnd mutex
+*/
+int init_wnd_mutex(void){
+    int err = 0;
+    pthread_mutexattr_t attr;
+
+    err = pthread_mutexattr_init(&attr);
+    if(err > 0){
+        errno = err;
+        perror("ERROR pthread_mutexattr_init()");
+        return -1;
+    }
+    err = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+    if(err > 0){
+        errno = err;
+        perror("ERROR pthread_mutexattr_settype()");
+        return -1;
+    }
+
+    err = pthread_mutex_init(&wnd_mutex, &attr);
+    if(err > 0){
+        errno = err;
+        perror("ERROR pthread_mutex_init()");
+        return -1;
+    }
+
+    err = pthread_mutexattr_destroy(&attr);
+    if(err > 0){
+        errno = err;
+        perror("ERROR pthread_mutexattr_destroy()");
+        return -1;
+    }
+
+    return 0;
+}
+
 void *consumer_main(void *wnd) {
     double msecs_d;
     unsigned int usecs;
     int fin_found = 5;
+    int err;
     srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
 
@@ -319,10 +365,29 @@ void *consumer_main(void *wnd) {
         _DEBUG("CONSUMER: we rounded to: %uus\n", usecs);
 
         usleep(usecs);
+        err = pthread_mutex_lock(&wnd_mutex);
+        if(err > 0){
+            errno = err;
+            perror("CONSUMER: ERROR pthread_mutex_destroy()");
+            exit(EXIT_FAILURE);
+        }
 
         /* todo: read from wnd */
+
+        pthread_mutex_unlock(&wnd_mutex);
+        if(err > 0){
+            errno = err;
+            perror("CONSUMER: ERROR pthread_mutex_destroy()");
+            exit(EXIT_FAILURE);
+        }
     }
 
+    err = pthread_mutex_destroy(&wnd_mutex);
+    if(err > 0){
+        errno = err;
+        perror("CONSUMER: ERROR pthread_mutex_destroy()");
+        exit(EXIT_FAILURE);
+    }
     /* todo: change */
     return wnd;
 }

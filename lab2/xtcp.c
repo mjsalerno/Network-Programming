@@ -11,7 +11,7 @@ static int wnd_count = 0; /* number of pkts currently in the window */
 void print_hdr(struct xtcphdr *hdr) {
     int is_ack = 0;
     int any_flags = 0;
-    printf("|hdr| seq:%u", hdr->seq);
+    printf("|hdr| <<<{ seq:%u", hdr->seq);
     printf(", flags:");
     if((hdr->flags & FIN) == FIN){ printf("F"); any_flags = 1; }
     if((hdr->flags & SYN) == SYN){ printf("S"); any_flags = 1; }
@@ -26,7 +26,7 @@ void print_hdr(struct xtcphdr *hdr) {
     else{
         printf(", dlen:%u", hdr->datalen);
     }*/
-    printf(", advwin:%u\n", hdr->advwin);
+    printf(", advwin:%u }>>>\n", hdr->advwin);
 }
 
 void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen) {
