@@ -121,6 +121,15 @@ int main(int argc, const char **argv) {
             }
         } while(errno == EINTR && n < 0);
 
+        ntohpkt((struct xtcphdr*)pkt);
+        ack_seq = ((struct xtcphdr*)pkt)->seq;
+
+        pkt[n] = 0;
+        if(((struct xtcphdr*)pkt)->flags != SYN) {
+            printf("server.hs1(): client did not send SYN: %hu\n", ((struct xtcphdr*)pkt)->flags);
+            continue;
+        }
+
         /* block SIGCHLD */
         sigemptyset(&sigset);
         sigaddset(&sigset, SIGCHLD);
@@ -135,14 +144,7 @@ int main(int argc, const char **argv) {
             print_hdr((struct xtcphdr *) pkt);
             continue;
         }
-        ntohpkt((struct xtcphdr*)pkt);
-        ack_seq = ((struct xtcphdr*)pkt)->seq;
 
-        pkt[n] = 0;
-        if(((struct xtcphdr*)pkt)->flags != SYN) {
-            printf("server.hs1(): client did not send SYN: %hu\n", ((struct xtcphdr*)pkt)->flags);
-            continue;
-        }
 
         /* pick the smallest advwin */
         advwin = ((struct xtcphdr*)pkt)->advwin < advwin ? ((struct xtcphdr*)pkt)->advwin : advwin;
@@ -160,9 +162,6 @@ int main(int argc, const char **argv) {
         }
         _DEBUG("pid: %d\n", pid);
 
-        /* unblock SIGCHLD */
-        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
-
         /*in child*/
         if (pid == 0) {
             child(pkt + DATA_OFFSET, cur_sock, cliaddr);
@@ -170,6 +169,10 @@ int main(int argc, const char **argv) {
             fprintf(stderr, "A child is trying to use the connection select\n");
             assert(0);
         }
+
+        newCli->pid = pid;
+        /* unblock SIGCHLD */
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
     }
 
 

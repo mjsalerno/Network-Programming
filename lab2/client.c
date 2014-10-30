@@ -193,6 +193,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     int maxfpd1 = 0;
     ssize_t n, err;
     struct timeval timer;
+    int attemp = 0;
 
     /* init seq/ack_seq */
     seq = (uint32_t)lrand48();
@@ -201,6 +202,11 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     /* todo: timeout  on oldest packet */
 
     sendagain: /* jump here if server doesn't respond */
+    if(attemp >= 3) {
+        fprintf(stderr, "Too many retries......Exiting....Goodbye\n");
+        return -1;
+    }
+    attemp++;
     printf("try send hs1\n");
     err = clisend(serv_fd, SYN, fname, strlen(fname));
     if(err < 0){
@@ -216,10 +222,11 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     for(EVER) {
         FD_ZERO(&rset);
         FD_SET(serv_fd, &rset);
-        timer.tv_sec = TIME_OUT;
+        timer.tv_sec = TIME_OUT * attemp;
         timer.tv_usec = 0;
         maxfpd1 = serv_fd + 1;
 
+        printf("will wait %lusecs to recv hs2\n", timer.tv_sec);
         err = select(maxfpd1, &rset, NULL, NULL, &timer);
         if(err < 0) {
             /* EINTR can't occur yet */
