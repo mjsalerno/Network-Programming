@@ -29,7 +29,7 @@ struct rtt_info {
 void	    rtt_debug  (struct rtt_info *          );
 void	    rtt_init   (struct rtt_info *          );
 void	    rtt_newpack(struct rtt_info *          );
-suseconds_t rtt_start  (struct rtt_info *          );
+void        rtt_start(struct rtt_info *ptr, struct itimerval* itv);
 void	    rtt_stop   (struct rtt_info *, suseconds_t);
 int		    rtt_timeout(struct rtt_info *          );
 suseconds_t rtt_ts     (struct rtt_info *          );

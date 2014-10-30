@@ -243,7 +243,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
             _DEBUG("%s\n", "recv'd a packet, should we drop it?");
             if(DROP_PKT()) {
                 /* we dropped it, note it, and continue */
-                printf("DROPPED RECV'ing PKT: ");
+                _NOTE("%s", "DROPPED RECV'ing PKT: ");
                 ntohpkt((struct xtcphdr*)pktbuf);
                 print_hdr((struct xtcphdr *)pktbuf);
                 continue;
@@ -293,7 +293,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
 
     sendpkt = alloc_pkt(seq, ack_seq, ACK, advwin, NULL, 0);
     printf("try send hs3: \n");
-    /* don't use cli_ack() here */
+
     /* todo: put hs2 into window */
     clisend(serv_fd, sendpkt, 0);
 
@@ -402,7 +402,7 @@ int clirecv(int sockfd, struct window* w) {
             /* not a FIN: try to drop it */
             if(DROP_PKT()) {
                 /* drop the pkt */
-                printf("DROPPED RECV'ing PKT: ");
+                _NOTE("%s", "DROPPED RECV'ing PKT: ");
                 print_hdr((struct xtcphdr *) pkt);
                 continue;
             } else {
@@ -436,8 +436,6 @@ int clirecv(int sockfd, struct window* w) {
 void clisend(int sockfd, struct xtcphdr *pkt, size_t datalen) {
     _DEBUG("%s\n", "printing hdr to send");
     print_hdr((struct xtcphdr*)pkt);
-    htonpkt((struct xtcphdr*)pkt);
-
     clisend_lossy(sockfd, pkt, datalen);
 }
 
@@ -490,10 +488,12 @@ void *consumer_main(void *null) {
         msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
 
         usecs = 1000 * (unsigned int) round(msecs_d);
-        _DEBUG("CONSUMER: sleeping for:  %fms\n", msecs_d);
+
 
         usleep(usecs);
         get_lock(&w_mutex);
+
+        _DEBUG("CONSUMER: slept for:  %fms\n", msecs_d);
 
         /* todo: read from wnd */
         consumer_read();

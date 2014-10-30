@@ -66,8 +66,8 @@ void print_window(struct window *w){
     struct win_node* curr = head;
     int n = -1;
     n++; /* for -pedantic -Wextra */
-    printf("|window| maxwnd: %6d, cwin: %6d, ssthresh: %6d, \n",
-            w->maxsize, w->cwin, w->ssthresh);
+    printf("|window| maxwnd: %5d, cwin: %5d, ssthresh: %5d, base: %p\n",
+            w->maxsize, w->cwin, w->ssthresh, (void*)w->base);
 
     do {
         if(curr->datalen < 0) {
@@ -82,7 +82,7 @@ void print_window(struct window *w){
     #ifdef DEBUG
     printf("DEBUG |window| nodes:\n");
     do {
-        printf("========= node %3d =========\n", n);
+        printf("========= node %3d ========\n", n);
         printf("|Datalen: %15d |\n", curr->datalen);
         printf("|Pkt ptr: %15p |\n", (void *)curr->pkt);
         if(curr->pkt != NULL) {
@@ -90,8 +90,8 @@ void print_window(struct window *w){
         }else{
             printf("|Pkt seq:          (none) |\n");
         }
-        printf("|Next:    %15p |\n", (void *)curr->next);
         printf("|This:    %15p |\n", (void *)curr);
+        printf("|Next:    %15p |\n", (void *)curr->next);
         printf("========= node %3d ========\n", n);
         curr = curr->next;
         n++;
@@ -382,15 +382,17 @@ void fast_retransmit(struct window* w) {
     /* todo: finish me*/
 }
 
-
+/**
+* pkt in HOST order please
+*/
 void clisend_lossy(int sockfd, void *pkt, size_t datalen){
     ssize_t err;
     /* simulate packet loss on sends */
     if(DROP_PKT()) {
-        printf("DROPPED SEND'ing PKT: ");
-        ntohpkt((struct xtcphdr*)pkt);
+        _NOTE("%s", "DROPPED SEND'ing PKT: ");
         print_hdr((struct xtcphdr *) pkt);
     } else {
+        ntohpkt((struct xtcphdr*)pkt);
         err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
         if (err < 0) {
             perror("xtcp.send_lossy()");
@@ -402,13 +404,14 @@ void clisend_lossy(int sockfd, void *pkt, size_t datalen){
 
 /**
 * Give pkt in host order.
+*
+* RETURNS: 0 if
 */
 int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w) {
     struct win_node *base;
     struct win_node *curr;
     uint32_t seqtoadd;
     struct xtcphdr *ackpkt;
-    int n = 0;
     int gaplength = 0;
 
     get_lock(&w_mutex);
@@ -436,63 +439,43 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
 
 
     seqtoadd = pkt->seq;
-    curr = base;
     _DEBUG("Trying to add pkt: %"PRIu32" to window...\n", seqtoadd);
 
-    if(seqtoadd >= (w->maxsize + w->clibaseseq)){
-        /* above my window */
-        _ERROR("%s\n", "trying to add a pkt with seq above my window");
-    }
+    curr = get_node(seqtoadd, w);
+    if(curr != NULL) {
 
-    /* find the win_node to insert */
-    for(; n < w->maxsize; n++) {
-        _DEBUG("looking at win_node #%d\n", n);
-        if(seqtoadd == (n + w->clibaseseq)){
-            _DEBUG("%s", "found win_node to add pkt\n");
-            if(curr->datalen < 0 || curr->pkt != NULL) { /* win_node is occupied */
-                if(seqtoadd != curr->pkt->seq) {
-                    _ERROR("%s\n", "found win_node occupied with different seq!");
-                    print_window(w);
-                    exit(EXIT_FAILURE);
-                } else {
-                    _DEBUG("%s\n", "found win_node already had the seqtoadd");
-                    /* ack this will be a dup ack*/
-                }
-            } else { /* win_node is empty*/
-                /* put the pkt in there */
-                curr->datalen = datalen;
-                curr->pkt = pkt;
-                w->numpkts = w->numpkts + 1;
+        _DEBUG("%s", "found win_node to add pkt\n");
+
+        if (curr->datalen < 0 || curr->pkt != NULL) { /* win_node is occupied */
+            if (seqtoadd != curr->pkt->seq) {
+                _ERROR("%s\n", "found win_node occupied with different seq!");
+                print_window(w);
+                exit(EXIT_FAILURE);
+            } else {
+                _DEBUG("%s\n", "found win_node already had the seqtoadd");
+                /* ack this will become a dup ack*/
             }
-            break;
+        } else { /* win_node is empty*/
+            /* put the pkt in there */
+            curr->datalen = datalen;
+            curr->pkt = pkt;
+            w->numpkts = w->numpkts + 1;
         }
 
-        /* move curr to the next*/
-        curr = curr->next;
-        if(curr == NULL) {
-            _ERROR("win_node #%d is NULL, init your window!\n", n + 1);
-            print_window(w);
-            exit(EXIT_FAILURE);
-        }
-        if(curr == base) {
-            _ERROR("%s\n", "reached the base while trying to add to window! Should be impossible!\n");
-            print_window(w);
-            exit(EXIT_FAILURE);
-        }
-    }
 
-    /* if it filled a gap then try to make a cumulative ACK by looking at the next pkts */
-    if(seqtoadd == w->clilastunacked) {
-        _DEBUG("%s\n","looking if the pkt filled a gap....");
-        curr = curr->next;
-        while (curr != base) {
-            if(curr->pkt == NULL){
-                _DEBUG("win_node #%d was empty, stopping search", n + gaplength + 1);
-                break;
-            }
-            _DEBUG("win_node #%d had pkt! continue search", n + gaplength + 1);
+        /* if it filled a gap then try to make a cumulative ACK by looking at the next pkts */
+        if (seqtoadd == w->clilastunacked) {
+            _DEBUG("%s\n", "looking if the pkt filled a gap....");
             curr = curr->next;
-            gaplength++;
+            while (curr != base) {
+                gaplength++;
+                if (curr->pkt == NULL) {
+                    _DEBUG("win_node #%d was empty, stopping search", (w->clibaseseq - seqtoadd) + gaplength);
+                    break;
+                }
+                _DEBUG("win_node #%d had pkt! continue search", (w->clibaseseq - seqtoadd) + gaplength);
+                curr = curr->next;
+            }
         }
     }
 
@@ -500,8 +483,9 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     /* fixme: seq num of acks */
     ackpkt = alloc_pkt(111111, (w->clilastunacked + gaplength), ACK, (uint16_t)(w->maxsize - w->numpkts), NULL, 0);
     unget_lock(&w_mutex);
-    clisend_lossy(sockfd, ackpkt, sizeof(struct xtcphdr));
 
+    clisend_lossy(sockfd, ackpkt, sizeof(struct xtcphdr));
+    free(ackpkt);
     return 0;
 }
 

@@ -79,6 +79,7 @@ void print_window(struct window *windo);
 void srv_send_base(int sockfd, struct window *w);
 int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w);
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt);
+struct win_node* get_node(uint32_t seqtoget, struct window *w);
 void get_lock(pthread_mutex_t* lock);
 void unget_lock(pthread_mutex_t* lock);
 

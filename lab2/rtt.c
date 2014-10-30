@@ -11,7 +11,7 @@ int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
 
 /*todo: both gettimeofday and setitimer operate on time_t (s) and suseconds_t (us) */
 
-static uint32_t rtt_minmax(uint32_t rto) {
+static suseconds_t rtt_minmax(suseconds_t rto) {
     if (rto < RTT_RXTMIN)
         rto = RTT_RXTMIN;
     else if (rto > RTT_RXTMAX)
@@ -63,8 +63,12 @@ void rtt_newpack(struct rtt_info *ptr) {
     ptr->rtt_nrexmt = 0;
 }
 
-suseconds_t rtt_start(struct rtt_info *ptr) {
-    return(ptr->rtt_rto + 500000);
+void rtt_start(struct rtt_info *ptr, struct itimerval* itv) {
+    suseconds_t  startrto = rtt_minmax((ptr->rtt_rto + 500000));
+    itv->it_value.tv_sec = startrto >> 20; /* 2^20 usecs is almost 1 sec */
+    itv->it_value.tv_usec = startrto - 1000000;
+    itv->it_interval.tv_sec = 0;
+    itv->it_interval.tv_usec =0;
     /* DONT DO:
      * alarm(rtt_start(&foo))
      *
