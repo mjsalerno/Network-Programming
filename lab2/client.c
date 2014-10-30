@@ -18,7 +18,6 @@ int main(void) {
     char ip4_str[INET_ADDRSTRLEN];
     /* char buf[BUFF_SIZE + 1]; */
     /* config/xtcp vars */
-    uint16_t orig_win_size;
     int seed;
 
     pthread_t consumer_tid;
@@ -67,9 +66,6 @@ int main(void) {
         "client.in:3: error getting transfer file name");
     /* 4. fill in file to transfer */
     advwin = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
-    orig_win_size = advwin;
-    orig_win_size++;
-    orig_win_size--;
 
     /* 5. fill in seed */
     seed = int_from_config(file, "client.in:5: error getting seed");
@@ -86,7 +82,7 @@ int main(void) {
 
     _DEBUG("config file args below:\nipv4:%s \nport:%hu \nfname:%s \n"
             "winsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
-        ip4_str, knownport, fname, orig_win_size, seed, pkt_loss_thresh, u);
+        ip4_str, knownport, fname, advwin, seed, pkt_loss_thresh, u);
 
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -135,7 +131,7 @@ int main(void) {
 
     /* pthread_create consumer thread */
     _DEBUG("%s\n", "creating pthread for consumer...");
-    err = pthread_create(&consumer_tid, NULL, &consumer_main, (void *)wnd);
+    err = pthread_create(&consumer_tid, NULL, &consumer_main, NULL);
     if(0 > err){
         errno = (int)err;
         perror("ERROR: consumer pthread_create()");
@@ -174,17 +170,21 @@ int main(void) {
         close(serv_fd);
         exit(EXIT_FAILURE);
     }
-    /* todo: use consumer_rtn ??*/
+
+    /* todo: use consumer return ?? */
 
     _DEBUG("%s\n", "success! closing serv_fd then exiting...");
     close(serv_fd);
     exit(EXIT_SUCCESS);
 }
 
-
+/**
+* -1 if timedout, 0 if connected.
+*/
 int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     char pktbuf[MAX_PKT_SIZE];
     struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
+    struct xtcphdr *sendpkt;
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
@@ -196,16 +196,17 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     seq = (uint32_t)lrand48();
     ack_seq = 0;
 
-    /* todo: timeout  on oldest packet */
+    sendpkt = alloc_pkt(seq, ack_seq, SYN, advwin, fname, strlen(fname));
 
     sendagain: /* jump here if server doesn't respond */
     if(attemp >= 3) {
         fprintf(stderr, "Too many retries......Exiting....Goodbye\n");
+        free(sendpkt);
         return -1;
     }
     attemp++;
     printf("try send hs1\n");
-    clisend(serv_fd, seq, ack_seq, advwin, SYN, fname, strlen(fname));
+    clisend(serv_fd, sendpkt, strlen(fname));
     /* don't increment seq until we know this sent */
 
     _DEBUG("%s\n", "waiting for hs2...");
@@ -223,19 +224,32 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
         err = select(maxfpd1, &rset, NULL, NULL, &timer);
         if(err < 0) {
             /* EINTR can't occur yet */
-            perror("hs1.select()");
-            return -1;
+            perror("handshakes().select()");
+            exit(EXIT_FAILURE);
         }
         /* check if the serv_fd is set */
         if(FD_ISSET(serv_fd, &rset)) {
             _DEBUG("%s\n", "recv()'ing something");
             n = recv(serv_fd, pktbuf, sizeof(pktbuf), 0);
             if (n < 0) {
-                perror("recv()");
-                return -1;
+                perror("handshakes().recv()");
+                exit(EXIT_FAILURE);
             }
-            /* we recv()'ed something so break from select */
-            break;
+            /* we recv()'ed so test if we should keep it */
+            _DEBUG("%s\n", "recv'd a packet, should we drop it?");
+            if(drand48() >= pkt_loss_thresh) {
+                /* we recv()'ed something so break from select */
+                _DEBUG("%s\n", "we kept it.");
+                break;
+            }
+            else {
+                /* we dropped it, note, and continue */
+                printf("DROPPED RECV'ing PKT: ");
+                ntohpkt((struct xtcphdr*)pktbuf);
+                print_hdr((struct xtcphdr *)pktbuf);
+                continue;
+            }
+
         }
         else { /* so the select timed out */
             _DEBUG("%s\n", "timeout() while waiting for hs2, resending hs1");
@@ -243,6 +257,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
             goto sendagain;
         }
     }
+    free(sendpkt);
     /* the server responded so now inc seq */
     ++seq;
     /* validate the something was a SYN-ACK */
@@ -263,7 +278,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
     if (err < 0) {
         perror("re connect()");
-        return -1;
+        exit(EXIT_FAILURE);
     }
     printf("re-connect()'ed to -- ");
     print_sock_peer(serv_fd, serv_addr);
@@ -272,14 +287,13 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     /* init the window and the wnd_base_seq */
     w = init_window(advwin, 0, 0, ack_seq-1, ack_seq-1+advwin);
 
-    /* todo: back by ARQ */
+    sendpkt = alloc_pkt(seq, ack_seq, ACK, advwin, NULL, 0);
     printf("try send hs3: \n");
     /* don't use cli_ack() here */
-    err = clisend(serv_fd, ACK, NULL, 0);
-    if(err < 0){
-        return -1;
-    }
+    /* todo: put hs2 into window */
+    clisend(serv_fd, sendpkt, 0);
 
+    free(sendpkt);
     return 0;
 
 }
@@ -303,6 +317,115 @@ int validate_hs2(struct xtcphdr* hdr, int len){
         return -1;
     }
     return 0;
+}
+
+/**
+* clirecv -- for the client/receiver
+* Returns: >0 bytes recv'd
+*           0 on FIN recv'd
+*          -1 on RST recv'd
+* DESC:
+* Blocks until a packet is recv'ed from sockfd. If it's a FIN, note the seq num and recv
+* until you have ACKed that you expect the FIN's seq_num.
+* If it's not a FIN then try to drop it based on pkt_loss_thresh.
+* -if dropped, pretend it never happened and continue to block in select()
+* -if kept:
+*   -if RST then return -1
+*   -else ACK
+* NOTES:
+* Sends ACKs and duplicate ACKS.
+* If a dup_ack is sent go back to block in select().
+* NULL terminates the data sent.
+*/
+int clirecv(int sockfd, struct window* w) {
+    ssize_t bytes = 0;
+    int err;
+    fd_set rset;
+    char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
+    if(pkt == NULL){
+        perror("clirecv().malloc()");
+        exit(EXIT_FAILURE);
+    }
+    for(EVER) {
+        continue_with_select:
+        /* todo: remove this print? */
+        _DEBUG("%s\n", "select() for ever loop");
+        print_window(w);
+        FD_ZERO(&rset);
+        FD_SET(sockfd, &rset);
+
+        err = select(sockfd + 1, &rset, NULL, NULL, NULL);
+        if(err < 0){
+            if(err == EINTR){
+                continue;
+            }
+            perror("clirecv().select()");
+            free(pkt);
+            exit(EXIT_FAILURE);
+        }
+        if(FD_ISSET(sockfd, &rset)){
+            /* recv the server's datagram */
+            bytes = recv(sockfd, pkt, MAX_PKT_SIZE, 0);
+            if(bytes < 0){
+                perror("clirecv().recv()");
+                free(pkt);
+                exit(EXIT_FAILURE);
+            }else if(bytes < 12){
+                _DEBUG("clirecv().recv() not long enough to be pkt: %dbytes\n", (int)bytes);
+                continue;
+            }
+            ntohpkt((struct xtcphdr *)pkt); /* host order please */
+            pkt[bytes] = 0; /* NULL terminate the ASCII text */
+
+            /* if it's a FIN or RST don't try to drop it, we're closing dirty! */
+            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN){
+                _DEBUG("%s\n", "clirecv()'d a FIN packet.");
+                free(pkt);
+                return 0;
+            }
+            if((((struct xtcphdr*)pkt)->flags & RST) == RST){
+                _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
+                free(pkt);
+                return -1;
+            }
+            /* not a FIN: try to drop it */
+            if(drand48() >= pkt_loss_thresh) {
+                /**
+                * keep the pkt:
+                * Pretend like the code after the "break;" is in here.
+                * However, because it's not in here it will use a goto
+                * instead of a continue later.
+                */
+                _DEBUG("keeping pkt with seq: %"PRIu32"\n", ((struct xtcphdr*)pkt)->seq);
+                err = cli_add_send(sockfd, (struct xtcphdr*)pkt, (int)bytes, w);
+                /*fixme: don't break? */
+                break;
+
+            } else {
+                /* drop the pkt */
+                printf("DROPPED RECV'ing PKT: ");
+                print_hdr((struct xtcphdr *) pkt);
+                continue;
+            }
+        }
+        /* end of select for(EVER) */
+    }
+    /* fixme: what is here? */
+    return -1;
+}
+
+/**
+* The client only directly calls this function twice, for the SYN and first ACK.
+* It provides packet loss to the client's sends.
+*
+* pkt is in HOST ORDER please!
+*/
+void clisend(int sockfd, struct xtcphdr *pkt, size_t datalen) {
+    _DEBUG("%s\n", "printing hdr to send");
+    print_hdr((struct xtcphdr*)pkt);
+    htonpkt((struct xtcphdr*)pkt);
+
+    clisend_lossy(sockfd, pkt, datalen);
 }
 
 /**
@@ -342,7 +465,7 @@ int init_wnd_mutex(void){
     return 0;
 }
 
-void *consumer_main(void *wnd) {
+void *consumer_main(void *null) {
     double msecs_d;
     unsigned int usecs;
     int fin_found = 5;
@@ -381,6 +504,6 @@ void *consumer_main(void *wnd) {
         exit(EXIT_FAILURE);
     }
     /* todo: change */
-    return wnd;
+    return null;
 }
 
