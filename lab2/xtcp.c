@@ -241,7 +241,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
     }
 
     if(effectivesize <= 0) {
-        _ERROR("%s\n", "srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
+        _ERROR("srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
         print_window(w);
         exit(EXIT_FAILURE);
     }
@@ -321,12 +321,12 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 
     if(window->cwin < window->ssthresh) {
         /* slow start */
-        _DEBUG("we are in slow start cwin: %d, ssthresh: %d");
+        _DEBUG("we are in slow start cwin: %d, ssthresh: %d", window->cwin, window->ssthresh);
         window->cwin = window->cwin + 1;
         count = remove_aked_pkts(window, pkt);
         _DEBUG("number of ACKs: %d\n", count);
         window->cwin += count;
-        _DEBUG("new cwin: %d\n", cwin);
+        _DEBUG("new cwin: %d\n", window->cwin);
     } else {
         /** todo: congestion cntrl
         *  count numacks
@@ -351,9 +351,9 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
 
     /* dup ack */
     if(window->servlastackrecv == pkt->ack_seq){
-        _NOTE("%s\n", "got dup ack: %" PRIu32 "\n", pkt->ack_seq);
+        _NOTE("got dup ack: %" PRIu32 "\n", pkt->ack_seq);
         window->dupacks++;
-        _NOTE("%s\n", "new dupack: %" PRIu32 "\n", window->dupacks);
+        _NOTE("new dupack: %" PRIu32 "\n", window->dupacks);
         /* todo: do fast retrans */
         return 0;
     }
@@ -426,7 +426,7 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     /* do window stuff */
     seqtoadd = pkt->seq;
     curr = base;
-    _DEBUG("%s", "Trying to add pkt:"PRIu32" to window...\n", seqtoadd);
+    _DEBUG("Trying to add pkt: %" PRIu32 " to window...\n", seqtoadd);
 
     if(seqtoadd >= (w->maxsize + w->clibaseseq)){
         /* above my window */
