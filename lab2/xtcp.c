@@ -1,4 +1,3 @@
-#include <errno.h>
 #include "xtcp.h"
 
 
@@ -152,7 +151,7 @@ void free_window(struct window* wnd) {
 * Called to init the sliding window.
 */
 struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
-        uint32_t cli_last_seqn_recvd, uint32_t cli_top_accept_seqn) {
+        uint32_t cli_last_seqn_recvd, uint32_t cli_base_seqn) {
 
     struct window* w;
     w = malloc(sizeof(struct window));
@@ -170,7 +169,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     w->cwin = 65536;
     w->ssthresh = 65536;
     w->dupacks = 0;
-    w->clitopaccptpkt = cli_top_accept_seqn;
+    w->clibaseseq = cli_base_seqn;
     w->clilastunacked = cli_last_seqn_recvd;
     w->base = alloc_window_nodes((size_t)maxsize);
     if(w->base == NULL){
@@ -400,11 +399,16 @@ void clisend_lossy(int sockfd, void *pkt, size_t datalen){
 }
 
 
+/**
+* Give pkt in host order.
+*/
 int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w) {
     struct win_node *base;
     struct win_node *curr;
     uint32_t seqtoadd;
+    struct xtcphdr *ackpkt;
     int n = 0;
+    int gaplength = 0;
 
     if(w == NULL) {
         _ERROR("%s\n", "w is NULL!");
@@ -427,32 +431,71 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     printf("packet contents:\n");
     printf("%s\n", (char*)pkt + DATA_OFFSET);
 
-    /* do window stuff */
+
     seqtoadd = pkt->seq;
     curr = base;
-    _DEBUG("Trying to add pkt: %" PRIu32 " to window...\n", seqtoadd);
+    _DEBUG("Trying to add pkt: %"PRIu32" to window...\n", seqtoadd);
 
     if(seqtoadd >= (w->maxsize + w->clibaseseq)){
         /* above my window */
-        _ERROR("%s\n", "trying to add pkt above my window");
+        _ERROR("%s\n", "trying to add a pkt with seq above my window");
     }
 
-
+    /* find the win_node to insert */
     for(; n < w->maxsize; n++) {
+        _DEBUG("looking at win_node #%d\n", n);
+        if(seqtoadd == (n + w->clibaseseq)){
+            _DEBUG("%s", "found win_node to add pkt\n");
+            if(curr->datalen < 0 || curr->pkt != NULL) { /* win_node is occupied */
+                if(seqtoadd != curr->pkt->seq) {
+                    _ERROR("%s\n", "found win_node occupied with different seq!");
+                    print_window(w);
+                    exit(EXIT_FAILURE);
+                } else {
+                    _DEBUG("%s\n", "found win_node already had the seqtoadd");
+                    /* ack this will be a dup ack*/
+                }
+            } else { /* win_node is empty*/
+                /* put the pkt in there */
+                curr->datalen = datalen;
+                curr->pkt = pkt;
+                w->numpkts = w->numpkts + 1;
+            }
+            break;
+        }
+
         /* move curr to the next*/
         curr = curr->next;
         if(curr == NULL) {
-            _ERROR("%s\n", "a win_node is NULL, init your window!\n");
+            _ERROR("win_node #%d is NULL, init your window!\n", n + 1);
             print_window(w);
             exit(EXIT_FAILURE);
         }
         if(curr == base) {
-            _ERROR("%s\n", "reached the base while trying to add to window!\n");
+            _ERROR("%s\n", "reached the base while trying to add to window! Should be impossible!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
     }
-    /* curr is now at the win_node we want? */
+
+    /* if it filled a gap then try to make a cumulative ACK by looking at the next pkts */
+    if(seqtoadd == w->clilastunacked) {
+        _DEBUG("%s\n","looking if the pkt filled a gap....");
+        curr = curr->next;
+        while (curr != base) {
+            if(curr->pkt == NULL){
+                _DEBUG("win_node #%d was empty, stopping search", n + gaplength + 1);
+                break;
+            }
+            _DEBUG("win_node #%d had pkt! continue search", n + gaplength + 1);
+            curr = curr->next;
+            gaplength++;
+        }
+    }
+
+    /* make pkt with maxsize - numpkts */
+    ackpkt = alloc_pkt(111111, (w->clilastunacked + gaplength), ACK, (uint16_t)(w->maxsize - w->numpkts), NULL, 0);
+    clisend_lossy(sockfd, ackpkt, sizeof(struct xtcphdr));
 
     return 0;
 }
