@@ -298,12 +298,12 @@ void srv_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window *w
 void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
     int count = 0;
     static int total_acks = 0;
-    if(pkt->ack_seq > window->servlastpktsent) {
-        _ERROR("Client ACKing something i never sent, last SEQ sent: %" PRIu32 " ACK got: %" PRIu32 "\n", window->servlastpktsent, pkt->ack_seq);
+    if(pkt->ack_seq > window->servlastseqsent) {
+        _ERROR("Client ACKing something i never sent, last SEQ sent: %" PRIu32 " ACK got: %" PRIu32 "\n", window->servlastseqsent, pkt->ack_seq);
         exit(EXIT_FAILURE);
-    } else if(pkt->ack_seq < window->base->pkt->seq) {
-        _ERROR("Client ACKing something already ACKed, base SEQ: %" PRIu32 " ACK got: %" PRIu32 "\n", window->base->pkt->seq, pkt->ack_seq);
-        exit(EXIT_FAILURE);
+    } else if(pkt->ack_seq < window->servlastackrecv) {
+        _NOTE("Client ACKing something already ACKed, base SEQ: %" PRIu32 " ACK got: %" PRIu32 "\n", window->base->pkt->seq, pkt->ack_seq);
+        return;
     }
 
     if(window->cwin < window->ssthresh) {
@@ -336,19 +336,30 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
 
-    while(pkt->ack_seq > window->base->pkt->seq) {
+    /* dup ack */
+    if(window->servlastackrecv == pkt->ack_seq){
+        _NOTE("%s\n", "got dup ack: %" PRIu32 "\n", pkt->ack_seq);
+        window->dupacks++;
+        _NOTE("%s\n", "new dupack: %" PRIu32 "\n", window->dupacks);
+        /* todo: do fast retrans */
+        return 0;
+    }
+
+    while(pkt->ack_seq > window->base->pkt->ack_seq) {
         rtn++;
         if(window->base == NULL || window->base->pkt == NULL) {
             _ERROR("%s\n", "was about to touch NULL");
             exit(EXIT_FAILURE);
         }
-        window->lastadvwinrecvd = pkt->advwin;
-        _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
-        _DEBUG("looking at %" PRIu32 ", have %" PRIu32 "\n", window->base->pkt->seq, pkt->ack_seq);
+
+        _DEBUG("looking at %" PRIu32 ", have %" PRIu32 "\n", window->servlastackrecv, pkt->ack_seq);
         _DEBUG("%s\n", "freeing ACKed packet");
         free(window->base->pkt);
         window->base->datalen = -1;
     }
+
+    window->lastadvwinrecvd = pkt->advwin;
+    _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
 
     return rtn;
 }
