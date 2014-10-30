@@ -50,6 +50,7 @@ struct win_node {
 
 struct window {
     int maxsize;
+    int lastadvwinrecvd;
     uint32_t servlastackrecv;
     uint32_t servlastpktsent;
     int cwin;
@@ -93,15 +94,16 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen,
 * If a dup_ack is sent go back to block in select().
 * NULL terminates the data sent.
 */
-int clirecv(int sockfd, char **wnd);
+int clirecv(int sockfd, struct window* w)
 
 void clisend_lossy(int sockfd, void *pkt, size_t datalen);
 int cli_ack(int sockfd, char **wnd);
 int cli_dup_ack(int sockfd);
-int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
+void clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
 
 void free_window(struct win_node* head);
 struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
         uint32_t cli_top_accept_seqn, uint32_t cli_last_seqn_recvd);
+void print_window(struct window *windo);
 
 #endif /*XTCP_H*/

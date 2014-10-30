@@ -1,12 +1,22 @@
 #include <errno.h>
 #include "xtcp.h"
 
-static int max_wnd_size;   /* initialized by init_wnd() */
 
-/* the seq number mapping to the current wnd base */
-static uint32_t wnd_base_seq; /* initialized by init_wnd() */
-static int wnd_base_i; /* initialized by init_wnd() */
-static int wnd_count = 0; /* number of pkts currently in the window */
+extern pthread_mutex_t w_mutex;
+
+void ntohpkt(struct xtcphdr *hdr) {
+    hdr->seq = ntohl(hdr->seq);
+    hdr->ack_seq = ntohl(hdr->ack_seq);
+    hdr->flags = ntohs(hdr->flags);
+    hdr->advwin = ntohs(hdr->advwin);
+}
+
+void htonpkt(struct xtcphdr *hdr) {
+    hdr->seq = htonl(hdr->seq);
+    hdr->ack_seq = htonl(hdr->ack_seq);
+    hdr->flags = htons(hdr->flags);
+    hdr->advwin = htons(hdr->advwin);
+}
 
 void print_hdr(struct xtcphdr *hdr) {
     int is_ack = 0;
@@ -50,9 +60,44 @@ void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_w
     return pkt;
 }
 
+void print_window(struct window *w){
+    struct win_node* head = w->base;
+    struct win_node* curr = head;
+    int n = 0;
+    printf("|window| maxwnd: %6d, cwin: %6d, ssthresh: %6d, \n",
+            w->maxsize, w->cwin, w->ssthresh);
+
+    do {
+        if(curr->datalen < 0){
+            printf("_ ");
+        }else {
+            printf("X ");
+        }
+        curr = curr->next;
+    } while(curr != head);
+
+    #ifdef DEBUG
+    printf("DEBUG |window| nodes:\n");
+    do {
+        printf("====== node %3d ========\n", n);
+        printf("|Datalen: %15d |\n", curr->datalen);
+        printf("|Pkt ptr: %15p |\n", (void *)curr->pkt);
+        if(curr->pkt != NULL) {
+            printf("|Pkt seq: %15"PRIu32" |\n", curr->pkt->seq);
+        }else{
+            printf("|Pkt seq: non pkt |\n");
+        }
+        printf("|Next:    %15p |\n", (void *)curr->next);
+        printf("|This:    %15p |\n", (void *)curr);
+        printf("====== node %3d =======\n", n);
+        curr = curr->next;
+    } while(curr != head);
+    #endif
+}
+
 struct win_node* alloc_window_nodes(size_t n) {
     struct win_node* head;
-    struct win_node* ptr;
+    struct win_node* tail;
 
     if(n < 1) {
         _DEBUG("passed invalid size: %d\n", (int)n);
@@ -66,21 +111,34 @@ struct win_node* alloc_window_nodes(size_t n) {
     }
     head->datalen = -1;
     head->pkt = NULL;
-    ptr = head->next;
+    tail = head;
 
     for(n -= 1; n > 0; --n) {
-        ptr = malloc(sizeof(struct win_node));
-        if(ptr == NULL) {
+        tail->next = malloc(sizeof(struct win_node));
+        if(tail->next == NULL) {
             perror("alloc_window(): malloc failed");
             exit(EXIT_FAILURE);
         }
-        ptr->datalen = -1;
-        ptr->pkt = NULL;
-        ptr = ptr->next;
+        tail = tail->next;
+        tail->datalen = -1;
+        tail->pkt = NULL;
     }
 
-    ptr->next = head;
+    tail->next = head;
     return head;
+}
+
+void free_window(struct win_node* head) {
+    struct win_node* tail = head->next;
+    struct win_node* tmp;
+
+    while(tail != head) {
+        tmp = tail;
+        tail = tail->next;
+        free(tmp);
+    }
+
+    free(head);
 }
 
 struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
@@ -93,6 +151,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
         exit(EXIT_FAILURE);
     }
     w->maxsize = maxsize;
+    w->lastadvwinrecvd = maxsize;
     w->servlastackrecv = srv_last_ack_seq_recvd;
     w->servlastpktsent = srv_last_seq_sent;
     /* todo: change to 1 */
@@ -109,51 +168,27 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     return w;
 }
 
-
-/**
-* srv_send_recv(){
-*
-*
-*   send until full
-*
-*   recv with BLOCK
-*   recv with MSG_DONTWAIT until you get EWOULDBLOCK
-*       check 
-*
-*
-*/
-
-void free_window(struct win_node* head) {
-    struct win_node* ptr1;
-    struct win_node* ptr2;
-    ptr2 = head->next;
-    ptr1 = ptr2->next;
-
-    for(; ptr2 != head; ptr2 = ptr1, ptr1=ptr1->next) {
-        free(ptr2);
+int srv_send_base(int sockfd, struct window *w){
+    ssize_t err;
+    if(w == NULL){
+        fprintf(stderr, "ERROR: srv_send_base() w is NULL\n");
+        return -1;
     }
-
-    free(head);
-}
-
-void ntohpkt(struct xtcphdr *hdr) {
-    hdr->seq = ntohl(hdr->seq);
-    hdr->ack_seq = ntohl(hdr->ack_seq);
-    hdr->flags = ntohs(hdr->flags);
-    hdr->advwin = ntohs(hdr->advwin);
-}
-
-void htonpkt(struct xtcphdr *hdr) {
-    hdr->seq = htonl(hdr->seq);
-    hdr->ack_seq = htonl(hdr->ack_seq);
-    hdr->flags = htons(hdr->flags);
-    hdr->advwin = htons(hdr->advwin);
+    if(w->base == NULL){
+        fprintf(stderr, "ERROR: srv_send_base() w->base is NULL, init your buffer!\n");
+        return -1;
+    }
+    if(w->base->pkt == NULL){
+        fprintf(stderr, "ERROR: srv_send_base() w->base->pkt is NULL, can't send NULL dummy!\n");
+        return -1;
+    }
+    err = send(sockfd, w->base->pkt , w->base->datalen);
 }
 
 /**
 *
 */
-void ackrecvd(struct window *window, struct xtcphdr *pkt){
+void newackrecvd(struct window *window, struct xtcphdr *pkt){
     if(window->cwin < window->ssthresh) {
         /* slow start */
         window->cwin = window->cwin + 1;
@@ -240,18 +275,10 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, 
 * The client only directly calls this function once, for the SYN.
 * It provides packet loss to the client's sends.
 * This malloc()'s and free()'s space for data and a header.
-* RETURNS: -1 on failure
-*           0 on success
 *
 */
-int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
-    void *pkt = malloc(DATA_OFFSET + datalen);
-    if(pkt == NULL){
-        perror("clisend().malloc()");
-        exit(EXIT_FAILURE);
-    }
-
-    make_pkt(pkt, flags, advwin, data, datalen);
+void clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
+    void *pkt = alloc_pkt(pkt, flags, advwin, data, datalen);
     _DEBUG("%s\n", "printing hdr to send");
     print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
@@ -259,7 +286,6 @@ int clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
     clisend_lossy(sockfd, pkt, datalen);
 
     free(pkt);
-    return 0;
 }
 
 void clisend_lossy(int sockfd, void *pkt, size_t datalen){
@@ -280,7 +306,7 @@ void clisend_lossy(int sockfd, void *pkt, size_t datalen){
 }
 
 
-int clirecv(int sockfd, char **wnd) {
+int clirecv(int sockfd, struct window* w) {
     ssize_t bytes = 0;
     uint32_t pktseq;
     int err;
@@ -294,7 +320,7 @@ int clirecv(int sockfd, char **wnd) {
         continue_with_select:
         /* todo: remove this print? */
         _DEBUG("%s\n", "select() for ever loop");
-        print_wnd((const char **)wnd);
+        print_window(w);
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
 
@@ -315,7 +341,8 @@ int clirecv(int sockfd, char **wnd) {
                 free(pkt);
                 return -2;
             }else if(bytes < 12){
-                _DEBUG("clirecv().recv() not long enough to be pkt: %d\n", (int)bytes);
+                _DEBUG("clirecv().recv() not long enough to be pkt: %dbytes\n", (int)bytes);
+                continue;
             }
             ntohpkt((struct xtcphdr *)pkt); /* host order please */
             pkt[bytes] = 0; /* NULL terminate the ASCII text */
@@ -358,87 +385,39 @@ int clirecv(int sockfd, char **wnd) {
 
     /* do window stuff */
     pktseq = ((struct xtcphdr *)pkt)->seq;
+    /* todo: use struct window *w */
     if(pktseq == ack_seq) {
-        /* everythings going fine, send a new ACK */
-        _DEBUG("pktseq: %" PRIu32 " == %" PRIu32 " :ack_seq, good but check wnd not full\n", pktseq, ack_seq);
-        err = add_to_wnd(ack_seq, pkt, (const char**)wnd);
-        if(err < 0){
-            _DEBUG("just ignore pkt, wnd must be full add_to_wnd() returned %d \n", err);
-            goto continue_with_select;
-        }
+        /* Send a new ack if it will fit in the window */
+        add_to_wnd(ack_seq, pkt, w);
         advwin--;
-        err = cli_ack(sockfd, wnd);
-        if(err < 0){
-            _DEBUG("cli_ack() returned %d\n", err);
-            return -2;
-        }
-        /* the normal return value */
-        return (int)bytes;
+        cli_ack(sockfd, w);
     }
     else if(pktseq < ack_seq){
         /* send a duplicate ACK */
         /* don't bother with window, it's in there */
         _DEBUG("%s\n", "duplicate packet, calling cli_dup_ack()");
-        err = cli_dup_ack(sockfd);
-        if(err < 0){
-            _DEBUG("cli_dup_ack() returned %d\n", err);
-            return -2;
-        }
+        cli_dup_ack(sockfd, w);
         /* continue in this function!, pretend like this is a continue */
         goto continue_with_select;
     }
     else if(pktseq > ack_seq) {
+        /* buffer out of order pkts */
         /* try to add to wnd, if it out of bounds then IGNORE, otherwise duplicate ACK */
-        err = add_to_wnd(pktseq, pkt, (const char **) wnd);
-        _DEBUG("add_to_wnd() returned: %d\n", err);
-        switch (err) {
-            case 0:
-                /* send ACK, added correctly and for the first time */
-                _DEBUG("%s\n", "buffered new gap packet, calling cli_dup_ack()");
-                advwin--;
-                err = cli_dup_ack(sockfd);
-                if (err < 0) {
-                    return -2;
-                }
-                return (int)bytes;
-            case E_OCCUPIED:
-                /* send duplicate ACK */
-                _DEBUG("%s\n", "duplicate gap packet, calling cli_dup_ack()");
-                err = cli_dup_ack(sockfd);
-                if (err < 0) {
-                    return -2;
-                }
-                goto continue_with_select;
-            case E_ISFULL:
-                /* don't ACK this, it's too far */
-                printf("not ACKing pkt because I can't store it! Just ignore it!\n");
-                goto continue_with_select;
-            default:
-                _DEBUG("ERROR: %d SOMETHING IS WRONG WITH WINDOW\n", err);
-                return -2;
-        }
+        add_to_wnd(pktseq, pkt, w);
     }
-    /* should never get here */
-    assert(0 == 1);
-    return -5;
+    return -1;
 }
 
-int cli_ack(int sockfd, char **wnd) {
-    int err;
+void cli_ack(int sockfd, struct window* w) {
     /* update ack_seq, check to send a cumulative ACK */
-    while(get_from_wnd(ack_seq, (const char**)wnd) != NULL) {
+    while(get_from_wnd(ack_seq, w) != NULL) {
         ++ack_seq;
     }
     printf("cli_ack(): sending normal ACK, ack_num: %"PRIu32"\n", ack_seq);
-    err = clisend(sockfd, ACK, NULL, 0);
-
-    return (int)err;
+    clisend(sockfd, ACK, NULL, 0);
 }
 
-int cli_dup_ack(int sockfd) {
-    int err;
+void cli_dup_ack(int sockfd, struct window* w) {
     printf("cli_dup_ack(): sending duplicate ACK, ack_num: %"PRIu32"\n", ack_seq);
-    err = clisend(sockfd, ACK, NULL, 0);
-
-    return err;
+    clisend(sockfd, ACK, NULL, 0);
 }

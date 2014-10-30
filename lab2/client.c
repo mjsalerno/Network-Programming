@@ -1,16 +1,14 @@
 #include "client.h"
 
-extern uint32_t seq;
-extern uint32_t ack_seq; /* also used by wnd as next expected seq */
-extern uint16_t advwin;
-
-static char** wnd; /* will point to malloc()'d array from init_wnd()*/
+static uint32_t seq;
+static uint32_t ack_seq; /* also used by wnd as next expected seq */
+static uint16_t advwin;
 
 double pkt_loss_thresh; /* packet loss percentage */
-
 static double u; /* (!!in ms!!) mean of the exponential distribution func */
 
-pthread_mutex_t wnd_mutex;
+static struct window* w;
+pthread_mutex_t w_mutex;
 
 int main(void) {
     ssize_t err; /* for error checking */
@@ -150,7 +148,7 @@ int main(void) {
     for(EVER) {
         print_wnd((const char**)wnd);
         _DEBUG("%s\n", "calling clirecv()");
-        err = clirecv(serv_fd, wnd);
+        err = clirecv(serv_fd, w);
         _DEBUG("clirecv() returned: %d\n", (int)err);
         if (err <= -2) {
             _DEBUG("%s\n", "client exit(EXIT_FAILURE)");
@@ -339,7 +337,7 @@ int init_wnd_mutex(void){
         return -1;
     }
 
-    err = pthread_mutex_init(&wnd_mutex, &attr);
+    err = pthread_mutex_init(&w_mutex, &attr);
     if(err > 0){
         errno = err;
         perror("ERROR pthread_mutex_init()");
@@ -371,7 +369,7 @@ void *consumer_main(void *wnd) {
         _DEBUG("CONSUMER: sleeping for:  %fms\n", msecs_d);
 
         usleep(usecs);
-        err = pthread_mutex_lock(&wnd_mutex);
+        err = pthread_mutex_lock(&w_mutex);
         if(err > 0){
             errno = err;
             perror("CONSUMER: ERROR pthread_mutex_destroy()");
@@ -380,7 +378,7 @@ void *consumer_main(void *wnd) {
 
         /* todo: read from wnd */
 
-        pthread_mutex_unlock(&wnd_mutex);
+        pthread_mutex_unlock(&w_mutex);
         if(err > 0){
             errno = err;
             perror("CONSUMER: ERROR pthread_mutex_destroy()");
@@ -388,7 +386,7 @@ void *consumer_main(void *wnd) {
         }
     }
 
-    err = pthread_mutex_destroy(&wnd_mutex);
+    err = pthread_mutex_destroy(&w_mutex);
     if(err > 0){
         errno = err;
         perror("CONSUMER: ERROR pthread_mutex_destroy()");
