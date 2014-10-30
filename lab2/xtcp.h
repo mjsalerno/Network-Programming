@@ -32,7 +32,7 @@ struct xtcphdr {
 };
 
 struct win_node {
-    int datalen;
+    size_t datalen;
     struct xtcphdr* pkt;
     struct win_node* next;
 };
@@ -63,7 +63,8 @@ void htonpkt(struct xtcphdr *hdr);
 
 int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen,
         char **wnd, int is_new, uint16_t* cli_wnd);
-
+void srv_add_send(int sockfd, void* data, size_t datalen, struct window *w);
+void new_ack_recvd(struct window *window, struct xtcphdr *pkt);
 
 
 int clirecv(int sockfd, struct window* w);

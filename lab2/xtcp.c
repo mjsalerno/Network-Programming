@@ -212,36 +212,41 @@ void srv_send_base(int sockfd, struct window *w) {
 * Prints the window and the header sent.
 *
 */
-void srv_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window *w){
+void srv_add_send(int sockfd, void* data, size_t datalen, struct window *w) {
     struct win_node *base;
     struct win_node *curr;
     int n = 0;
     int effectivesize;
     uint32_t seqtoadd;
+    void* pkt;
 
     effectivesize = MIN(w->cwin, MIN(w->lastadvwinrecvd, w->maxsize));
 
     if(w == NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() w is NULL!\n");
+        _ERROR("srv_add_send() w is NULL!\n");
         exit(EXIT_FAILURE);
     }
-    if(pkt == NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() pkt is NULL, can't add/send NULL!\n");
+    if(data == NULL) {
+        _ERROR("srv_add_send() data is NULL, can't add/send NULL!\n");
         exit(EXIT_FAILURE);
     }
     base = w->base;
     if(base == NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() w->base is NULL!\n");
+        _ERROR("srv_add_send() w->base is NULL!\n");
         exit(EXIT_FAILURE);
     }
 
     if(effectivesize <= 0) {
-        fprintf(stderr, "ERROR: srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
+        _ERROR("srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
         print_window(w);
         exit(EXIT_FAILURE);
     }
 
-    seqtoadd = pkt->seq;
+    pkt = alloc_pkt(w->servlastseqsent + 1, 0, 0, 0, data, datalen);
+    w->servlastseqsent = w->servlastseqsent + 1;
+    print_hdr(pkt);
+
+    seqtoadd = ((struct xtcphdr*) pkt)->seq;
     if(seqtoadd != (w->servlastseqsent + 1)){
         fprintf(stderr, "ERROR: srv_add_send() seqtoadd: %"PRIu32" != "
                         "(w->servlastseqsent + 1): %"PRIu32"\n", seqtoadd,
@@ -255,24 +260,24 @@ void srv_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window *w
         n++;
         curr = curr->next;
         if(curr == NULL) {
-            fprintf(stderr, "ERROR: srv_add_send() a win_node is NULL, init your window!\n");
+            _ERROR("srv_add_send() a win_node is NULL, init your window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
         if(curr == base) {
-            fprintf(stderr, "ERROR: srv_add_send() reached the base while trying to add to window!\n");
+            _ERROR("srv_add_send() reached the base while trying to add to window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
     }
     /* curr is now at the win_node we want? */
     if(curr->datalen >= 0 || curr->pkt != NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() curr->pkt not empty!\n");
+        _ERROR("srv_add_send() curr->pkt not empty!\n");
         print_window(w);
         exit(EXIT_FAILURE);
     } else {
         _DEBUG("%s", "Found win_node for pkt. Adding to window.\n");
-        curr->datalen = datalen;
+        curr->datalen = (int)datalen;
         curr->pkt = pkt;
         w->servlastseqsent = seqtoadd;
     }
