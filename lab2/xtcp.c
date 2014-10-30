@@ -257,9 +257,9 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
     }
     curr = base;
     while(n < effectivesize) {
-        /* fixme: doesn't work */
-        if(seqtoadd == (n + )) {
-
+        if(seqtoadd == (n + w->servlastackrecv)) {
+            /* we are at the correct node */
+            break;
         }
         /* inc n and move curr to the next*/
         n++;
@@ -400,16 +400,16 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     int n = 0;
 
     if(w == NULL) {
-        _ERROR("%s\n", "cli_add_send() w is NULL!");
+        _ERROR("%s\n", "w is NULL!");
         exit(EXIT_FAILURE);
     }
     if(pkt == NULL) {
-        _ERROR("%s\n", "cli_add_send() data is NULL, can't add/ack NULL!");
+        _ERROR("%s\n", "data is NULL, can't add/ack NULL!");
         exit(EXIT_FAILURE);
     }
     base = w->base;
     if(base == NULL) {
-        _ERROR("%s\n", "cli_add_send() w->base is NULL!");
+        _ERROR("%s\n", "w->base is NULL!");
         exit(EXIT_FAILURE);
     }
 
@@ -425,20 +425,22 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     curr = base;
     _DEBUG("%s", "Trying to add pkt:"PRIu32" to window...\n", seqtoadd);
 
+    if(seqtoadd >= (w->maxsize + w->clibaseseq)){
+        /* above my window */
+        _ERROR("%s\n", "trying to add pkt above my window");
+    }
+
 
     for(; n < w->maxsize; n++) {
-
-
-        /* inc n and move curr to the next*/
-        n++;
+        /* move curr to the next*/
         curr = curr->next;
         if(curr == NULL) {
-            _ERROR("%s\n", "srv_add_send() a win_node is NULL, init your window!\n");
+            _ERROR("%s\n", "a win_node is NULL, init your window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
         if(curr == base) {
-            _ERROR("%s\n", "srv_add_send() reached the base while trying to add to window!\n");
+            _ERROR("%s\n", "reached the base while trying to add to window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
