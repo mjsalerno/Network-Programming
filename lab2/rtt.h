@@ -2,6 +2,10 @@
 #define	RTT_H
 
 /*#include	"unp.h" */
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/time.h>
 
 struct rtt_info {
     suseconds_t    rtt_rtt;	    /* most recent measured RTT, in us */

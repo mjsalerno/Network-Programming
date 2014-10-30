@@ -1,7 +1,4 @@
 /* include rtt1 */
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include "rtt.h"
 
 int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
