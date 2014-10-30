@@ -22,9 +22,6 @@ common.o: common.c common.h unp.h get_ifi_info_plus.o
 get_ifi_info_plus.o: get_ifi_info_plus.c config.h unp.h unpifiplus.h
 	$(CC) $(FLAGS) -c $< -o $@
 
-xtcp.o: xtcp.c xtcp.h
-	$(CC) $(FLAGS) -c $< -o $@
-
 clean:
 	-rm -f  test client server *.o
 

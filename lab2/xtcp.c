@@ -1,7 +1,6 @@
 #include "xtcp.h"
 
-
-extern pthread_mutex_t w_mutex;
+pthread_mutex_t w_mutex;
 
 void ntohpkt(struct xtcphdr *hdr) {
     hdr->seq = ntohl(hdr->seq);
@@ -78,6 +77,7 @@ void print_window(struct window *w){
         }
         curr = curr->next;
     } while(curr != head);
+    printf("\n");
 
     #ifdef DEBUG
     printf("DEBUG |window| nodes:\n");
@@ -247,7 +247,6 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
     }
 
     pkt = alloc_pkt(w->servlastseqsent + 1, 0, flags, 0, data, datalen);
-    w->servlastseqsent = w->servlastseqsent + 1;
     print_hdr(pkt);
 
     seqtoadd = ((struct xtcphdr*) pkt)->seq;
@@ -296,6 +295,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
         _ERROR("%s\n", "srv_add_send().send()");
         exit(EXIT_FAILURE);
     }
+    w->servlastseqsent = w->servlastseqsent + 1;
     ntohpkt(pkt);
     printf("SENT ");
     print_hdr(pkt);
@@ -377,6 +377,10 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     return rtn;
 }
 
+void fast_retransmit(struct window* w) {
+    w->ssthresh = MAX(((w->servlastseqsent - w->base->pkt->seq)/ 2), 2);
+    /* todo: finish me*/
+}
 
 
 void clisend_lossy(int sockfd, void *pkt, size_t datalen){
@@ -406,6 +410,8 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     struct xtcphdr *ackpkt;
     int n = 0;
     int gaplength = 0;
+
+    get_lock(&w_mutex);
 
     if(w == NULL) {
         _ERROR("%s\n", "w is NULL!");
@@ -493,6 +499,7 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     /* make pkt with maxsize - numpkts */
     /* fixme: seq num of acks */
     ackpkt = alloc_pkt(111111, (w->clilastunacked + gaplength), ACK, (uint16_t)(w->maxsize - w->numpkts), NULL, 0);
+    unget_lock(&w_mutex);
     clisend_lossy(sockfd, ackpkt, sizeof(struct xtcphdr));
 
     return 0;
@@ -546,4 +553,24 @@ struct win_node* get_node(uint32_t seqtoget, struct window *w) {
     _ERROR("Shouldn't reach this spot! seqtoget: %"PRIu32", "
             "clibaseseq: %"PRIu32", maxsize: %d\n", seqtoget, w->clibaseseq, w->maxsize);
     return NULL; /* we wrapped around */
+}
+
+void get_lock(pthread_mutex_t* lock) {
+    int err;
+    err = pthread_mutex_lock(lock);
+    if(err > 0) {
+        errno = err;
+        perror("CONSUMER: ERROR pthread_mutex_lock()");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void unget_lock(pthread_mutex_t* lock) {
+    int err;
+    err = pthread_mutex_unlock(lock);
+    if(err > 0) {
+        errno = err;
+        perror("CONSUMER: ERROR pthread_mutex_unlock()");
+        exit(EXIT_FAILURE);
+    }
 }
