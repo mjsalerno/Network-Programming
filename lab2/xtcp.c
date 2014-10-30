@@ -89,7 +89,7 @@ void print_window(struct window *w){
         if(curr->pkt != NULL) {
             printf("|Pkt seq: %15"PRIu32" |\n", curr->pkt->seq);
         }else{
-            printf("|Pkt seq: non pkt |\n");
+            printf("|Pkt seq:          (none) |\n");
         }
         printf("|Next:    %15p |\n", (void *)curr->next);
         printf("|This:    %15p |\n", (void *)curr);
@@ -260,6 +260,10 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
     }
     curr = base;
     while(n < effectivesize) {
+        /* fixme: doesn't work */
+        if(seqtoadd == (n + )) {
+
+        }
         /* inc n and move curr to the next*/
         n++;
         curr = curr->next;
@@ -378,59 +382,71 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
 void clisend_lossy(int sockfd, void *pkt, size_t datalen){
     ssize_t err;
     /* simulate packet loss on sends */
-    if(drand48() >= pkt_loss_thresh) {
+    if(DROP_PKT()) {
+        printf("DROPPED SEND'ing PKT: ");
+        ntohpkt((struct xtcphdr*)pkt);
+        print_hdr((struct xtcphdr *) pkt);
+    } else {
         err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
         if (err < 0) {
             perror("xtcp.send_lossy()");
             exit(EXIT_FAILURE);
         }
     }
-    else {
-        printf("DROPPED SEND'ing PKT: ");
-        ntohpkt((struct xtcphdr*)pkt);
-        print_hdr((struct xtcphdr *) pkt);
-    }
 }
 
 
 int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w) {
-    uint32_t pktseq;
+    struct win_node *base;
+    struct win_node *curr;
+    uint32_t seqtoadd;
+    int n = 0;
+
+    if(w == NULL) {
+        _ERROR("%s\n", "cli_add_send() w is NULL!");
+        exit(EXIT_FAILURE);
+    }
+    if(pkt == NULL) {
+        _ERROR("%s\n", "cli_add_send() data is NULL, can't add/ack NULL!");
+        exit(EXIT_FAILURE);
+    }
+    base = w->base;
+    if(base == NULL) {
+        _ERROR("%s\n", "cli_add_send() w->base is NULL!");
+        exit(EXIT_FAILURE);
+    }
+
     /* recv'ed a pkt, it is in host order, and we will put it in the window */
     printf("recv'd packet ");
-    print_hdr((struct xtcphdr *) pkt);
+    print_hdr(pkt);
     /* todo: remove */
     printf("packet contents:\n");
     printf("%s\n", (char*)pkt + DATA_OFFSET);
-    _DEBUG("%s", "Trying to add to window...\n");
 
     /* do window stuff */
-    pktseq = pkt->seq;
-    /* todo: use struct window *w */
-    if(pktseq <= w->clilastunacked || pktseq > w->clitopaccptpkt) {
-        /* send a duplicate ACK */
-        /* don't bother with window, it's in there */
-        _DEBUG("%s\n", "duplicate packet, calling cli_dup_ack()");
-        cli_dup_ack(sockfd, w);
-        /* continue in this function!, pretend like this is a continue */
-        /* goto continue_with_select; */
+    seqtoadd = pkt->seq;
+    curr = base;
+    _DEBUG("%s", "Trying to add pkt:"PRIu32" to window...\n", seqtoadd);
 
-    } else {
-        /* Send a new ack if it will fit in the window */
-        add_to_wnd(ack_seq, pkt, w);
-        cli_ack(sockfd, w);
+
+    for(; n < w->maxsize; n++) {
+
+
+        /* inc n and move curr to the next*/
+        n++;
+        curr = curr->next;
+        if(curr == NULL) {
+            _ERROR("%s\n", "srv_add_send() a win_node is NULL, init your window!\n");
+            print_window(w);
+            exit(EXIT_FAILURE);
+        }
+        if(curr == base) {
+            _ERROR("%s\n", "srv_add_send() reached the base while trying to add to window!\n");
+            print_window(w);
+            exit(EXIT_FAILURE);
+        }
     }
-}
+    /* curr is now at the win_node we want? */
 
-void cli_ack(int sockfd, struct window* w) {
-    /* update ack_seq, check to send a cumulative ACK */
-    while(get_from_wnd(ack_seq, w) != NULL) {
-        ++ack_seq;
-    }
-    printf("cli_ack(): sending normal ACK, ack_num: %"PRIu32"\n", ack_seq);
-    clisend(sockfd, ACK, NULL, 0);
-}
-
-void cli_dup_ack(int sockfd, struct window* w) {
-    printf("cli_dup_ack(): sending duplicate ACK, ack_num: %"PRIu32"\n", ack_seq);
-    clisend(sockfd, ACK, NULL, 0);
+    return 0;
 }

@@ -140,9 +140,11 @@ int main(void) {
     }
 
 
-    _DEBUG("%s\n", "waiting for the file ...");
+    printf("waiting for the file...\n");
+
     for(EVER) {
-        _DEBUG("%s\n", "calling clirecv()");
+
+        _DEBUG("%s\n", "calling clirecv() to recv file data");
         err = clirecv(serv_fd, w);
         _DEBUG("clirecv() returned: %d\n", (int)err);
         if (err <= -2) {
@@ -150,15 +152,17 @@ int main(void) {
             exit(EXIT_FAILURE);
         }
         else if(err == -1){
-            _DEBUG("%s\n", "Got RST, ending client...");
-            break;
+            _ERROR("%s\n", "Got a RST, ending client...");
+            close(serv_fd);
+            exit(EXIT_SUCCESS);
         }
         else if(err == 0) {
-            _DEBUG("%s\n", "Done getting file...");
+            _DEBUG("%s\n", "Done recv'ing the file...");
             break;
         }
         /* got actual data, loop back around for more */
         _DEBUG("%s\n", "clirecv() got actual data, loop back around for more");
+
     }
 
     /* wake up when the window is empty */
@@ -237,17 +241,16 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
             }
             /* we recv()'ed so test if we should keep it */
             _DEBUG("%s\n", "recv'd a packet, should we drop it?");
-            if(drand48() >= pkt_loss_thresh) {
-                /* we recv()'ed something so break from select */
-                _DEBUG("%s\n", "we kept it.");
-                break;
-            }
-            else {
-                /* we dropped it, note, and continue */
+            if(DROP_PKT()) {
+                /* we dropped it, note it, and continue */
                 printf("DROPPED RECV'ing PKT: ");
                 ntohpkt((struct xtcphdr*)pktbuf);
                 print_hdr((struct xtcphdr *)pktbuf);
                 continue;
+            }else {
+                /* we recv()'ed something so break from select */
+                _DEBUG("%s\n", "we kept it.");
+                break;
             }
 
         }
@@ -320,6 +323,7 @@ int validate_hs2(struct xtcphdr* hdr, int len){
 }
 
 /**
+* TODO: return code for we are done (we have sent an ACK for the FIN pkt)
 * clirecv -- for the client/receiver
 * Returns: >0 bytes recv'd
 *           0 on FIN recv'd
@@ -347,16 +351,17 @@ int clirecv(int sockfd, struct window* w) {
         exit(EXIT_FAILURE);
     }
     for(EVER) {
-        continue_with_select:
+        /*continue_with_select: */
         /* todo: remove this print? */
-        _DEBUG("%s\n", "select() for ever loop");
+        _DEBUG("%s\n", "select()'ing on server socket for pkts");
         print_window(w);
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
+        /* todo: add 12 * 3 or 40 second timeout on select() */
 
         err = select(sockfd + 1, &rset, NULL, NULL, NULL);
         if(err < 0){
-            if(err == EINTR){
+            if(err == EINTR) {
                 continue;
             }
             perror("clirecv().select()");
@@ -389,7 +394,12 @@ int clirecv(int sockfd, struct window* w) {
                 return -1;
             }
             /* not a FIN: try to drop it */
-            if(drand48() >= pkt_loss_thresh) {
+            if(DROP_PKT()) {
+                /* drop the pkt */
+                printf("DROPPED RECV'ing PKT: ");
+                print_hdr((struct xtcphdr *) pkt);
+                continue;
+            } else {
                 /**
                 * keep the pkt:
                 * Pretend like the code after the "break;" is in here.
@@ -398,15 +408,12 @@ int clirecv(int sockfd, struct window* w) {
                 */
                 _DEBUG("keeping pkt with seq: %"PRIu32"\n", ((struct xtcphdr*)pkt)->seq);
                 err = cli_add_send(sockfd, (struct xtcphdr*)pkt, (int)bytes, w);
-                /*fixme: don't break? */
+                /* todo: check return codes */
+                /* fixme: don't break here? */
                 break;
-
-            } else {
-                /* drop the pkt */
-                printf("DROPPED RECV'ing PKT: ");
-                print_hdr((struct xtcphdr *) pkt);
-                continue;
             }
+        } else{
+            /* todo: add timeout */
         }
         /* end of select for(EVER) */
     }
