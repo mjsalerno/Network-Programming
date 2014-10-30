@@ -8,6 +8,8 @@ all: client server
 
 %: %.c
 
+%: %.o
+
 %: %.o common.o xtcp.o get_ifi_info_plus.o rtt.o
 	$(CC) $(FLAGS) $^ $(LIBS) -o $@
 
@@ -18,9 +20,6 @@ common.o: common.c common.h unp.h get_ifi_info_plus.o
 	$(CC) $(FLAGS) -c $< -o $@
 
 get_ifi_info_plus.o: get_ifi_info_plus.c config.h unp.h unpifiplus.h
-	$(CC) $(FLAGS) -c $< -o $@
-
-xtcp.o: xtcp.c xtcp.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:

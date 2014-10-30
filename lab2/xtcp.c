@@ -82,7 +82,7 @@ void print_window(struct window *w){
     #ifdef DEBUG
     printf("DEBUG |window| nodes:\n");
     do {
-        printf("====== node %3d ========\n", n);
+        printf("====== node %3d =======\n", n);
         printf("|Datalen: %15d |\n", curr->datalen);
         printf("|Pkt ptr: %15p |\n", (void *)curr->pkt);
         if(curr->pkt != NULL) {
@@ -246,7 +246,6 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
     }
 
     pkt = alloc_pkt(w->servlastseqsent + 1, 0, flags, 0, data, datalen);
-    w->servlastseqsent = w->servlastseqsent + 1;
     print_hdr(pkt);
 
     seqtoadd = ((struct xtcphdr*) pkt)->seq;
@@ -295,6 +294,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
         _ERROR("%s\n", "srv_add_send().send()");
         exit(EXIT_FAILURE);
     }
+    w->servlastseqsent = w->servlastseqsent + 1;
     ntohpkt(pkt);
     printf("SENT ");
     print_hdr(pkt);

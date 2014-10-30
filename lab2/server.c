@@ -263,6 +263,11 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     print_sock_peer(child_sock, &cliaddr);
     printf("\n");
 
+    /* init window */
+    _DEBUG("%s\n", "init_wnd()");
+    wnd = init_window(3, start_seq, 1, 0, 0);
+    print_window(wnd);
+
     _DEBUG("%s\n", "doing hs2 ...");
     err = hand_shake2(par_sock, cliaddr, child_sock, childaddr.sin_port);
     if(err != EXIT_SUCCESS) {
@@ -276,11 +281,6 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     memset (&sa, 0, sizeof (sa));
     sa.sa_handler = &sig_alrm;
     sigaction (SIGALRM, &sa, NULL);
-
-    /* init window */
-    _DEBUG("%s\n", "init_wnd()");
-    wnd = init_window(3, start_seq, 1, 0, 0);
-    print_window(wnd);
 
     /* TODO: err = close(everything);*/
     close(par_sock);
@@ -456,7 +456,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
 
     _DEBUG("child| ACK: %" PRIu32 " SEQ: %" PRIu32 "\n", ini_ack_seq, ini_seq);
 
-    hdr = alloc_pkt(ini_seq, ini_ack_seq, flags, ini_advwin, &newport, 2);
+    hdr = alloc_pkt(++ini_seq, ++ini_ack_seq, flags, ini_advwin, &newport, 2);
     printf("sent hs2: ");
     print_hdr(hdr);
     htonpkt(hdr);
@@ -533,6 +533,8 @@ redo_hs2:
             exit(EXIT_FAILURE);
         }
     }
+    ntohpkt(hdr);
+    wnd->servlastseqsent = hdr->seq;
     free(hdr);
 
     /* will happen when breaking out of while above */
@@ -551,6 +553,7 @@ redo_hs2:
     } while(errno == EINTR && n < 0);
 
     ntohpkt((struct xtcphdr*) pktbuf);
+    wnd->servlastackrecv =((struct xtcphdr*) pktbuf)->ack_seq;
     printf("GOT: ");
     print_hdr((struct xtcphdr *) pktbuf);
     if(((struct xtcphdr*) pktbuf)->flags != ACK

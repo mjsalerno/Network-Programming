@@ -383,7 +383,8 @@ int clirecv(int sockfd, struct window* w) {
             pkt[bytes] = 0; /* NULL terminate the ASCII text */
 
             /* if it's a FIN or RST don't try to drop it, we're closing dirty! */
-            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN){
+            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN) {
+                /* FIXME: buffer FIN */
                 _DEBUG("%s\n", "clirecv()'d a FIN packet.");
                 free(pkt);
                 return 0;
@@ -410,7 +411,7 @@ int clirecv(int sockfd, struct window* w) {
                 err = cli_add_send(sockfd, (struct xtcphdr*)pkt, (int)bytes, w);
                 /* todo: check return codes */
                 /* fixme: don't break here? */
-                break;
+                return 1;
             }
         } else{
             /* todo: add timeout */
