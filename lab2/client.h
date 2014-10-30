@@ -16,6 +16,8 @@ Returns -1 on failure with perror() printed
         0 on success
 */
 int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname);
+void unget_lock(pthread_mutex_t* lock);
+void get_lock(pthread_mutex_t* lock);
 int validate_hs2(struct xtcphdr* hdr, int len);
 void *consumer_main(void *);
 int consumer_read();

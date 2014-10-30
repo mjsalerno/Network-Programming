@@ -8,7 +8,7 @@ extern double pkt_loss_thresh; /* packet loss percentage */
 static double u; /* (!!in ms!!) mean of the exponential distribution func */
 
 static struct window* w;
-pthread_mutex_t w_mutex;
+extern pthread_mutex_t w_mutex;
 
 int main(void) {
     ssize_t err; /* for error checking */
@@ -288,7 +288,9 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
 
     /* move on to third handshake */
     /* init the window and the wnd_base_seq */
+    get_lock(&w_mutex);
     w = init_window(advwin, 0, 0, ack_seq-1, ack_seq-1+advwin);
+    unget_lock(&w_mutex);
 
     sendpkt = alloc_pkt(seq, ack_seq, ACK, advwin, NULL, 0);
     printf("try send hs3: \n");
@@ -354,7 +356,11 @@ int clirecv(int sockfd, struct window* w) {
         /*continue_with_select: */
         /* todo: remove this print? */
         _DEBUG("%s\n", "select()'ing on server socket for pkts");
+
+        get_lock(&w_mutex);
         print_window(w);
+        unget_lock(&w_mutex);
+
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
         /* todo: add 12 * 3 or 40 second timeout on select() */
@@ -488,22 +494,12 @@ void *consumer_main(void *null) {
         _DEBUG("CONSUMER: sleeping for:  %fms\n", msecs_d);
 
         usleep(usecs);
-        err = pthread_mutex_lock(&w_mutex);
-        if(err > 0){
-            errno = err;
-            perror("CONSUMER: ERROR pthread_mutex_destroy()");
-            exit(EXIT_FAILURE);
-        }
+        get_lock(&w_mutex);
 
         /* todo: read from wnd */
         consumer_read();
 
-        pthread_mutex_unlock(&w_mutex);
-        if(err > 0){
-            errno = err;
-            perror("CONSUMER: ERROR pthread_mutex_destroy()");
-            exit(EXIT_FAILURE);
-        }
+        unget_lock(&w_mutex);
     }
 
     err = pthread_mutex_destroy(&w_mutex);
