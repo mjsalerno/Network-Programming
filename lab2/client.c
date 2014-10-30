@@ -497,7 +497,7 @@ void *consumer_main(void *null) {
         /* todo: read from wnd */
         consumer_read();
 
-        pthread_mutex_unlock(&w_mutex);
+        err = pthread_mutex_unlock(&w_mutex);
         if(err > 0){
             errno = err;
             perror("CONSUMER: ERROR pthread_mutex_destroy()");
@@ -515,6 +515,9 @@ void *consumer_main(void *null) {
     return null;
 }
 
+/**
+* fixme: after reading fin die!
+*/
 int consumer_read() {
     struct win_node* at;
     int count = 0;

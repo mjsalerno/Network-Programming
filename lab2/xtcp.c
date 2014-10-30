@@ -66,7 +66,7 @@ void print_window(struct window *w){
     struct win_node* head = w->base;
     struct win_node* curr = head;
     int n = -1;
-    n++;
+    n++; /* for -pedantic -Wextra */
     printf("|window| maxwnd: %6d, cwin: %6d, ssthresh: %6d, \n",
             w->maxsize, w->cwin, w->ssthresh);
 
@@ -82,7 +82,7 @@ void print_window(struct window *w){
     #ifdef DEBUG
     printf("DEBUG |window| nodes:\n");
     do {
-        printf("====== node %3d ========\n", n);
+        printf("========= node %3d =========\n", n);
         printf("|Datalen: %15d |\n", curr->datalen);
         printf("|Pkt ptr: %15p |\n", (void *)curr->pkt);
         if(curr->pkt != NULL) {
@@ -92,8 +92,9 @@ void print_window(struct window *w){
         }
         printf("|Next:    %15p |\n", (void *)curr->next);
         printf("|This:    %15p |\n", (void *)curr);
-        printf("====== node %3d =======\n", n);
+        printf("========= node %3d ========\n", n);
         curr = curr->next;
+        n++;
     } while(curr != head);
     #endif
 }
@@ -499,9 +500,8 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
 
 
 /**
-* Looks for node with a pkt containing the seqtoget
-*
-* todo: finish
+* Finds the node where seqtoget should go and returns it.
+* Returns NULL if not in the window
 */
 struct win_node* get_node(uint32_t seqtoget, struct window *w) {
     struct win_node* base;
@@ -517,24 +517,33 @@ struct win_node* get_node(uint32_t seqtoget, struct window *w) {
         _ERROR("%s\n", "w->base is NULL!");
         exit(EXIT_FAILURE);
     }
-    _DEBUG("%s", "Looking for win_node to grab...\n");
+
+    /* below window              or             above window */
+    if(seqtoget < w->clibaseseq  || seqtoget >= (w->clibaseseq + w->maxsize)) {
+        _DEBUG("Returning NULL, %"PRIu32" is outside the window\n", seqtoget);
+        return NULL;
+    }
+
+    _DEBUG("Looking for win_node to grab %"PRIu32"...\n", seqtoget);
 
     curr = base;
     do {
-        _DEBUG("looking at win_node #%d ...", n);seqtoget++;
+        _DEBUG("looking at win_node #%d ...", n);
+        if(seqtoget ==  (w->clibaseseq + n)) {
+            _DEBUG("Found %"PRIu32" in win_node #%d\n", seqtoget, n);
+            return curr;
+        }
+
         if(curr == NULL){
             _ERROR("win_node #%d is NULL, init your window!\n", n);
             print_window(w);
             exit(EXIT_FAILURE);
         }
-
-
         curr = curr->next;
         n++;
     } while(curr != base); /* stop if we wrap around */
 
-    return curr;
-
-
-
+    _ERROR("Shouldn't reach this spot! seqtoget: %"PRIu32", "
+            "clibaseseq: %"PRIu32", maxsize: %d\n", seqtoget, w->clibaseseq, w->maxsize);
+    return NULL; /* we wrapped around */
 }
