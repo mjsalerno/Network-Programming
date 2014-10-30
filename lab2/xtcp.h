@@ -22,6 +22,7 @@
 #define TIME_OUT 2
 
 extern double pkt_loss_thresh; /* packet loss percentage */
+#define DROP_PKT() (drand48() < (pkt_loss_thresh))
 
 struct xtcphdr {
     uint32_t seq;
@@ -32,7 +33,7 @@ struct xtcphdr {
 };
 
 struct win_node {
-    size_t datalen;
+    int datalen;
     struct xtcphdr* pkt;
     struct win_node* next;
 };
@@ -69,8 +70,6 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt);
 
 
 void clisend_lossy(int sockfd, void *pkt, size_t datalen);
-int cli_ack(int sockfd, char **wnd);
-int cli_dup_ack(int sockfd);
 
 
 void free_window(struct win_node* head);
