@@ -48,7 +48,7 @@ void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_w
     if(data == NULL || datalen <= 0){
         datalen = 0;
     }
-    pkt= malloc(DATA_OFFSET + datalen);
+    pkt = malloc(DATA_OFFSET + datalen);
     if(pkt == NULL){
         perror("ERROR: alloc_pkt().malloc()");
         exit(EXIT_FAILURE);
@@ -150,14 +150,16 @@ void free_window(struct win_node* head) {
 * Called to init the sliding window.
 */
 struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
-        uint32_t cli_last_seqn_recvd, uint32_t cli_top_accept_seqn){
+        uint32_t cli_last_seqn_recvd, uint32_t cli_top_accept_seqn) {
 
     struct window* w;
+
     w = malloc(sizeof(struct window));
-    if(w == NULL){
+    if(w == NULL) {
         perror("ERROR init_window().malloc()");
         exit(EXIT_FAILURE);
     }
+
     w->maxsize = maxsize;
     w->lastadvwinrecvd = maxsize;
     w->servlastackrecv = srv_last_ack_seq_recvd;
@@ -212,7 +214,7 @@ void srv_send_base(int sockfd, struct window *w) {
 * Prints the window and the header sent.
 *
 */
-void srv_add_send(int sockfd, void* data, size_t datalen, struct window *w) {
+void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct window *w) {
     struct win_node *base;
     struct win_node *curr;
     int n = 0;
@@ -223,26 +225,26 @@ void srv_add_send(int sockfd, void* data, size_t datalen, struct window *w) {
     effectivesize = MIN(w->cwin, MIN(w->lastadvwinrecvd, w->maxsize));
 
     if(w == NULL) {
-        _ERROR("srv_add_send() w is NULL!\n");
+        _ERROR("%s\n", "srv_add_send() w is NULL!\n");
         exit(EXIT_FAILURE);
     }
     if(data == NULL) {
-        _ERROR("srv_add_send() data is NULL, can't add/send NULL!\n");
+        _ERROR("%s\n", "srv_add_send() data is NULL, can't add/send NULL!\n");
         exit(EXIT_FAILURE);
     }
     base = w->base;
     if(base == NULL) {
-        _ERROR("srv_add_send() w->base is NULL!\n");
+        _ERROR("%s\n", "srv_add_send() w->base is NULL!\n");
         exit(EXIT_FAILURE);
     }
 
     if(effectivesize <= 0) {
-        _ERROR("srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
+        _ERROR("%s\n", "srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
         print_window(w);
         exit(EXIT_FAILURE);
     }
 
-    pkt = alloc_pkt(w->servlastseqsent + 1, 0, 0, 0, data, datalen);
+    pkt = alloc_pkt(w->servlastseqsent + 1, 0, flags, 0, data, datalen);
     w->servlastseqsent = w->servlastseqsent + 1;
     print_hdr(pkt);
 
@@ -260,19 +262,19 @@ void srv_add_send(int sockfd, void* data, size_t datalen, struct window *w) {
         n++;
         curr = curr->next;
         if(curr == NULL) {
-            _ERROR("srv_add_send() a win_node is NULL, init your window!\n");
+            _ERROR("%s\n", "srv_add_send() a win_node is NULL, init your window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
         if(curr == base) {
-            _ERROR("srv_add_send() reached the base while trying to add to window!\n");
+            _ERROR("%s\n", "srv_add_send() reached the base while trying to add to window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
     }
     /* curr is now at the win_node we want? */
     if(curr->datalen >= 0 || curr->pkt != NULL) {
-        _ERROR("srv_add_send() curr->pkt not empty!\n");
+        _ERROR("%s\n", "srv_add_send() curr->pkt not empty!\n");
         print_window(w);
         exit(EXIT_FAILURE);
     } else {
@@ -367,74 +369,6 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
 
     return rtn;
-}
-
-
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new, uint16_t* cli_wnd) {
-
-    int err;
-    void *pkt;
-
-    if(*cli_wnd < 1) {
-        if(!is_wnd_empty()) {
-            _DEBUG("%s\n", "The client window was too small, pretending like my window is full ...");
-            return -1;
-        } else {
-            _DEBUG("%s\n", "The client window was too small, but there isnothing to be ACKed... WHAT DO?");
-        }
-    }
-
-    pkt = malloc(sizeof(struct xtcphdr) + datalen);
-    make_pkt(pkt, flags, advwin, data, datalen);
-
-    printf("SENDING: ");
-    print_hdr((struct xtcphdr*)pkt);
-    htonpkt((struct xtcphdr*)pkt);
-    /* fixme: double check */
-    /* todo: do WND/rtt stuff */
-    if(is_new) {
-        if (can_add_to_wnd(seq)) {
-            err = add_to_wnd(seq, pkt, (const char **) wnd);
-            if (err == E_OCCUPIED) {
-                _DEBUG("ERROR: tried to re-insert seq: %"PRIu32"\n", seq);
-                free(pkt);
-                return -2;
-            } else if (err == E_ISFULL) {
-                _DEBUG("%s\n", "The window was full, not sending");
-                free(pkt);
-                return -1;
-            } else if (err < 0) { /* some other error */
-                _DEBUG("ERROR: SOMETHING IS WRONG, err: %d", err);
-                return -6;
-            } else { /* added to wnd correctly */
-                _DEBUG("%s\n", "packet was added ...");
-            }
-        } else {
-            _DEBUG("can't add to wnd with seq: %"PRIu32"\n", seq);
-            free(pkt);
-            return -1;
-        }
-    }
-    else{
-        _DEBUG("%s\n", "sending old data...");
-    }
-
-    do {
-        err = (int)send(sockfd, pkt, DATA_OFFSET + datalen, 0);
-    } while(errno == EINTR && err < 0);
-    if(err < 0) {
-        perror("xtcp.srvsend()");
-        /* FIXME: fix this */
-        _DEBUG("%s\n", "ERROR ERROR: DOING BAD THINGS!!!!!");
-        /* remove_from_wnd((const char **)wnd); */
-        free(pkt);
-        return -2;
-    }
-
-    (*cli_wnd)--;
-    print_wnd((const char**)wnd);
-
-    return 1;
 }
 
 /**

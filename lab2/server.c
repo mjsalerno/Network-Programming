@@ -1,15 +1,21 @@
+#define DEBUG
 #include <time.h>
+#include <setjmp.h>
 #include "server.h"
+#include "rtt.h"
 
 struct client_list* cliList;
 
-extern uint32_t seq;
-extern uint32_t ack_seq;
-extern uint16_t advwin;
-
 static uint32_t start_seq;
-static uint16_t cli_wnd;
 static struct iface_info* ifaces;
+
+static struct rtt_info   rttinfo;
+static sigjmp_buf	jmpbuf;
+static struct window* wnd;
+static uint16_t ini_advwin;
+static uint32_t ini_seq;
+
+uint32_t ini_ack_seq;
 
 int main(int argc, const char **argv) {
     const char *path;
@@ -57,12 +63,12 @@ int main(int argc, const char **argv) {
     printf("Port: %hu\n", port);
 
     /*Get the window size*/
-    advwin = (uint16_t)int_from_config(file, "There was an error getting the window size number");
-    if(advwin < 1) {
+    ini_advwin = (uint16_t)int_from_config(file, "There was an error getting the window size number");
+    if(ini_advwin < 1) {
         fprintf(stderr, "The window can not be less than 1\n");
         exit(EXIT_FAILURE);
     }
-    _DEBUG("Window: %hu\n", advwin);
+    _DEBUG("Window: %hu\n", ini_advwin);
     _DEBUG("config: %s\n", path);
 
     err = fclose(file);
@@ -122,7 +128,7 @@ int main(int argc, const char **argv) {
         } while(errno == EINTR && n < 0);
 
         ntohpkt((struct xtcphdr*)pkt);
-        ack_seq = ((struct xtcphdr*)pkt)->seq;
+        ini_ack_seq = ((struct xtcphdr*)pkt)->seq;
 
         pkt[n] = 0;
         if(((struct xtcphdr*)pkt)->flags != SYN) {
@@ -147,9 +153,8 @@ int main(int argc, const char **argv) {
 
 
         /* pick the smallest advwin */
-        advwin = ((struct xtcphdr*)pkt)->advwin < advwin ? ((struct xtcphdr*)pkt)->advwin : advwin;
-        cli_wnd = advwin;
-        _DEBUG("new advwin: %d\n", advwin);
+        ini_advwin = ((struct xtcphdr*)pkt)->advwin < ini_advwin ? ((struct xtcphdr*)pkt)->advwin : ini_advwin;
+        _DEBUG("new advwin: %d\n", ini_advwin);
 
         print_hdr((struct xtcphdr *) pkt);
         _DEBUG("Got filename: %s\n", pkt + DATA_OFFSET);
@@ -185,8 +190,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     int err;
     int child_sock;
     socklen_t len;
-
-    char** wnd;  /* the actual window */
+    struct sigaction sa;
 
     _DEBUG("%s\n", "In child");
 
@@ -270,10 +274,14 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         exit(EXIT_FAILURE);
     }
 
+    memset (&sa, 0, sizeof (sa));
+    sa.sa_handler = &sig_alrm;
+    sigaction (SIGALRM, &sa, NULL);
+
     /* init window */
     _DEBUG("%s\n", "init_wnd()");
-    wnd  = init_wnd(start_seq);
-    print_wnd((const char**)wnd);
+    wnd = init_window(3, start_seq, 1, 0, 0);
+    print_window(wnd);
 
     /* TODO: err = close(everything);*/
     close(par_sock);
@@ -284,7 +292,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     print_sock_peer(child_sock, &cliaddr);
 
     _DEBUG("%s\n", "Sending file ...");
-    err = send_file(fname, child_sock, wnd);
+    err = send_file(fname, child_sock);
     if(err < 0) {
         _DEBUG("%s\n", "Something went wrong while sending the file.");
     }
@@ -298,11 +306,10 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
             _DEBUG("%s\n", "got ACK");
         }
 
-        print_wnd((const char **)wnd);
+        print_window(wnd);
     }
 
     _DEBUG("%s\n", "sending FIN");
-    ++seq;
     /*srvsend(child_sock, FIN, NULL, 0, wnd);*/
     send_fin(child_sock);
 
@@ -311,26 +318,14 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     _DEBUG("%s\n", "cleaning up client list ...");
     free_clients(cliList);
     _DEBUG("%s\n", "cleaning up window ...");
-    free_wnd(wnd);
+    free_window(wnd);
     _DEBUG("%s\n", "Exiting child");
     exit(EXIT_SUCCESS);
 }
 
 void send_fin(int sock) {
     ssize_t err;
-    void* pkt = malloc(sizeof(struct xtcphdr));
-    make_pkt(pkt, FIN, advwin, NULL, 0);
-    printf("SENDING: ");
-    print_hdr(pkt);
-    htonpkt(pkt);
-    do {
-        err = send(sock, pkt, sizeof(struct xtcphdr), 0);
-    } while(errno == EINTR && err < 0);
-    if(err < 0) {
-        perror("send_fin()");
-    }
-
-    free(pkt);
+    srv_add_send(sock, NULL, 0, FIN, wnd);
 }
 
 void proc_exit(int i) {
@@ -448,7 +443,7 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
     ssize_t n;
     socklen_t len;
     char pktbuf[BUFF_SIZE];
-    struct xtcphdr* hdr = malloc(sizeof(struct xtcphdr) + 2);
+    struct xtcphdr* hdr;
     uint16_t flags = 0;
     fd_set rset;
     int err;
@@ -457,15 +452,13 @@ int hand_shake2(int par_sock, struct sockaddr_in cliaddr, int child_sock, in_por
 
 
     srand48(1);
-    seq = (uint32_t)lrand48();
+    ini_seq = (uint32_t)lrand48();
 
     flags = SYN|ACK;
-    ++seq;
-    ++ack_seq;
 
-    _DEBUG("child| ACK: %" PRIu32 " SEQ: %" PRIu32 "\n", ack_seq, seq);
+    _DEBUG("child| ACK: %" PRIu32 " SEQ: %" PRIu32 "\n", ini_ack_seq, ini_seq);
 
-    make_pkt(hdr, flags, advwin, &newport, 2);
+    hdr = alloc_pkt(ini_seq, ini_ack_seq, flags, ini_advwin, &newport, 2);
     printf("sent hs2: ");
     print_hdr(hdr);
     htonpkt(hdr);
@@ -563,8 +556,8 @@ redo_hs2:
     printf("GOT: ");
     print_hdr((struct xtcphdr *) pktbuf);
     if(((struct xtcphdr*) pktbuf)->flags != ACK
-            || ((struct xtcphdr*) pktbuf)->ack_seq != (seq + 1)
-            || ((struct xtcphdr*) pktbuf)->seq != ack_seq) {
+            || ((struct xtcphdr*) pktbuf)->ack_seq != (ini_seq + 1)
+            || ((struct xtcphdr*) pktbuf)->seq != ini_ack_seq) {
         printf("client's flags||ack||seq are wrong, handshake broken\n");
         exit(EXIT_FAILURE);
     }
@@ -576,83 +569,71 @@ redo_hs2:
     return EXIT_SUCCESS;
 }
 
-
-int send_file(char* fname, int sock, char **wnd) {
-    FILE *file;
-    char data[MAX_DATA_SIZE] = {0};  /* buffer for sending file and getting ACKs */
+int send_file(char* fname, int sock) {
+    FILE* file;
     size_t n;
-    int err, tally, save_data;
-
-    save_data = 0;
-    tally = 0;
-    n = 0;
+    int tally = 0;
+    char data[MAX_DATA_SIZE];
 
     file = fopen(fname, "r");
     if(file == NULL) {
-        fprintf(stderr, "send_file.fopen(%s",fname);
-        perror(")");
-        return EXIT_FAILURE;
+        perror("new_send_file()");
+        exit(EXIT_FAILURE);
     }
 
     for(EVER) {
-        if(save_data) {
-            _DEBUG("%s\n", "sending old data ...");
-            goto saving_data;
-        }
-        n = fread(data, 1, MAX_DATA_SIZE, file);
-        tally += n;
-        _DEBUG("send_file.fread(%lu)\n", (unsigned long)n);
-        if (ferror(file)) {
-            printf("server.send_file(): There was an error reading the file\n");
-            clearerr(file);
-            fclose(file);
-            return EXIT_FAILURE;
-        } else if(feof(file) && n < 1) {
-            printf("File finished uploading ...\n");
-            break;
-        } else {
-            ++seq;
-saving_data:
-            _DEBUG("sending %lu bytes of file\n", (unsigned long) n);
 
-            err = srvsend(sock, 0, data, n, wnd, !save_data, &cli_wnd);
-            if(err == -1) {                                                           /* the error code for full window */
-                save_data = 1;
-                err = get_aks(wnd, sock, 0);
-                if(err < 0) {
-                    _DEBUG("%s\n", "there is something wrong woth the AKS");
-                    return EXIT_FAILURE;
-                }
+        if(!is_wnd_full()) {
+            n = fread(data, 1, MAX_DATA_SIZE, file);
+            tally += n;
+            _DEBUG("send_file.fread(%lu)\n", (unsigned long) n);
+            if (ferror(file)) {
+                printf("server.send_file(): There was an error reading the file\n");
+                clearerr(file);
+                fclose(file);
+                return EXIT_FAILURE;
 
-            } else if(err < 0) {
-                printf("server.send_file(): there was an error sending the file\n");
-            } else {
-                save_data = 0;
+            } else if (feof(file) && n < 1) {
+                printf("File finished uploading ...\n");
+                break;
             }
+            srv_add_send(sock, data, n, 0,wnd);
+
+            if (is_wnd_empty()) {
+                refresh_timer();
+                _NOTE("%s\n", "the window is empty, refreshing timer");
+            }
+
+            if (sigsetjmp(jmpbuf, 1) != 0) {
+                if (rtt_timeout(&rttinfo) < 0) {
+                    _ERROR("%s\n", "The packet has timed out, giving up\n");
+                    /* todo: send_rst(); */
+                    exit(EXIT_FAILURE);
+                } else {
+                    _NOTE("%s\n", "Packet timeout, resending");
+                    srv_send_base(sock, wnd);
+                    wnd->ssthresh = wnd->cwin/2;
+                    wnd->cwin = 1;
+                    break;
+                }
+            }
+        } else {
+            recv_acks(sock, 0);
         }
     }
 
-    _DEBUG("tally: %d\n", tally);
-    fclose(file);
-
-    return EXIT_SUCCESS;
+    return 1;
 }
 
-int get_aks(char** wnd, int sock, int always_block) {
-    void* pkt;
-    int err;
+int recv_acks(int sock, int always_block) {
     int flag;
+    int err;
     int acks = 0;
+    char pkt[MAX_PKT_SIZE];
 
-    pkt = malloc(MAX_PKT_SIZE);
-    if(pkt == NULL) {
-        perror("get_aks(): ");
-        return -1;
-    }
+    for(EVER) {
 
-    for(EVER) {                                                           /* listen for ACKs */
-        print_wnd((const char**) wnd);
-        if((is_wnd_full() || always_block) && !is_wnd_empty()) {                                               /* see if we need to wait for the window */
+        if ((is_wnd_full() || always_block) && !is_wnd_empty()) {
             flag = 0;
             _DEBUG("%s\n", "wnd IS full or quitting, recv WILL block");
         } else {
@@ -667,47 +648,46 @@ int get_aks(char** wnd, int sock, int always_block) {
             if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
                 fprintf(stderr, "send_file.get_ack(%d", err);
                 perror(")");
-                free(pkt);
                 return -1;
             } else {                                                       /* no ACKs */
                 _DEBUG("EWOULDBLOCK: ACKs recvd: %d\n", acks);
                 break;
             }
         } else {                                                           /* got an ACK */
-            ntohpkt(pkt);
+            acks++;
+            ntohpkt((struct xtcphdr*)pkt);
             printf("GOT: ");
-            print_hdr(pkt);
+            print_hdr((struct xtcphdr*)pkt);
             _DEBUG("got an ACK: SEQ: %" PRIu32 " ACK: %" PRIu32 "\n",
                     ((struct xtcphdr *)pkt)->seq,
                     ((struct xtcphdr *)pkt)->ack_seq);
 
-            err = handle_ack((struct xtcphdr *)pkt, wnd);
-            if(err < 0) {
-                _DEBUG("%s\n", "There was something wrong with client ACK");
-                _DEBUG("ACKs recvd before error: %d\n", acks);
-                return -1;
-            }
+            new_ack_recvd(wnd, (struct xtcphdr*)pkt);
         }
     }
 
-    free(pkt);
     return acks;
 }
 
-int handle_ack(struct xtcphdr* pkt, char** wnd) {
-    uint32_t pkt_ack = pkt->ack_seq;
-    int count = 0;
+void refresh_timer() {
+    rtt_init(&rttinfo);
+    rtt_d_flag = 1;
 
-    while(ge_base(pkt_ack -1)) {
-        count++;
-        _DEBUG("eating pkts until SEQ: %" PRIu32 "\n",  pkt_ack);
-        cli_wnd = pkt->advwin;
-        _DEBUG("Reset cli_wnd: %" PRIu16 "\n",  cli_wnd);
+    rtt_newpack(&rttinfo);
 
-        remove_from_wnd((const char **) wnd);
-    }
+    struct itimerval newtimer =  {(struct timeval){0, 0}, (struct timeval){0,rtt_start(&rttinfo)}};
+    setitimer(ITIMER_REAL, &newtimer, NULL);
+}
 
-    /*if(count == 0) count = -1;*/
-    _DEBUG("ate %d pkts\n", count);
-    return count;
+int is_wnd_full() {
+    return wnd->servlastseqsent >= (wnd->servlastackrecv + MIN(wnd->cwin, MIN(wnd->lastadvwinrecvd, wnd->maxsize)));
+}
+
+int is_wnd_empty() {
+    return wnd->servlastackrecv == wnd->servlastseqsent;
+}
+
+static void sig_alrm(int signo) {
+    signo++;
+    siglongjmp(jmpbuf, 1);
 }
