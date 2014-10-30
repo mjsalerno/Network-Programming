@@ -308,9 +308,15 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         print_window(wnd);
     }
 
-    _DEBUG("%s\n", "sending FIN");
-    /*srvsend(child_sock, FIN, NULL, 0, wnd);*/
-    quick_send(child_sock, FIN);
+    _NOTE("%s\n", "sending FIN");
+
+    if(is_wnd_full()) {
+        recv_acks(child_sock, 0);
+    }
+    srv_add_send(child_sock, NULL, 0, FIN, wnd);
+
+    _NOTE("%s\n", "Waiting for client to ACK all pkts ...");
+    recv_acks(child_sock, 1);
 
     _DEBUG("%s\n", "cleaning up sockets ...");
     close(child_sock);
@@ -598,12 +604,13 @@ int send_file(char* fname, int sock) {
                 printf("File finished uploading ...\n");
                 break;
             }
-            srv_add_send(sock, data, n, 0,wnd);
 
             if (is_wnd_empty()) {
                 refresh_timer();
                 _NOTE("%s\n", "the window is empty, refreshing timer");
             }
+
+            srv_add_send(sock, data, n, 0,wnd);
 
             if (sigsetjmp(jmpbuf, 1) != 0) {
                 if (rtt_timeout(&rttinfo) < 0) {
@@ -613,9 +620,7 @@ int send_file(char* fname, int sock) {
                 } else {
                     _NOTE("%s\n", "Packet timeout, resending");
                     srv_send_base(sock, wnd);
-                    if(wnd->cwin > 1) {
-                        wnd->ssthresh = wnd->cwin / 2;
-                    }
+                    wnd->ssthresh = MAX(wnd->cwin / 2, 1);
                     wnd->cwin = 1;
                     break;
                 }
@@ -666,6 +671,8 @@ int recv_acks(int sock, int always_block) {
                     ((struct xtcphdr *)pkt)->ack_seq);
 
             new_ack_recvd(wnd, (struct xtcphdr*)pkt);
+            _DEBUG("%s\n", "refreshing timer");
+            refresh_timer();
         }
     }
 
@@ -674,23 +681,13 @@ int recv_acks(int sock, int always_block) {
 
 void refresh_timer() {
     struct itimerval newtimer;
-    struct timeval tv1;
-    struct timeval tv2;
 
-    rtt_d_flag = 1;
     rtt_init(&rttinfo);
-
-    tv1.tv_sec = 0;
-    tv1.tv_usec = 0;
-
-    tv2.tv_sec = 0;
-    tv2.tv_usec = rtt_start(&rttinfo);
-
-    newtimer.it_interval = tv1;
-    newtimer.it_value = tv2;
+    rtt_start(&rttinfo, &newtimer);
 
     rtt_newpack(&rttinfo);
     setitimer(ITIMER_REAL, &newtimer, NULL);
+    _DEBUG("%s\n", "timer refreshed");
 }
 
 int is_wnd_full() {

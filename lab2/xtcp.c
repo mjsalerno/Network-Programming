@@ -378,6 +378,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
 }
 
 void fast_retransmit(struct window* w) {
+    _NOTE("%s\n", "Sending Fast Retransmit");
     w->ssthresh = MAX(((w->servlastseqsent - w->base->pkt->seq)/ 2), 2);
     /* todo: finish me*/
 }
