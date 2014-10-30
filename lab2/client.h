@@ -7,6 +7,9 @@
 
 #include "debug.h"
 
+extern double pkt_loss_thresh; /* packet loss percentage */
+#define DROP_PKT() (drand48() < (pkt_loss_thresh))
+
 /*
 Performs handshakes.
 Returns -1 on failure with perror() printed

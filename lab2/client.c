@@ -4,7 +4,7 @@ static uint32_t seq;
 static uint32_t ack_seq; /* also used by wnd as next expected seq */
 static uint16_t advwin;
 
-double pkt_loss_thresh; /* packet loss percentage */
+extern double pkt_loss_thresh; /* packet loss percentage */
 static double u; /* (!!in ms!!) mean of the exponential distribution func */
 
 static struct window* w;

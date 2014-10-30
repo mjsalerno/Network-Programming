@@ -21,7 +21,7 @@
 
 #define TIME_OUT 2
 
-extern double pkt_loss_thresh; /* packet loss percentage */
+double pkt_loss_thresh; /* packet loss percentage */
 #define DROP_PKT() (drand48() < (pkt_loss_thresh))
 
 struct xtcphdr {
