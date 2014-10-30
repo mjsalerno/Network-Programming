@@ -28,15 +28,21 @@ set(IFFY_SOURCE_FILES
     unp.h
     unpifiplus.h)
 
+set(RTT_SOURCE_FILES
+    rtt.c
+    rtt.h)
+
 add_library(commonlib OBJECT ${COMMON_SOURCE_FILES})
 add_library(xtcplib OBJECT ${XTCP_SOURCE_FILES})
 add_library(iffylib OBJECT ${IFFY_SOURCE_FILES})
+add_library(rttlib OBJECT ${RTT_SOURCE_FILES})
 
 add_executable(server
 	${SERVER_SOURCE_FILES}
 	$<TARGET_OBJECTS:xtcplib>
 	$<TARGET_OBJECTS:commonlib>
-	$<TARGET_OBJECTS:iffylib>)
+	$<TARGET_OBJECTS:iffylib>
+	$<TARGET_OBJECTS:rttlib>)
 
 add_executable(client
 	${CLIENT_SOURCE_FILES}
