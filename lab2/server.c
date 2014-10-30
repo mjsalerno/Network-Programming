@@ -1,4 +1,3 @@
-#define DEBUG
 #include <time.h>
 #include <setjmp.h>
 #include "server.h"
@@ -299,7 +298,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     while(!is_wnd_empty()) {
         _DEBUG("%s\n", "QUITING: waiting for unACKed pkts");
-        err = get_aks(wnd, child_sock, 1);
+        err = recv_acks(child_sock, 1);
         if(err < 0) {
             _DEBUG("%s\n", "there was a problem getting ACKs");
         } else {
@@ -324,7 +323,6 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 }
 
 void send_fin(int sock) {
-    ssize_t err;
     srv_add_send(sock, NULL, 0, FIN, wnd);
 }
 
@@ -670,12 +668,23 @@ int recv_acks(int sock, int always_block) {
 }
 
 void refresh_timer() {
-    rtt_init(&rttinfo);
+    struct itimerval newtimer;
+    struct timeval tv1;
+    struct timeval tv2;
+
     rtt_d_flag = 1;
+    rtt_init(&rttinfo);
+
+    tv1.tv_sec = 0;
+    tv1.tv_usec = 0;
+
+    tv2.tv_sec = 0;
+    tv2.tv_usec = rtt_start(&rttinfo);
+
+    newtimer.it_interval = tv1;
+    newtimer.it_value = tv2;
 
     rtt_newpack(&rttinfo);
-
-    struct itimerval newtimer =  {(struct timeval){0, 0}, (struct timeval){0,rtt_start(&rttinfo)}};
     setitimer(ITIMER_REAL, &newtimer, NULL);
 }
 
