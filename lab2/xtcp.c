@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <cursesw.h>
 #include "xtcp.h"
 
 
@@ -212,36 +213,41 @@ void srv_send_base(int sockfd, struct window *w) {
 * Prints the window and the header sent.
 *
 */
-void srv_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window *w){
+void srv_add_send(int sockfd, void* data, size_t datalen, struct window *w) {
     struct win_node *base;
     struct win_node *curr;
     int n = 0;
     int effectivesize;
     uint32_t seqtoadd;
+    void* pkt;
 
     effectivesize = MIN(w->cwin, MIN(w->lastadvwinrecvd, w->maxsize));
 
     if(w == NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() w is NULL!\n");
+        _ERROR("srv_add_send() w is NULL!\n");
         exit(EXIT_FAILURE);
     }
-    if(pkt == NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() pkt is NULL, can't add/send NULL!\n");
+    if(data == NULL) {
+        _ERROR("srv_add_send() data is NULL, can't add/send NULL!\n");
         exit(EXIT_FAILURE);
     }
     base = w->base;
     if(base == NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() w->base is NULL!\n");
+        _ERROR("srv_add_send() w->base is NULL!\n");
         exit(EXIT_FAILURE);
     }
 
     if(effectivesize <= 0) {
-        fprintf(stderr, "ERROR: srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
+        _ERROR("srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
         print_window(w);
         exit(EXIT_FAILURE);
     }
 
-    seqtoadd = pkt->seq;
+    pkt = alloc_pkt(w->servlastseqsent + 1, 0, 0, 0, data, datalen);
+    w->servlastseqsent = w->servlastseqsent + 1;
+    print_hdr(pkt);
+
+    seqtoadd = ((struct xtcphdr*) pkt)->seq;
     if(seqtoadd != (w->servlastseqsent + 1)){
         fprintf(stderr, "ERROR: srv_add_send() seqtoadd: %"PRIu32" != "
                         "(w->servlastseqsent + 1): %"PRIu32"\n", seqtoadd,
@@ -255,24 +261,24 @@ void srv_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window *w
         n++;
         curr = curr->next;
         if(curr == NULL) {
-            fprintf(stderr, "ERROR: srv_add_send() a win_node is NULL, init your window!\n");
+            _ERROR("srv_add_send() a win_node is NULL, init your window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
         if(curr == base) {
-            fprintf(stderr, "ERROR: srv_add_send() reached the base while trying to add to window!\n");
+            _ERROR("srv_add_send() reached the base while trying to add to window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
     }
     /* curr is now at the win_node we want? */
     if(curr->datalen >= 0 || curr->pkt != NULL) {
-        fprintf(stderr, "ERROR: srv_add_send() curr->pkt not empty!\n");
+        _ERROR("srv_add_send() curr->pkt not empty!\n");
         print_window(w);
         exit(EXIT_FAILURE);
     } else {
         _DEBUG("%s", "Found win_node for pkt. Adding to window.\n");
-        curr->datalen = datalen;
+        curr->datalen = (int)datalen;
         curr->pkt = pkt;
         w->servlastseqsent = seqtoadd;
     }
@@ -295,19 +301,73 @@ void srv_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window *w
 * todo: Please mask sigalrm, sigprocmask()
 *
 */
-void newackrecvd(struct window *window, struct xtcphdr *pkt){
+void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
+    int count = 0;
+    static int total_acks = 0;
+    if(pkt->ack_seq > window->servlastseqsent) {
+        _ERROR("Client ACKing something i never sent, last SEQ sent: %" PRIu32 " ACK got: %" PRIu32 "\n", window->servlastseqsent, pkt->ack_seq);
+        exit(EXIT_FAILURE);
+    } else if(pkt->ack_seq < window->servlastackrecv) {
+        _NOTE("Client ACKing something already ACKed, base SEQ: %" PRIu32 " ACK got: %" PRIu32 "\n", window->base->pkt->seq, pkt->ack_seq);
+        return;
+    }
+
     if(window->cwin < window->ssthresh) {
         /* slow start */
+        _DEBUG("we are in slow start cwin: %d, ssthresh: %d");
         window->cwin = window->cwin + 1;
-    }
-    else {
+        count = remove_aked_pkts(window, pkt);
+        _DEBUG("number of ACKs: %d\n", count);
+        window->cwin += count;
+        _DEBUG("new cwin: %d\n", cwin);
+    } else {
         /** todo: congestion cntrl
         *  count numacks
         *  if numacks == cwin
         *  then cwin++, num acks = 0
         **/
-        window->cwin = window->cwin; /*    +1/cwin     */
+        count = remove_aked_pkts(window, pkt);
+        total_acks += count;
+
+        _DEBUG("number of ACKs: %d\n", count);
+        _DEBUG("new total_acks: %d\n", total_acks);
+
+        if(total_acks >= window->cwin) {
+            window->cwin += 1;
+            _DEBUG("incremented cwin, new cwin: %d\n", window->cwin);
+        }
     }
+}
+
+int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
+    int rtn = 0;
+
+    /* dup ack */
+    if(window->servlastackrecv == pkt->ack_seq){
+        _NOTE("%s\n", "got dup ack: %" PRIu32 "\n", pkt->ack_seq);
+        window->dupacks++;
+        _NOTE("%s\n", "new dupack: %" PRIu32 "\n", window->dupacks);
+        /* todo: do fast retrans */
+        return 0;
+    }
+
+    while(pkt->ack_seq > window->base->pkt->ack_seq) {
+        rtn++;
+        if(window->base == NULL || window->base->pkt == NULL) {
+            _ERROR("%s\n", "was about to touch NULL");
+            exit(EXIT_FAILURE);
+        }
+
+        _DEBUG("looking at %" PRIu32 ", have %" PRIu32 "\n", window->servlastackrecv, pkt->ack_seq);
+        _DEBUG("%s\n", "freeing ACKed packet");
+        free(window->base->pkt);
+        window->base->datalen = -1;
+    }
+
+    window->lastadvwinrecvd = pkt->advwin;
+    _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
+
+    return rtn;
 }
 
 
