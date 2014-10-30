@@ -146,7 +146,6 @@ int main(void) {
 
     _DEBUG("%s\n", "waiting for the file ...");
     for(EVER) {
-        print_wnd((const char**)wnd);
         _DEBUG("%s\n", "calling clirecv()");
         err = clirecv(serv_fd, w);
         _DEBUG("clirecv() returned: %d\n", (int)err);
@@ -206,11 +205,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     }
     attemp++;
     printf("try send hs1\n");
-    err = clisend(serv_fd, SYN, fname, strlen(fname));
-    if(err < 0){
-        _DEBUG("handshakes.clisend() returned: %d\n", (int)err);
-        return -1;
-    }
+    clisend(serv_fd, seq, ack_seq, advwin, SYN, fname, strlen(fname));
     /* don't increment seq until we know this sent */
 
     _DEBUG("%s\n", "waiting for hs2...");
@@ -262,10 +257,6 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     print_hdr(hdr);
     ack_seq = hdr->seq + 1; /* we expect their seq + 1 */
 
-    /* pick the smallest advwin */
-    advwin = ((hdr)->advwin < advwin) ? (hdr)->advwin : advwin;
-    _DEBUG("new advwin: %d\n", advwin);
-
     /* copy the passed port into the serv_addr */
     memcpy(&serv_addr->sin_port, pktbuf + DATA_OFFSET, sizeof(serv_addr->sin_port));
     /* re connect() with new port */
@@ -279,10 +270,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
 
     /* move on to third handshake */
     /* init the window and the wnd_base_seq */
-    wnd = init_wnd(ack_seq);
-    if(wnd == NULL){
-        return -1;
-    }
+    w = init_window(advwin, 0, 0, ack_seq-1, ack_seq-1+advwin);
 
     /* todo: back by ARQ */
     printf("try send hs3: \n");

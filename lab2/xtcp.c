@@ -61,6 +61,9 @@ void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_w
     return pkt;
 }
 
+/**
+* Nice fancy print function. Extra goodies if DEBUG is defined.
+*/
 void print_window(struct window *w){
     struct win_node* head = w->base;
     struct win_node* curr = head;
@@ -96,6 +99,7 @@ void print_window(struct window *w){
     #endif
 }
 
+/* Only used by init_window */
 struct win_node* alloc_window_nodes(size_t n) {
     struct win_node* head;
     struct win_node* tail;
@@ -142,8 +146,11 @@ void free_window(struct win_node* head) {
     free(head);
 }
 
+/**
+* Called to init the sliding window.
+*/
 struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
-        uint32_t cli_top_accept_seqn, uint32_t cli_last_seqn_recvd){
+        uint32_t cli_last_seqn_recvd, uint32_t cli_top_accept_seqn){
 
     struct window* w;
     w = malloc(sizeof(struct window));
@@ -154,7 +161,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     w->maxsize = maxsize;
     w->lastadvwinrecvd = maxsize;
     w->servlastackrecv = srv_last_ack_seq_recvd;
-    w->servlastpktsent = srv_last_seq_sent;
+    w->servlastseqsent = srv_last_seq_sent;
     /* todo: change to 1 */
     w->cwin = 65536;
     w->ssthresh = 65536;
@@ -169,24 +176,123 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     return w;
 }
 
-int srv_send_base(int sockfd, struct window *w){
+/**
+* todo: Please mask sigalrm, sigprocmask()
+* Used when a timeout occurs. Sends the pkt at the base.
+*
+* Caller MUST check if the packet CAN be sent. min(cwin, lastadvwinrecvd, maxsize)
+*/
+void srv_send_base(int sockfd, struct window *w) {
     ssize_t err;
-    if(w == NULL){
+    if(w == NULL) {
         fprintf(stderr, "ERROR: srv_send_base() w is NULL\n");
-        return -1;
+        exit(EXIT_FAILURE);
     }
-    if(w->base == NULL){
-        fprintf(stderr, "ERROR: srv_send_base() w->base is NULL, init your buffer!\n");
-        return -1;
+    if(w->base == NULL) {
+        fprintf(stderr, "ERROR: srv_send_base() w->base is NULL, init your window!\n");
+        print_window(w);
+        exit(EXIT_FAILURE);
     }
-    if(w->base->pkt == NULL){
+    if(w->base->pkt == NULL) {
         fprintf(stderr, "ERROR: srv_send_base() w->base->pkt is NULL, can't send NULL dummy!\n");
-        return -1;
+        print_window(w);
+        exit(EXIT_FAILURE);
     }
-    err = send(sockfd, w->base->pkt , w->base->datalen);
+    err = send(sockfd, w->base->pkt , (size_t)w->base->datalen, 0);
+    if(err < 0){
+        perror("ERROR srv_send_base().send()");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /**
+* todo: Please mask sigalrm, sigprocmask()
+* Give me pkt in host order!! The window contains host order packets.
+*
+* Prints the window and the header sent.
+*
+*/
+void srv_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window *w){
+    struct win_node *base;
+    struct win_node *curr;
+    int n = 0;
+    int effectivesize;
+    uint32_t seqtoadd;
+
+    effectivesize = MIN(w->cwin, MIN(w->lastadvwinrecvd, w->maxsize));
+
+    if(w == NULL) {
+        fprintf(stderr, "ERROR: srv_add_send() w is NULL!\n");
+        exit(EXIT_FAILURE);
+    }
+    if(pkt == NULL) {
+        fprintf(stderr, "ERROR: srv_add_send() pkt is NULL, can't add/send NULL!\n");
+        exit(EXIT_FAILURE);
+    }
+    base = w->base;
+    if(base == NULL) {
+        fprintf(stderr, "ERROR: srv_add_send() w->base is NULL!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(effectivesize <= 0) {
+        fprintf(stderr, "ERROR: srv_add_send() effective winsize: %d is <= 0\n", effectivesize);
+        print_window(w);
+        exit(EXIT_FAILURE);
+    }
+
+    seqtoadd = pkt->seq;
+    if(seqtoadd != (w->servlastseqsent + 1)){
+        fprintf(stderr, "ERROR: srv_add_send() seqtoadd: %"PRIu32" != "
+                        "(w->servlastseqsent + 1): %"PRIu32"\n", seqtoadd,
+                (w->servlastseqsent + 1));
+        print_window(w);
+        exit(EXIT_FAILURE);
+    }
+    curr = base;
+    while(n < effectivesize) {
+        /* inc n and move curr to the next*/
+        n++;
+        curr = curr->next;
+        if(curr == NULL) {
+            fprintf(stderr, "ERROR: srv_add_send() a win_node is NULL, init your window!\n");
+            print_window(w);
+            exit(EXIT_FAILURE);
+        }
+        if(curr == base) {
+            fprintf(stderr, "ERROR: srv_add_send() reached the base while trying to add to window!\n");
+            print_window(w);
+            exit(EXIT_FAILURE);
+        }
+    }
+    /* curr is now at the win_node we want? */
+    if(curr->datalen >= 0 || curr->pkt != NULL) {
+        fprintf(stderr, "ERROR: srv_add_send() curr->pkt not empty!\n");
+        print_window(w);
+        exit(EXIT_FAILURE);
+    } else {
+        _DEBUG("%s", "Found win_node for pkt. Adding to window.\n");
+        curr->datalen = datalen;
+        curr->pkt = pkt;
+        w->servlastseqsent = seqtoadd;
+    }
+
+    htonpkt(pkt);
+    n = (int) send(sockfd, pkt, (size_t)datalen, 0);
+    if(n < 0) {
+        _ERROR("%s\n", "srv_add_send().send()");
+        exit(EXIT_FAILURE);
+    }
+    ntohpkt(pkt);
+    printf("SENT ");
+    print_hdr(pkt);
+    print_window(w);
+}
+
+
+
+/**
+* todo: Please mask sigalrm, sigprocmask()
 *
 */
 void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
@@ -321,8 +427,8 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, 
 * This malloc()'s and free()'s space for data and a header.
 *
 */
-void clisend(int sockfd, uint16_t flags, void *data, size_t datalen){
-    void *pkt = alloc_pkt(pkt, flags, advwin, data, datalen);
+void clisend(int sockfd, uint32_t seq, uint32_t ack_seq, uint16_t flags, uint16_t adv_win, void *data, size_t datalen){
+    void *pkt = alloc_pkt(seq, ack_seq, flags, adv_win, data, datalen);
     _DEBUG("%s\n", "printing hdr to send");
     print_hdr((struct xtcphdr*)pkt);
     htonpkt((struct xtcphdr*)pkt);
@@ -349,7 +455,24 @@ void clisend_lossy(int sockfd, void *pkt, size_t datalen){
     }
 }
 
-
+/**
+* clirecv -- for the client/receiver/acker
+* Returns: >0 bytes recv'd
+*           0 on FIN recv'd
+*          -1 on RST recv'd
+*          -2 on failure, with perror printed
+* DESC:
+* Blocks until a packet is recv'ed from sockfd. If it's a FIN, immediately return 0.
+* If it's not a FIN then try to drop it based on pkt_loss_thresh.
+* -if dropped, pretend it never happened and continue to block in select()
+* -if kept:
+*   -if RST then return -1
+*   -else ACK
+* NOTES:
+* Sends ACKs and duplicate ACKS.
+* If a dup_ack is sent go back to block in select().
+* NULL terminates the data sent.
+*/
 int clirecv(int sockfd, struct window* w) {
     ssize_t bytes = 0;
     uint32_t pktseq;
@@ -358,7 +481,7 @@ int clirecv(int sockfd, struct window* w) {
     char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
     if(pkt == NULL){
         perror("clirecv().malloc()");
-        return -1;
+        exit(EXIT_FAILURE);
     }
     for(;;) {
         continue_with_select:
@@ -375,7 +498,7 @@ int clirecv(int sockfd, struct window* w) {
             }
             perror("clirecv().select()");
             free(pkt);
-            return -2;
+            exit(EXIT_FAILURE);
         }
         if(FD_ISSET(sockfd, &rset)){
             /* recv the server's datagram */
