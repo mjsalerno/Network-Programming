@@ -310,7 +310,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     _DEBUG("%s\n", "sending FIN");
     /*srvsend(child_sock, FIN, NULL, 0, wnd);*/
-    send_fin(child_sock);
+    quick_send(child_sock, FIN);
 
     _DEBUG("%s\n", "cleaning up sockets ...");
     close(child_sock);
@@ -322,8 +322,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     exit(EXIT_SUCCESS);
 }
 
-void send_fin(int sock) {
-    srv_add_send(sock, NULL, 0, FIN, wnd);
+void quick_send(int sock, uint16_t flags) {
+    srv_add_send(sock, NULL, 0, flags, wnd);
 }
 
 void proc_exit(int i) {
@@ -605,12 +605,14 @@ int send_file(char* fname, int sock) {
             if (sigsetjmp(jmpbuf, 1) != 0) {
                 if (rtt_timeout(&rttinfo) < 0) {
                     _ERROR("%s\n", "The packet has timed out, giving up\n");
-                    /* todo: send_rst(); */
+                    quick_send(sock, RST);
                     exit(EXIT_FAILURE);
                 } else {
                     _NOTE("%s\n", "Packet timeout, resending");
                     srv_send_base(sock, wnd);
-                    wnd->ssthresh = wnd->cwin/2;
+                    if(wnd->cwin > 1) {
+                        wnd->ssthresh = wnd->cwin / 2;
+                    }
                     wnd->cwin = 1;
                     break;
                 }

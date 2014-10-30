@@ -19,7 +19,7 @@ int send_file(char* fname, int sock);
 void free_clients(struct client_list* head);
 int remove_client(struct client_list** head, pid_t pid);
 void proc_exit(int i);
-void send_fin(int sock);
+void quick_send(int sock, uint16_t flags);
 static void sig_alrm(int signo);
 int is_wnd_full();
 int is_wnd_empty();

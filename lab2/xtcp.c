@@ -377,6 +377,10 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     return rtn;
 }
 
+void fast_retransmit(struct window* w) {
+    w->ssthresh = MAX(((w->servlastseqsent - w->base->pkt->seq)/ 2), 2);
+    /* todo: finish me*/
+}
 
 
 void clisend_lossy(int sockfd, void *pkt, size_t datalen){
