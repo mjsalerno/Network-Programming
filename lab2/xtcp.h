@@ -78,5 +78,6 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
 void print_window(struct window *windo);
 void srv_send_base(int sockfd, struct window *w);
 int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w);
+int remove_aked_pkts(struct window *window, struct xtcphdr *pkt);
 
 #endif /*XTCP_H*/
