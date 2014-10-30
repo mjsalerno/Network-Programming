@@ -17,4 +17,7 @@ int validate_hs2(struct xtcphdr* hdr, int len);
 void *consumer_main(void *);
 int init_wnd_mutex(void);
 
+int clirecv(int sockfd, struct window* w);
+void clisend(int sockfd, struct xtcphdr *pkt, size_t datalen);
+
 #endif

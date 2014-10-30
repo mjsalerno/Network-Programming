@@ -158,6 +158,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
         exit(EXIT_FAILURE);
     }
     w->maxsize = maxsize;
+    w->numpkts = 0;
     w->lastadvwinrecvd = maxsize;
     w->servlastackrecv = srv_last_ack_seq_recvd;
     w->servlastseqsent = srv_last_seq_sent;
@@ -166,7 +167,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     w->ssthresh = 65536;
     w->dupacks = 0;
     w->clitopaccptpkt = cli_top_accept_seqn;
-    w->clilastpktrecv = cli_last_seqn_recvd;
+    w->clilastunacked = cli_last_seqn_recvd;
     w->base = alloc_window_nodes((size_t)maxsize);
     if(w->base == NULL){
         perror("init_window().alloc_window()");
@@ -377,23 +378,8 @@ int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, 
     return 1;
 }
 
-/**
-* The client only directly calls this function once, for the SYN.
-* It provides packet loss to the client's sends.
-* This malloc()'s and free()'s space for data and a header.
-*
-*/
-void clisend(int sockfd, uint32_t seq, uint32_t ack_seq, uint16_t flags, uint16_t adv_win, void *data, size_t datalen){
-    void *pkt = alloc_pkt(seq, ack_seq, flags, adv_win, data, datalen);
-    _DEBUG("%s\n", "printing hdr to send");
-    print_hdr((struct xtcphdr*)pkt);
-    htonpkt((struct xtcphdr*)pkt);
 
-    clisend_lossy(sockfd, pkt, datalen);
-
-    free(pkt);
-}
-
+ 
 void clisend_lossy(int sockfd, void *pkt, size_t datalen){
     ssize_t err;
     /* simulate packet loss on sends */
@@ -411,124 +397,33 @@ void clisend_lossy(int sockfd, void *pkt, size_t datalen){
     }
 }
 
-/**
-* clirecv -- for the client/receiver/acker
-* Returns: >0 bytes recv'd
-*           0 on FIN recv'd
-*          -1 on RST recv'd
-*          -2 on failure, with perror printed
-* DESC:
-* Blocks until a packet is recv'ed from sockfd. If it's a FIN, immediately return 0.
-* If it's not a FIN then try to drop it based on pkt_loss_thresh.
-* -if dropped, pretend it never happened and continue to block in select()
-* -if kept:
-*   -if RST then return -1
-*   -else ACK
-* NOTES:
-* Sends ACKs and duplicate ACKS.
-* If a dup_ack is sent go back to block in select().
-* NULL terminates the data sent.
-*/
-int clirecv(int sockfd, struct window* w) {
-    ssize_t bytes = 0;
+
+int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w) {
     uint32_t pktseq;
-    int err;
-    fd_set rset;
-    char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
-    if(pkt == NULL){
-        perror("clirecv().malloc()");
-        exit(EXIT_FAILURE);
-    }
-    for(;;) {
-        continue_with_select:
-        /* todo: remove this print? */
-        _DEBUG("%s\n", "select() for ever loop");
-        print_window(w);
-        FD_ZERO(&rset);
-        FD_SET(sockfd, &rset);
-
-        err = select(sockfd + 1, &rset, NULL, NULL, NULL);
-        if(err < 0){
-            if(err == EINTR){
-                continue;
-            }
-            perror("clirecv().select()");
-            free(pkt);
-            exit(EXIT_FAILURE);
-        }
-        if(FD_ISSET(sockfd, &rset)){
-            /* recv the server's datagram */
-            bytes = recv(sockfd, pkt, MAX_PKT_SIZE, 0);
-            if(bytes < 0){
-                perror("clirecv().recv()");
-                free(pkt);
-                return -2;
-            }else if(bytes < 12){
-                _DEBUG("clirecv().recv() not long enough to be pkt: %dbytes\n", (int)bytes);
-                continue;
-            }
-            ntohpkt((struct xtcphdr *)pkt); /* host order please */
-            pkt[bytes] = 0; /* NULL terminate the ASCII text */
-
-            /* if it's a FIN or RST don't try to drop it, we're closing dirty! */
-            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN){
-                _DEBUG("%s\n", "clirecv()'d a FIN packet.");
-                free(pkt);
-                return 0;
-            }
-            if((((struct xtcphdr*)pkt)->flags & RST) == RST){
-                _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
-                free(pkt);
-                return -1;
-            }
-            /* not a FIN: try to drop it */
-            if(drand48() >= pkt_loss_thresh){
-                /**
-                * keep the pkt:
-                * Pretend like the code after the "break;" is in here.
-                * However, because it's not in here it will use a goto
-                * instead of a continue later.
-                */
-                break;
-            }else{
-                /* drop the pkt */
-                /* fixme: remove prints? */
-                printf("DROPPED RECV'ing PKT: ");
-                print_hdr((struct xtcphdr *) pkt);
-                continue;
-            }
-        }
-        /* end of select for(EVER) */
-    }
     /* recv'ed a pkt, it is in host order, and we will put it in the window */
     printf("recv'd packet ");
     print_hdr((struct xtcphdr *) pkt);
+    /* todo: remove */
     printf("packet contents:\n");
-    printf("%s\n", pkt + DATA_OFFSET);
+    printf("%s\n", (char*)pkt + DATA_OFFSET);
+    _DEBUG("%s", "Trying to add to window...\n");
 
     /* do window stuff */
-    pktseq = ((struct xtcphdr *)pkt)->seq;
+    pktseq = pkt->seq;
     /* todo: use struct window *w */
-    if(pktseq == ack_seq) {
-        /* Send a new ack if it will fit in the window */
-        add_to_wnd(ack_seq, pkt, w);
-        advwin--;
-        cli_ack(sockfd, w);
-    }
-    else if(pktseq < ack_seq){
+    if(pktseq <= w->clilastunacked || pktseq > w->clitopaccptpkt) {
         /* send a duplicate ACK */
         /* don't bother with window, it's in there */
         _DEBUG("%s\n", "duplicate packet, calling cli_dup_ack()");
         cli_dup_ack(sockfd, w);
         /* continue in this function!, pretend like this is a continue */
-        goto continue_with_select;
+        /* goto continue_with_select; */
+
+    } else {
+        /* Send a new ack if it will fit in the window */
+        add_to_wnd(ack_seq, pkt, w);
+        cli_ack(sockfd, w);
     }
-    else if(pktseq > ack_seq) {
-        /* buffer out of order pkts */
-        /* try to add to wnd, if it out of bounds then IGNORE, otherwise duplicate ACK */
-        add_to_wnd(pktseq, pkt, w);
-    }
-    return -1;
 }
 
 void cli_ack(int sockfd, struct window* w) {
