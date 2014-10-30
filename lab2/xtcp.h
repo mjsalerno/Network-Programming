@@ -73,7 +73,7 @@ int cli_ack(int sockfd, char **wnd);
 int cli_dup_ack(int sockfd);
 
 
-void free_window(struct win_node* head);
+void free_window(struct window* wnd);
 struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
         uint32_t cli_top_accept_seqn, uint32_t cli_last_seqn_recvd);
 void print_window(struct window *windo);

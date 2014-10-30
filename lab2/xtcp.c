@@ -1,5 +1,4 @@
 #include <errno.h>
-#include <cursesw.h>
 #include "xtcp.h"
 
 
@@ -67,12 +66,13 @@ void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_w
 void print_window(struct window *w){
     struct win_node* head = w->base;
     struct win_node* curr = head;
-    int n = 0;
+    int n = -1;
+    n++;
     printf("|window| maxwnd: %6d, cwin: %6d, ssthresh: %6d, \n",
             w->maxsize, w->cwin, w->ssthresh);
 
     do {
-        if(curr->datalen < 0){
+        if(curr->datalen < 0) {
             printf("_ ");
         }else {
             printf("X ");
@@ -133,7 +133,8 @@ struct win_node* alloc_window_nodes(size_t n) {
     return head;
 }
 
-void free_window(struct win_node* head) {
+void free_window(struct window* wnd) {
+    struct win_node* head = wnd->base;
     struct win_node* tail = head->next;
     struct win_node* tmp;
 
@@ -144,6 +145,7 @@ void free_window(struct win_node* head) {
     }
 
     free(head);
+    free(wnd);
 }
 
 /**
