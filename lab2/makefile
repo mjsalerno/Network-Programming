@@ -8,6 +8,8 @@ all: client server
 
 %: %.c
 
+%: %.o
+
 %: %.o common.o xtcp.o get_ifi_info_plus.o rtt.o
 	$(CC) $(FLAGS) $^ $(LIBS) -o $@
 

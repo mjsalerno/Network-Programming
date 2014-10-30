@@ -490,8 +490,51 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
     }
 
     /* make pkt with maxsize - numpkts */
+    /* fixme: seq num of acks */
     ackpkt = alloc_pkt(111111, (w->clilastunacked + gaplength), ACK, (uint16_t)(w->maxsize - w->numpkts), NULL, 0);
     clisend_lossy(sockfd, ackpkt, sizeof(struct xtcphdr));
 
     return 0;
+}
+
+
+/**
+* Looks for node with a pkt containing the seqtoget
+*
+* todo: finish
+*/
+struct win_node* get_node(uint32_t seqtoget, struct window *w) {
+    struct win_node* base;
+    struct win_node* curr;
+    int n = 0;
+    if(w == NULL) {
+        _ERROR("%s\n", "w is NULL!");
+        exit(EXIT_FAILURE);
+    }
+    base = w->base;
+
+    if(base == NULL) {
+        _ERROR("%s\n", "w->base is NULL!");
+        exit(EXIT_FAILURE);
+    }
+    _DEBUG("%s", "Looking for win_node to grab...\n");
+
+    curr = base;
+    do {
+        _DEBUG("looking at win_node #%d ...", n);seqtoget++;
+        if(curr == NULL){
+            _ERROR("win_node #%d is NULL, init your window!\n", n);
+            print_window(w);
+            exit(EXIT_FAILURE);
+        }
+
+
+        curr = curr->next;
+        n++;
+    } while(curr != base); /* stop if we wrap around */
+
+    return curr;
+
+
+
 }
