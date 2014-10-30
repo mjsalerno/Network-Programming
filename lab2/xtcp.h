@@ -47,7 +47,7 @@ struct window {
     int cwin;
     int ssthresh;
     int dupacks;
-    uint32_t clitopaccptpkt;
+    uint32_t clibaseseq;
     uint32_t clilastunacked;
     struct win_node *base;
 };
@@ -74,7 +74,7 @@ void clisend_lossy(int sockfd, void *pkt, size_t datalen);
 
 void free_window(struct window* wnd);
 struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
-        uint32_t cli_top_accept_seqn, uint32_t cli_last_seqn_recvd);
+        uint32_t cli_last_seqn_recvd, uint32_t cli_base_seqn);
 void print_window(struct window *windo);
 void srv_send_base(int sockfd, struct window *w);
 int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w);
