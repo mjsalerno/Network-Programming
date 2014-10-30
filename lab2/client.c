@@ -495,6 +495,7 @@ void *consumer_main(void *null) {
         }
 
         /* todo: read from wnd */
+        consumer_read();
 
         pthread_mutex_unlock(&w_mutex);
         if(err > 0){
@@ -514,3 +515,17 @@ void *consumer_main(void *null) {
     return null;
 }
 
+int consumer_read() {
+    struct win_node* at;
+    int count = 0;
+    at = w->base;
+
+    for(; at->datalen > 0; at = at->next, ++count) {
+        printf("%s", (char*)((at->pkt) + DATA_OFFSET));
+        at->datalen = -1;
+    }
+
+    w->base = at;
+
+    return count;
+}
