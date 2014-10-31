@@ -671,6 +671,19 @@ int recv_acks(int sock, int always_block) {
                 break;
             }
         } else {                                                           /* got an ACK */
+            switch(((struct xtcphdr*)pkt)->flags) {
+                case FIN:
+                    _NOTE("%s\n", "client sent me a FIN, quiting");
+                    exit(EXIT_FAILURE);
+                case RST:
+                    _NOTE("%s\n", "client sent me a RST, quiting");
+                    exit(EXIT_FAILURE);
+                case ACK:
+                    break;
+                default:
+                    _ERROR("%s\n", "client sent me bad flag: %" PRIu16 ", quiting", ((struct xtcphdr*)pkt)->flags);
+                    break;
+            }
             acks++;
             ntohpkt((struct xtcphdr*)pkt);
             printf("GOT: ");
