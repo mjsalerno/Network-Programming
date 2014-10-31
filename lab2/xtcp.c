@@ -236,8 +236,8 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
         _ERROR("%s\n", "srv_add_send() w is NULL!\n");
         exit(EXIT_FAILURE);
     }
-    if(data == NULL && 0) {
-        _ERROR("%s\n", "srv_add_send() data is NULL, can't add/send NULL!\n");
+    if(data == NULL && flags == 0) {
+        _ERROR("%s\n", "srv_add_send() data is NULL, can't add/send NULL with no flags!\n");
         exit(EXIT_FAILURE);
     }
     base = w->base;
@@ -292,7 +292,6 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
         _DEBUG("%s", "Found win_node for pkt. Adding to window.\n");
         curr->datalen = (int)datalen;
         curr->pkt = pkt;
-        w->servlastseqsent = seqtoadd;
     }
 
     htonpkt(pkt);
@@ -301,7 +300,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
         _ERROR("%s\n", "srv_add_send().send()");
         exit(EXIT_FAILURE);
     }
-    w->servlastseqsent = w->servlastseqsent + 1;
+    w->servlastseqsent = seqtoadd;
     ntohpkt(pkt);
     printf("SENT ");
     print_hdr(pkt);
@@ -325,9 +324,12 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
         return;
     }
 
+    _INFO("%s\n", "got an ACK");
+    print_hdr(pkt);
+
     if(window->cwin < window->ssthresh) {
         /* slow start */
-        _DEBUG("we are in slow start cwin: %d, ssthresh: %d", window->cwin, window->ssthresh);
+        _INFO("we are in slow start cwin: %d, ssthresh: %d", window->cwin, window->ssthresh);
         window->cwin = window->cwin + 1;
         count = remove_aked_pkts(window, pkt);
         _DEBUG("number of ACKs: %d\n", count);
