@@ -11,6 +11,9 @@ static double u; /* (!!in ms!!) mean of the exponential distribution func */
 static struct window* w;
 extern pthread_mutex_t w_mutex;
 
+/* serv_fd -- the main server connection socket, reconnected later */
+static int serv_fd; /*todo: not static? */
+
 int main(void) {
     ssize_t err; /* for error checking */
     char *path = "client.in"; /* config path */
@@ -23,9 +26,6 @@ int main(void) {
 
     pthread_t consumer_tid;
     void *consumer_rtn;
-
-    /* serv_fd -- the main server connection socket, reconnected later */
-    int serv_fd;
 
     uint16_t knownport; /* , trans_port; */
     /* my_addr -- my (client) address */
@@ -528,7 +528,7 @@ void *consumer_main(void *fname) {
 
         unget_lock(&w_mutex);
     }
-    _NOTE("CONSUMER: done! Total: %u bytes across %u pkts", totbytes, totpkts);
+    _NOTE("CONSUMER: done! Total: %u bytes across %u pkts\n", totbytes, totpkts);
 
     err = pthread_mutex_destroy(&w_mutex);
     if(err > 0){
@@ -551,10 +551,15 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     struct win_node* at;
     unsigned int nodes = 0;
     unsigned int bytes = 0;
+    int wasfull = 0;
+    struct xtcphdr *pkt;
     int rtn = 0;
     ssize_t n = 0;
     ssize_t totn = 0;
     at = w->base;
+    if(w->numpkts == w->maxsize){
+        wasfull = 1;
+    }
 
     for(; (at->datalen >= 0) && (at->pkt != NULL); at = at->next) {
         _NOTE("consumer looking at win_node #%u\n", nodes);
@@ -591,5 +596,10 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     *totpkts += nodes;
     _NOTE("CONSUMER read %u bytes across %u pkts\n", bytes, nodes);
     print_window(w);
+    if(wasfull) { /* send window update */
+        pkt = alloc_pkt(seq, w->clilastunacked, ACK, (uint16_t) (w->maxsize - w->numpkts), NULL, 0);
+        clisend_lossy(serv_fd, pkt, 0);
+        free(pkt);
+    }
     return rtn;
 }
