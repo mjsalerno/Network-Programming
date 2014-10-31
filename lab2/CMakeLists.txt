@@ -48,7 +48,8 @@ add_executable(client
 	${CLIENT_SOURCE_FILES}
 	$<TARGET_OBJECTS:xtcplib>
 	$<TARGET_OBJECTS:commonlib>
-	$<TARGET_OBJECTS:iffylib>)
+	$<TARGET_OBJECTS:iffylib>
+	$<TARGET_OBJECTS:rttlib>)
 
 target_link_libraries(client ${CMAKE_THREAD_LIBS_INIT})
 if(UNIX)

@@ -92,7 +92,7 @@ void print_window(struct window *w){
         if(curr->pkt != NULL) {
             printf("|Pkt seq: %15"PRIu32" |\n", curr->pkt->seq);
         }else{
-            printf("|Pkt seq:          (none) |\n");
+            printf("|Pkt seq:          ------ |\n");
         }
         printf("|This:    %15p |\n", (void *)curr);
         printf("|Next:    %15p |\n", (void *)curr->next);
@@ -410,7 +410,7 @@ void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen) {
     ssize_t err;
     /* simulate packet loss on sends */
     if(DROP_PKT()) {
-        _NOTE("%s", "DROPPED SEND'ing PKT: ");
+        _NOTE("%s", "DROPPED SEND'ing PKT:\n");
     } else {
         htonpkt(pkt);
         err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
@@ -419,7 +419,7 @@ void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen) {
             exit(EXIT_FAILURE);
         }
         ntohpkt(pkt);
-        _NOTE("%s", "SENT PKT: ");
+        _NOTE("%s", "SENT PKT:\n");
     }
     print_hdr(pkt);
 }

@@ -13,12 +13,12 @@
 # define _DEBUG(fmt, args...)
 #endif
 
-#define _ERROR(fmt, args...) fprintf(stderr, _RED "ERROR: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
+#define _ERROR(fmt, args...) fprintf(stderr,   _RED "ERROR: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
 
 #define _NOTE(fmt, args...) fprintf(stderr, _YELLOW "NOTICE: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
 
-#define _INFO(fmt, args...) fprintf(stderr, _BLUE "INFO: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
+#define _INFO(fmt, args...) fprintf(stderr,   _BLUE "INFO: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
 
-#define _SPEC(fmt, args...) fprintf(stderr, _GREEN "SPEC: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
+#define _SPEC(fmt, args...) fprintf(stderr,  _GREEN "SPEC: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
 
 #endif
