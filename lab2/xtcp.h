@@ -77,7 +77,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
         uint32_t cli_last_seqn_recvd, uint32_t cli_base_seqn);
 void print_window(struct window *windo);
 void srv_send_base(int sockfd, struct window *w);
-int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w);
+int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, struct window* w);
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt);
 struct win_node* get_node(uint32_t seqtoget, struct window *w);
 void get_lock(pthread_mutex_t* lock);
