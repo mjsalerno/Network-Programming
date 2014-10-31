@@ -17,13 +17,12 @@ int main(void) {
     char fname[BUFF_SIZE]; /* file to transfer */
     FILE *file; /* config file */
     char ip4_str[INET_ADDRSTRLEN];
-    /* char buf[BUFF_SIZE + 1]; */
     /* config/xtcp vars */
     int seed;
     struct iface_info* iface_ptr;
 
-    /*pthread_t consumer_tid;
-    void *consumer_rtn;*/
+    pthread_t consumer_tid;
+    void *consumer_rtn;
 
     /* serv_fd -- the main server connection socket, reconnected later */
     int serv_fd;
@@ -159,14 +158,14 @@ int main(void) {
 
     /* pthread_create consumer thread */
     _DEBUG("%s\n", "creating pthread for consumer...");
-    /*
+
     err = pthread_create(&consumer_tid, NULL, &consumer_main, fname);
     if(0 > err){
         errno = (int)err;
         perror("ERROR: consumer pthread_create()");
         close(serv_fd);
         exit(EXIT_FAILURE);
-    }*/
+    }
 
     printf("waiting for the file...\n");
 
@@ -190,14 +189,14 @@ int main(void) {
 
     /* wake up when the window is empty */
     _DEBUG("%s\n", "joining on consumer thread.....");
-    /*
+
     err = pthread_join(consumer_tid, &consumer_rtn);
     if(err > 0) {
         errno = (int)err;
         perror("ERROR: pthread_join()");
         close(serv_fd);
         exit(EXIT_FAILURE);
-    }*/
+    }
 
     _DEBUG("%s\n", "success! closing serv_fd and cleaning up, then exiting...");
     free_window(w);
@@ -491,22 +490,22 @@ void *consumer_main(void *fname) {
     int fin_found = ACK;
     int err;
     char *tmpfname;
-    char suffix[] = ".tmp";
+    char midffix[] = ".tmp";
     int filefd;
     srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
     _NOTE("%s","CONSUMER: consumer created\n");
     /* create a template filename for mkstemp */
-    tmpfname = malloc(strlen(fname) + 6 + strlen(suffix) + 1);
+    tmpfname = malloc(strlen(fname) + 6 + strlen(midffix) + 1);
     if(tmpfname == NULL){
         _ERROR("%s","ERROR consumer_main().malloc()\n");
         exit(EXIT_FAILURE);
     }
     strcpy(tmpfname, fname);
-    strcpy((tmpfname + strlen(fname)), "XXXXXX");
-    strcpy((tmpfname + strlen(fname) + 6), suffix);
-    printf("%s\n", tmpfname);
-    filefd = mkstemps(tmpfname, (int)strlen(suffix));
+    strcpy((tmpfname + strlen(fname)), midffix);
+    strcpy((tmpfname + strlen(fname) + strlen(midffix)), "XXXXXX");
+    _NOTE("consumer: storing in outfile: %s\n", tmpfname);
+    filefd = mkstemp(tmpfname);
     if(filefd < 0) {
         perror("ERRROR consumer_main().mkstemp()");
         exit(EXIT_FAILURE);

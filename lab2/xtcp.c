@@ -505,23 +505,19 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
                 finreached = FIN;
             }
             curr = curr->next;
-            if(curr == base){ /* if this was the last pakt then the window is full */
-                gaplength = 1;
-
-            } else {
-                while (curr != base) {
-                    gaplength++;
-                    if (curr->pkt == NULL) {
-                        _DEBUG("win_node #%d was empty, stopping search for gap\n", (w->clibaseseq - seqtoadd) + gaplength);
-                        break;
-                    } else if (curr->pkt->flags & FIN) {  /* we reached a a FIN */
-                        _DEBUG("win_node #%d had FIN!\n", (w->clibaseseq - seqtoadd) + gaplength);
-                        finreached = FIN;
-                        break;
-                    }
-                    _DEBUG("win_node #%d had pkt! continue search\n", (w->clibaseseq - seqtoadd) + gaplength);
-                    curr = curr->next;
+            gaplength = 1;
+            while (curr != base) {
+                if (curr->pkt == NULL) {
+                    _DEBUG("win_node #%d was empty, stopping search for gap\n", (w->clibaseseq - seqtoadd) + gaplength);
+                    break;
+                } else if (curr->pkt->flags & FIN) {  /* we reached a a FIN */
+                    _DEBUG("win_node #%d had FIN!\n", (w->clibaseseq - seqtoadd) + gaplength);
+                    finreached = FIN;
+                    break;
                 }
+                gaplength++;
+                _DEBUG("win_node #%d had pkt! continue search\n", (w->clibaseseq - seqtoadd) + gaplength);
+                curr = curr->next;
             }
         }
     }
