@@ -189,7 +189,8 @@ int main(void) {
         exit(EXIT_FAILURE);
     }*/
 
-    _DEBUG("%s\n", "success! closing serv_fd then exiting...");
+    _DEBUG("%s\n", "success! closing serv_fd and cleaning up, then exiting...");
+    free_window(w);
     close(serv_fd);
     exit(EXIT_SUCCESS);
 }
@@ -362,10 +363,6 @@ int clirecv(int sockfd, struct window* w) {
         /* todo: remove this print? */
         _DEBUG("%s\n", "select()'ing on server socket for pkts");
 
-        get_lock(&w_mutex);
-        print_window(w);
-        unget_lock(&w_mutex);
-
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
         /* todo: add 12 * 3 or 40 second timeout on select() */
@@ -499,7 +496,7 @@ void *consumer_main(void *fname) {
     strcpy((tmpfname + strlen(fname) + 6), suffix);
     printf("%s\n", tmpfname);
     filefd = mkstemps(tmpfname, (int)strlen(suffix));
-    if(filefd < 0){
+    if(filefd < 0) {
         perror("ERRROR consumer_main().mkstemp()");
         exit(EXIT_FAILURE);
     }

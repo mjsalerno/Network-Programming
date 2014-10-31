@@ -506,7 +506,7 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
             while (curr != base) {
                 gaplength++;
                 if (curr->pkt == NULL) {
-                    _DEBUG("win_node #%d was empty, stopping search\n", (w->clibaseseq - seqtoadd) + gaplength);
+                    _DEBUG("win_node #%d was empty, stopping search for gap\n", (w->clibaseseq - seqtoadd) + gaplength);
                     break;
                 } else if(curr->pkt->flags & FIN) {  /* we reached a a FIN */
                     _DEBUG("win_node #%d had FIN!\n", (w->clibaseseq - seqtoadd) + gaplength);
@@ -521,11 +521,14 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
 
     /* make pkt with maxsize - numpkts */
     ackpkt = alloc_pkt(seqn, (w->clilastunacked + gaplength), ACK, (uint16_t)(w->maxsize - w->numpkts), NULL, 0);
+    w->clilastunacked += gaplength;
+
+    print_window(w);
     unget_lock(&w_mutex);
 
 
 
-    clisend_lossy(sockfd, ackpkt, sizeof(struct xtcphdr));
+    clisend_lossy(sockfd, ackpkt, 0);
     free(ackpkt);
     return finreached;
 }
