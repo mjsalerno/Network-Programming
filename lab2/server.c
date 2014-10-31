@@ -197,6 +197,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     iface_ptr = get_iface_from_sock(ifaces, par_sock);
     if(iface_ptr == NULL) {
         _DEBUG("%s\n", "could not find the iface with that socket");
+        free_iface_info(ifaces);
         return -1;
     }
 
@@ -223,6 +224,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
         if(err < 0) {
             perror("child.setsockopt()");
+            free_iface_info(ifaces);
             return -1;
         }
         childaddr.sin_addr.s_addr = iface_ptr->ip;
@@ -234,6 +236,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     if (err < 0) {
         perror("child.bind()");
         free_clients(cliList);
+        free_iface_info(ifaces);
         close(child_sock);
         close(par_sock);
         exit(EXIT_FAILURE);
@@ -243,6 +246,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     if (err < 0) {
         perror("child.connect()");
         free_clients(cliList);
+        free_iface_info(ifaces);
         close(child_sock);
         close(par_sock);
         exit(EXIT_FAILURE);
@@ -253,6 +257,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     if(err < 0) {
         perror("child.getsockname()");
         free_clients(cliList);
+        free_iface_info(ifaces);
         close(child_sock);
         close(par_sock);
         exit(EXIT_FAILURE);
@@ -274,6 +279,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     if(err != EXIT_SUCCESS) {
         printf("There was an error with the handshake");
         free_clients(cliList);
+        free_iface_info(ifaces);
         close(child_sock);
         close(par_sock);
         exit(EXIT_FAILURE);
@@ -330,6 +336,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     free_clients(cliList);
     _DEBUG("%s\n", "cleaning up window ...");
     free_window(wnd);
+    _DEBUG("%s\n", "cleaning up iface list ...");
+    free_iface_info(ifaces);
     _DEBUG("%s\n", "Exiting child");
     exit(EXIT_SUCCESS);
 }
@@ -591,6 +599,7 @@ int send_file(char* fname, int sock) {
     file = fopen(fname, "r");
     if(file == NULL) {
         perror("new_send_file()");
+        fclose(file);
         exit(EXIT_FAILURE);
     }
 
@@ -604,7 +613,8 @@ int send_file(char* fname, int sock) {
                 printf("server.send_file(): There was an error reading the file\n");
                 clearerr(file);
                 fclose(file);
-                return EXIT_FAILURE;
+                quick_send(sock, RST);
+                exit(EXIT_FAILURE);
 
             } else if (feof(file) && n < 1) {
                 printf("File finished uploading ...\n");
@@ -624,6 +634,7 @@ int send_file(char* fname, int sock) {
                 if (rtt_timeout(&rttinfo) < 0) {
                     _ERROR("%s\n", "The packet has timed out, giving up\n");
                     quick_send(sock, RST);
+                    fclose(file);
                     exit(EXIT_FAILURE);
                 } else {
                     _NOTE("%s\n", "Packet timeout, resending");
@@ -639,6 +650,7 @@ int send_file(char* fname, int sock) {
         }
     }
 
+    fclose(file);
     return 1;
 }
 

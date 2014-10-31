@@ -28,6 +28,7 @@ get_ifi_info_plus(int family, int doaliases) {
             perror("get_ifi_info_plus malloc");
             exit(EXIT_FAILURE);
         }
+        memset(buf, 0, len);
         ifc.ifc_len = len;
         ifc.ifc_buf = buf;
         if (ioctl(sockfd, SIOCGIFCONF, &ifc) < 0) {
