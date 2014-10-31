@@ -147,22 +147,17 @@ int main(void) {
         _DEBUG("%s\n", "calling clirecv() to recv file data");
         err = clirecv(serv_fd, w);
         _DEBUG("clirecv() returned: %d\n", (int)err);
-        if (err <= -2) {
-            _DEBUG("%s\n", "client exit(EXIT_FAILURE)");
-            exit(EXIT_FAILURE);
-        }
-        else if(err == -1){
+        if(err == -RST){
             _ERROR("%s\n", "Got a RST, ending client...");
             close(serv_fd);
             exit(EXIT_SUCCESS);
         }
-        else if(err == 0) {
+        else if(err == -FIN) {
             _DEBUG("%s\n", "Done recv'ing the file...");
             break;
         }
         /* got actual data, loop back around for more */
         _DEBUG("%s\n", "clirecv() got actual data, loop back around for more");
-
     }
 
     /* wake up when the window is empty */
@@ -174,8 +169,6 @@ int main(void) {
         close(serv_fd);
         exit(EXIT_FAILURE);
     }
-
-    /* todo: use consumer return ?? */
 
     _DEBUG("%s\n", "success! closing serv_fd then exiting...");
     close(serv_fd);
@@ -324,22 +317,16 @@ int validate_hs2(struct xtcphdr* hdr, int len){
 }
 
 /**
-* TODO: return code for we are done (we have sent an ACK for the FIN pkt)
 * clirecv -- for the client/receiver
 * Returns: >0 bytes recv'd
-*           0 on FIN recv'd
-*          -1 on RST recv'd
+*          -FIN on FIN recv'd
+*          -RST on RST recv'd
 * DESC:
-* Blocks until a packet is recv'ed from sockfd. If it's a FIN, note the seq num and recv
-* until you have ACKed that you expect the FIN's seq_num.
-* If it's not a FIN then try to drop it based on pkt_loss_thresh.
+* Blocks until a packet is recv'ed from sockfd.
+* If it's not a RST then try to drop it based on pkt_loss_thresh.
 * -if dropped, pretend it never happened and continue to block in select()
-* -if kept:
-*   -if RST then return -1
-*   -else ACK
+* -if kept call cli_add_send() to store it into the window and ACK.
 * NOTES:
-* Sends ACKs and duplicate ACKS.
-* If a dup_ack is sent go back to block in select().
 * NULL terminates the data sent.
 */
 int clirecv(int sockfd, struct window* w) {
@@ -385,19 +372,13 @@ int clirecv(int sockfd, struct window* w) {
                 continue;
             }
             ntohpkt((struct xtcphdr *)pkt); /* host order please */
-            pkt[bytes] = 0; /* NULL terminate the ASCII text */
+            pkt[bytes] = 0; /* NULL terminate the ASCII text for printing later */
 
-            /* if it's a FIN or RST don't try to drop it, we're closing dirty! */
-            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN) {
-                /* FIXME: buffer FIN */
-                _DEBUG("%s\n", "clirecv()'d a FIN packet.");
-                free(pkt);
-                return 0;
-            }
+            /* if it's a RST don't try to drop it, just quit! */
             if((((struct xtcphdr*)pkt)->flags & RST) == RST){
                 _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
                 free(pkt);
-                return -1;
+                return -RST;
             }
             /* not a FIN: try to drop it */
             if(DROP_PKT()) {
@@ -414,17 +395,16 @@ int clirecv(int sockfd, struct window* w) {
                 */
                 _DEBUG("keeping pkt with seq: %"PRIu32", add and send from window.\n", ((struct xtcphdr*)pkt)->seq);
                 err = cli_add_send(sockfd, seq, (struct xtcphdr*)pkt, ((int)bytes - DATA_OFFSET), w);
-                /* todo: check return codes */
-                /* fixme: don't break here? */
-                return 1;
+                if(err == FIN) { /* we ACKed the FIN */
+                    return -FIN;
+                }
+                return (int)bytes;
             }
         } else{
             /* todo: add timeout */
         }
         /* end of select for(EVER) */
     }
-    /* fixme: what is here? */
-    return -1;
 }
 
 /**

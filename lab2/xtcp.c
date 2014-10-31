@@ -433,7 +433,8 @@ void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen) {
 /**
 * Give pkt in host order.
 *
-* RETURNS: 0 if
+* RETURNS:  0 if normal
+*           FIN if we just ACKed the FIN
 */
 int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, struct window* w) {
     struct win_node *base;
@@ -441,6 +442,7 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
     uint32_t seqtoadd;
     struct xtcphdr *ackpkt;
     int gaplength = 0;
+    int finreached = 0;
 
     get_lock(&w_mutex);
 
@@ -492,13 +494,20 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
 
 
         /* if it filled a gap then try to make a cumulative ACK by looking at the next pkts */
-        if (seqtoadd == w->clilastunacked) {
+        if (seqtoadd == w->clilastunacked && w->numpkts > 0) {
             _DEBUG("%s\n", "looking if the pkt filled a gap....");
+            if(pkt->flags & FIN) { /* pkt is the lastunacked and it's a FIN */
+                finreached = FIN;
+            }
             curr = curr->next;
             while (curr != base) {
                 gaplength++;
                 if (curr->pkt == NULL) {
                     _DEBUG("win_node #%d was empty, stopping search\n", (w->clibaseseq - seqtoadd) + gaplength);
+                    break;
+                } else if(curr->pkt->flags & FIN) {  /* we reached a a FIN */
+                    _DEBUG("win_node #%d had FIN!\n", (w->clibaseseq - seqtoadd) + gaplength);
+                    finreached = FIN;
                     break;
                 }
                 _DEBUG("win_node #%d had pkt! continue search\n", (w->clibaseseq - seqtoadd) + gaplength);
@@ -511,9 +520,11 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
     ackpkt = alloc_pkt(seqn, (w->clilastunacked + gaplength), ACK, (uint16_t)(w->maxsize - w->numpkts), NULL, 0);
     unget_lock(&w_mutex);
 
+
+
     clisend_lossy(sockfd, ackpkt, sizeof(struct xtcphdr));
     free(ackpkt);
-    return 0;
+    return finreached;
 }
 
 
