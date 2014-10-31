@@ -20,7 +20,7 @@ void unget_lock(pthread_mutex_t* lock);
 void get_lock(pthread_mutex_t* lock);
 int validate_hs2(struct xtcphdr* hdr, int len);
 void *consumer_main(void *);
-int consumer_read();
+int consumer_read(unsigned int *totbytes, unsigned int *totpkts);
 int init_wnd_mutex(void);
 
 int clirecv(int sockfd, struct window* w);

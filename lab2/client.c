@@ -431,7 +431,7 @@ int clirecv(int sockfd, struct window* w) {
                 * instead of a continue later.
                 */
                 _DEBUG("keeping pkt with seq: %"PRIu32", add and send from window.\n", ((struct xtcphdr*)pkt)->seq);
-                err = cli_add_send(sockfd, (struct xtcphdr*)pkt, (int)bytes, w);
+                err = cli_add_send(sockfd, seq, (struct xtcphdr*)pkt, ((int)bytes - DATA_OFFSET), w);
                 /* todo: check return codes */
                 /* fixme: don't break here? */
                 return 1;
@@ -495,10 +495,12 @@ int init_wnd_mutex(void){
 }
 
 void *consumer_main(void *null) {
+    /*unsigned int totbytes = 0;
+    unsigned int totpkts = 0;*/
     double msecs_d;
     unsigned int usecs;
     int fin_found = 5;
-    int err;
+    int rtn;
     srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
     _NOTE("%s","CONSUMER: consumer created\n");
@@ -516,14 +518,14 @@ void *consumer_main(void *null) {
         _NOTE("CONSUMER: woke up after sleeping %fms, has the lock\n", msecs_d);*/
 
         /* fixme: read from wnd */
-        /*consumer_read();*/
+        /* rtn = consumer_read(&totbytes, &totpkts);*/
 
         /*unget_lock(&w_mutex);*/
     }
 
-    err = pthread_mutex_destroy(&w_mutex);
-    if(err > 0){
-        errno = err;
+    rtn = pthread_mutex_destroy(&w_mutex);
+    if(rtn > 0){
+        errno = rtn;
         perror("CONSUMER: ERROR pthread_mutex_destroy()");
         exit(EXIT_FAILURE);
     }
@@ -532,24 +534,40 @@ void *consumer_main(void *null) {
 }
 
 /**
-* fixme: after reading fin die!
-* fixme: count total bytes/pkts read and return if read FIN
+* NOTE: Caller MUST have the mutex.
+* Adds into nbytes the number of bytes read, into npkts the number of pkts read.
+* RETURNS:  0 if normal
+*           -1 if read up to a FIN
 */
-int consumer_read() {
+int consumer_read(unsigned int *totbytes,unsigned int *totpkts) {
     struct win_node* at;
-    int count = 0;
+    unsigned int nodes = 0;
+    unsigned int bytes = 0;
+    int rtn = 0;
     at = w->base;
 
-    for(; at->datalen > 0; at = at->next, ++count) {
+    for(; (at->datalen >= 0) && (at->pkt != NULL); at = at->next) {
+        _NOTE("consumer looking at win_node 3%u\n", nodes);
+        nodes++;
         if ((at->pkt->flags & FIN) == FIN) {
             _NOTE("%s\n", "consumer has reached FIN");
+            rtn = -1;
             break;
         }
         printf("%s", (char*)((at->pkt) + DATA_OFFSET));
+        bytes += at->datalen;
+        free(at->pkt);
         at->datalen = -1;
+        at->pkt = NULL;
     }
 
+    w->clibaseseq += nodes;
     w->base = at;
+    w->numpkts -= nodes;
 
-    return count;
+    *totbytes += bytes;
+    *totpkts += nodes;
+    _NOTE("CONSUMER read %ubytes int %u pkts\n", bytes, nodes);
+    print_window(w);
+    return rtn;
 }
