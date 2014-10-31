@@ -1,5 +1,6 @@
 /* include rtt1 */
 #include "rtt.h"
+#include "debug.h"
 
 int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
 
@@ -12,10 +13,12 @@ int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
 /*todo: both gettimeofday and setitimer operate on time_t (s) and suseconds_t (us) */
 
 static suseconds_t rtt_minmax(suseconds_t rto) {
-    if (rto < RTT_RXTMIN)
+    if (rto < RTT_RXTMIN) {
         rto = RTT_RXTMIN;
-    else if (rto > RTT_RXTMAX)
+    }
+    else if (rto > RTT_RXTMAX) {
         rto = RTT_RXTMAX;
+    }
     return(rto);
 }
 
@@ -31,9 +34,10 @@ void rtt_init(struct rtt_info *ptr) {
     ptr->rtt_base_sec = tv.tv_sec;      /* # sec since 1/1/1970 at start */
     ptr->rtt_base_usec = tv.tv_usec;    /* # us since 1/1/1970 at start */
 
+    ptr->rtt_nrexmt = 0;
     ptr->rtt_rtt    = 0;
     ptr->rtt_srtt   = 0;
-    ptr->rtt_sdev   = 750000 << 2;
+    ptr->rtt_sdev   = 250000 << 2; /* to start the rtt_rto at 1 second */
     ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
     /* first RTO at (srtt + (4 * rttvar)) = 3 seconds */
 }
@@ -53,8 +57,7 @@ suseconds_t rtt_ts(struct rtt_info *ptr) {
         perror("rtt_ts.gettimeofday()");
         exit(EXIT_FAILURE);
     }
-    /* todo: double check! */
-    /* fixme: !*/
+    /* fixme: double check!*/
     ts = ((tv.tv_sec - ptr->rtt_base_sec) * 1000000) + ((tv.tv_usec - ptr->rtt_base_usec));
     return(ts);
 }
@@ -63,17 +66,38 @@ void rtt_newpack(struct rtt_info *ptr) {
     ptr->rtt_nrexmt = 0;
 }
 
-void rtt_start(struct rtt_info *ptr, struct itimerval* itv) {
+
+/**
+* Fills in itv with the current RTO.
+*
+*/
+void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
     suseconds_t  startrto = rtt_minmax((ptr->rtt_rto + 500000));
-    itv->it_value.tv_sec = startrto >> 20; /* 2^20 usecs is almost 1 sec */
-    itv->it_value.tv_usec = startrto - 1000000;
+    _NOTE("start rto is %ld\n", (long)startrto);
+    /*itv->it_value.tv_sec = startrto >> 20;*/ /* 2^20 usecs is almost 1 sec */
+    if(startrto >= 3000000) {
+        itv->it_value.tv_sec = 3;
+        itv->it_value.tv_usec = 0;
+    } else if(startrto >= 2000000) {
+        itv->it_value.tv_sec = 2;
+        itv->it_value.tv_usec = itv->it_value.tv_usec - 2000000;
+    } else if(startrto >= 1000000){
+        itv->it_value.tv_sec = 1;
+        itv->it_value.tv_usec = itv->it_value.tv_usec - 1000000;
+    } else {
+        itv->it_value.tv_sec = 1;
+        itv->it_value.tv_usec = 0;
+    }
     itv->it_interval.tv_sec = 0;
-    itv->it_interval.tv_usec =0;
+    itv->it_interval.tv_usec = 0;
+    _NOTE("timer filled for %ld secs %ld usecs\n", (long)itv->it_value.tv_sec, (long)itv->it_value.tv_usec);
+    rtt_debug(ptr);
     /* DONT DO:
      * alarm(rtt_start(&foo))
      *
      * USE AS:
-     * struct itimerval newtimer =  {(struct timeval){0, 0}, (struct timeval){0,rtt_start(&foo)}}
+     * struct itimerval newtimer;
+     * rtt_start_timer(&newtimer);
      * setitimer(ITIMER_REAL, &newtimer, NULL)
      */
 
@@ -84,16 +108,19 @@ void rtt_start(struct rtt_info *ptr, struct itimerval* itv) {
 }
 
 /*
+ *
  * A response was received.
  * Stop the timer and update the appropriate values in the structure
  * based on this packet's RTT.  We calculate the RTT, then update the
  * estimators of the RTT and its mean deviation.
+ *
  * This function should be called right after turning off the
  * timer with alarm(0), or right after a timeout occurs.
  *
- * note suseconds_t is a signed type
+ * NOTE suseconds_t is a signed type
  */
-void rtt_stop(struct rtt_info *ptr, suseconds_t m) {
+void rtt_stop(struct rtt_info *ptr) {
+    suseconds_t m = rtt_ts(ptr);
     ptr->rtt_rtt = m; /* update last measured RTT in usecs */
 
     /*
@@ -128,6 +155,7 @@ void rtt_stop(struct rtt_info *ptr, suseconds_t m) {
     m -= (ptr->rtt_sdev >> 2);
     ptr->rtt_sdev += m;
     ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
+    rtt_debug(ptr);
 }
 
 /*
@@ -144,6 +172,7 @@ int rtt_timeout(struct rtt_info *ptr) {
 
     if (++ptr->rtt_nrexmt > RTT_MAXNREXMT)
         return(-1);			/* time to give up for this packet */
+    rtt_debug(ptr);
     return(0);
 }
 
@@ -151,10 +180,7 @@ int rtt_timeout(struct rtt_info *ptr) {
  * Print debugging information on stderr, if the "rtt_d_flag" is nonzero.
  */
 void rtt_debug(struct rtt_info *ptr) {
-    if (rtt_d_flag == 0)
-        return;
 
-    fprintf(stderr, "rtt = %ld, srtt = %ld, sdev = %ld, rto = %ld\n",
+    _NOTE("rtt = %ldus, srtt>>3 = %ldus, sdev>>2 = %ldus, rto = %ldus\n",
             ptr->rtt_rtt, ptr->rtt_srtt >> 3, ptr->rtt_sdev >> 2, ptr->rtt_rto);
-    fflush(stderr);
 }

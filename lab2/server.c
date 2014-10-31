@@ -683,7 +683,7 @@ void refresh_timer() {
     struct itimerval newtimer;
 
     rtt_init(&rttinfo);
-    rtt_start(&rttinfo, &newtimer);
+    rtt_start_timer(&rttinfo, &newtimer);
 
     rtt_newpack(&rttinfo);
     setitimer(ITIMER_REAL, &newtimer, NULL);
@@ -695,7 +695,7 @@ int is_wnd_full() {
 }
 
 int is_wnd_empty() {
-    return wnd->servlastackrecv == wnd->servlastseqsent;
+    return wnd->servlastackrecv >= wnd->servlastseqsent;
 }
 
 static void sig_alrm(int signo) {

@@ -412,7 +412,7 @@ int clirecv(int sockfd, struct window* w) {
                 * However, because it's not in here it will use a goto
                 * instead of a continue later.
                 */
-                _DEBUG("keeping pkt with seq: %"PRIu32"\n", ((struct xtcphdr*)pkt)->seq);
+                _DEBUG("keeping pkt with seq: %"PRIu32", add and send from window.\n", ((struct xtcphdr*)pkt)->seq);
                 err = cli_add_send(sockfd, (struct xtcphdr*)pkt, (int)bytes, w);
                 /* todo: check return codes */
                 /* fixme: don't break here? */
