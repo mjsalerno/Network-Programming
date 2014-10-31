@@ -82,5 +82,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt);
 struct win_node* get_node(uint32_t seqtoget, struct window *w);
 void get_lock(pthread_mutex_t* lock);
 void unget_lock(pthread_mutex_t* lock);
+int is_wnd_empty(struct window* wnd);
+int is_wnd_full(struct window* wnd);
 
 #endif /*XTCP_H*/

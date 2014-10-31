@@ -522,6 +522,10 @@ int consumer_read() {
     at = w->base;
 
     for(; at->datalen > 0; at = at->next, ++count) {
+        if ((at->pkt->flags & FIN) == FIN) {
+            _NOTE("%s\n", "consumer has reached FIN");
+            break;
+        }
         printf("%s", (char*)((at->pkt) + DATA_OFFSET));
         at->datalen = -1;
     }

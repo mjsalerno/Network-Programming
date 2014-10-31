@@ -8,7 +8,8 @@ struct client_list* cliList;
 static uint32_t start_seq;
 static struct iface_info* ifaces;
 
-static struct rtt_info   rttinfo;
+extern struct rtt_info   rttinfo;
+extern struct itimerval newtimer;
 static sigjmp_buf	jmpbuf;
 static struct window* wnd;
 static uint16_t ini_advwin;
@@ -296,7 +297,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         _DEBUG("%s\n", "Something went wrong while sending the file.");
     }
 
-    while(!is_wnd_empty()) {
+    while(!is_wnd_empty(wnd)) {
         _DEBUG("%s\n", "QUITING: waiting for unACKed pkts");
         err = recv_acks(child_sock, 1);
         if(err < 0) {
@@ -310,8 +311,13 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     _NOTE("%s\n", "sending FIN");
 
-    if(is_wnd_full()) {
+    if(is_wnd_full(wnd)) {
+        /* need to wait untill we have enough window space */
         recv_acks(child_sock, 0);
+    } else if(is_wnd_empty(wnd)) {
+        /* the timer wont be called for us since we are the last pkt */
+        rtt_newpack(&rttinfo);
+        rtt_start_timer(&rttinfo, &newtimer);
     }
     srv_add_send(child_sock, NULL, 0, FIN, wnd);
 
@@ -590,7 +596,7 @@ int send_file(char* fname, int sock) {
 
     for(EVER) {
 
-        if(!is_wnd_full()) {
+        if(!is_wnd_full(wnd)) {
             n = fread(data, 1, MAX_DATA_SIZE, file);
             tally += n;
             _DEBUG("send_file.fread(%lu)\n", (unsigned long) n);
@@ -605,8 +611,10 @@ int send_file(char* fname, int sock) {
                 break;
             }
 
-            if (is_wnd_empty()) {
-                refresh_timer();
+            /* start timer for new pkt */
+            if (is_wnd_empty(wnd)) {
+                rtt_newpack(&rttinfo);
+                rtt_start_timer(&rttinfo, &newtimer);
                 _NOTE("%s\n", "the window is empty, refreshing timer");
             }
 
@@ -619,9 +627,10 @@ int send_file(char* fname, int sock) {
                     exit(EXIT_FAILURE);
                 } else {
                     _NOTE("%s\n", "Packet timeout, resending");
-                    srv_send_base(sock, wnd);
+                    rtt_start_timer(&rttinfo, &newtimer);
                     wnd->ssthresh = MAX(wnd->cwin / 2, 1);
                     wnd->cwin = 1;
+                    srv_send_base(sock, wnd);
                     break;
                 }
             }
@@ -641,7 +650,7 @@ int recv_acks(int sock, int always_block) {
 
     for(EVER) {
 
-        if ((is_wnd_full() || always_block) && !is_wnd_empty()) {
+        if ((is_wnd_full(wnd) || always_block) && !is_wnd_empty(wnd)) {
             flag = 0;
             _DEBUG("%s\n", "wnd IS full or quitting, recv WILL block");
         } else {
@@ -662,6 +671,19 @@ int recv_acks(int sock, int always_block) {
                 break;
             }
         } else {                                                           /* got an ACK */
+            switch(((struct xtcphdr*)pkt)->flags) {
+                case FIN:
+                    _NOTE("%s\n", "client sent me a FIN, quiting");
+                    exit(EXIT_FAILURE);
+                case RST:
+                    _NOTE("%s\n", "client sent me a RST, quiting");
+                    exit(EXIT_FAILURE);
+                case ACK:
+                    break;
+                default:
+                    _ERROR("%s\n", "client sent me bad flag: %" PRIu16 ", quiting", ((struct xtcphdr*)pkt)->flags);
+                    break;
+            }
             acks++;
             ntohpkt((struct xtcphdr*)pkt);
             printf("GOT: ");
@@ -671,31 +693,10 @@ int recv_acks(int sock, int always_block) {
                     ((struct xtcphdr *)pkt)->ack_seq);
 
             new_ack_recvd(wnd, (struct xtcphdr*)pkt);
-            _DEBUG("%s\n", "refreshing timer");
-            refresh_timer();
         }
     }
 
     return acks;
-}
-
-void refresh_timer() {
-    struct itimerval newtimer;
-
-    rtt_init(&rttinfo);
-    rtt_start_timer(&rttinfo, &newtimer);
-
-    rtt_newpack(&rttinfo);
-    setitimer(ITIMER_REAL, &newtimer, NULL);
-    _DEBUG("%s\n", "timer refreshed");
-}
-
-int is_wnd_full() {
-    return wnd->servlastseqsent >= (wnd->servlastackrecv + MIN(wnd->cwin, MIN(wnd->lastadvwinrecvd, wnd->maxsize)));
-}
-
-int is_wnd_empty() {
-    return wnd->servlastackrecv >= wnd->servlastseqsent;
 }
 
 static void sig_alrm(int signo) {
