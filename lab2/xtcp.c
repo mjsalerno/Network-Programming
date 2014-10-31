@@ -24,10 +24,10 @@ void print_hdr(struct xtcphdr *hdr) {
     int any_flags = 0;
     printf("|hdr| <<<{ seq:%u", hdr->seq);
     printf(", flags:");
-    if((hdr->flags & FIN) == FIN){ printf("F"); any_flags = 1; }
-    if((hdr->flags & SYN) == SYN){ printf("S"); any_flags = 1; }
-    if((hdr->flags & RST) == RST){ printf("R"); any_flags = 1; }
-    if((hdr->flags & ACK) == ACK){ printf("A"); any_flags = 1; is_ack = 1; }
+    if(hdr->flags & FIN) { printf("F"); any_flags = 1; }
+    if(hdr->flags & SYN) { printf("S"); any_flags = 1; }
+    if(hdr->flags & RST) { printf("R"); any_flags = 1; }
+    if(hdr->flags & ACK) { printf("A"); any_flags = 1; is_ack = 1; }
     if(!any_flags) {
         printf("0");
     }
@@ -46,7 +46,7 @@ void print_hdr(struct xtcphdr *hdr) {
 */
 void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_win, void *data, size_t datalen) {
     struct xtcphdr *pkt;
-    if(data == NULL || datalen <= 0){
+    if(data == NULL || datalen <= 0) {
         datalen = 0;
     }
     pkt = malloc(DATA_OFFSET + datalen);
@@ -84,7 +84,7 @@ void print_window(struct window *w){
     printf("\n");
 
     #ifdef DEBUG
-    printf("DEBUG |window| nodes:\n");
+    printf("\n");
     do {
         if(curr->pkt != NULL) {
             printf("========= node %3d ========         ======================\n", n);
@@ -503,18 +503,23 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
                 finreached = FIN;
             }
             curr = curr->next;
-            while (curr != base) {
-                gaplength++;
-                if (curr->pkt == NULL) {
-                    _DEBUG("win_node #%d was empty, stopping search for gap\n", (w->clibaseseq - seqtoadd) + gaplength);
-                    break;
-                } else if(curr->pkt->flags & FIN) {  /* we reached a a FIN */
-                    _DEBUG("win_node #%d had FIN!\n", (w->clibaseseq - seqtoadd) + gaplength);
-                    finreached = FIN;
-                    break;
+            if(curr == base){ /* if this was the last pakt then the window is full */
+                gaplength = 1;
+
+            } else {
+                while (curr != base) {
+                    gaplength++;
+                    if (curr->pkt == NULL) {
+                        _DEBUG("win_node #%d was empty, stopping search for gap\n", (w->clibaseseq - seqtoadd) + gaplength);
+                        break;
+                    } else if (curr->pkt->flags & FIN) {  /* we reached a a FIN */
+                        _DEBUG("win_node #%d had FIN!\n", (w->clibaseseq - seqtoadd) + gaplength);
+                        finreached = FIN;
+                        break;
+                    }
+                    _DEBUG("win_node #%d had pkt! continue search\n", (w->clibaseseq - seqtoadd) + gaplength);
+                    curr = curr->next;
                 }
-                _DEBUG("win_node #%d had pkt! continue search\n", (w->clibaseseq - seqtoadd) + gaplength);
-                curr = curr->next;
             }
         }
     }
