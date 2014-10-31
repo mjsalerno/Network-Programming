@@ -149,7 +149,7 @@ int main(void) {
 
     /* pthread_create consumer thread */
     _DEBUG("%s\n", "creating pthread for consumer...");
-    err = pthread_create(&consumer_tid, NULL, &consumer_main, NULL);
+    err = pthread_create(&consumer_tid, NULL, &consumer_main, fname);
     if(0 > err){
         errno = (int)err;
         perror("ERROR: consumer pthread_create()");
@@ -474,56 +474,73 @@ int init_wnd_mutex(void){
     return 0;
 }
 
-void *consumer_main(void *null) {
-    /*unsigned int totbytes = 0;
-    unsigned int totpkts = 0;*/
+void *consumer_main(void *fname) {
+    unsigned int totbytes = 0;
+    unsigned int totpkts = 0;
     double msecs_d;
     unsigned int usecs;
-    int fin_found = 5;
-    int rtn;
+    int fin_found = ACK;
+    int err;
+    char *tmpfname;
+    int filefd;
     srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
     _NOTE("%s","CONSUMER: consumer created\n");
+    /* create a template filename for mkstemp */
+    tmpfname = malloc(strlen(fname)+6+1);
+    if(tmpfname == NULL){
+        _ERROR("%s","ERROR consumer_main().malloc()\n");
+        exit(EXIT_FAILURE);
+    }
+    strcpy(tmpfname, fname);
+    strcpy((tmpfname+strlen(fname)), "XXXXXX");
+    filefd = mkstemp(tmpfname);
+    if(filefd < 0){
+        perror("ERRROR consumer_main().mkstemp()");
+        exit(EXIT_FAILURE);
+    }
 
-    /* fixme: break when fin found */
-    while(fin_found) {
+    /* stop when FIN found */
+    while(fin_found != FIN) {
         msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
 
         usecs = 1000 * (unsigned int) round(msecs_d);
 
 
         usleep(usecs);
-        /*get_lock(&w_mutex);
+        get_lock(&w_mutex);
 
-        _NOTE("CONSUMER: woke up after sleeping %fms, has the lock\n", msecs_d);*/
+        _NOTE("CONSUMER: woke up after sleeping %fms, has the lock\n", msecs_d);
 
-        /* fixme: read from wnd */
-        /* rtn = consumer_read(&totbytes, &totpkts);*/
+        fin_found = consumer_read(filefd, &totbytes, &totpkts);
 
-        /*unget_lock(&w_mutex);*/
+        unget_lock(&w_mutex);
     }
 
-    rtn = pthread_mutex_destroy(&w_mutex);
-    if(rtn > 0){
-        errno = rtn;
+    err = pthread_mutex_destroy(&w_mutex);
+    if(err > 0){
+        errno = err;
         perror("CONSUMER: ERROR pthread_mutex_destroy()");
         exit(EXIT_FAILURE);
     }
-    /* todo: change */
-    return null;
+
+    free(tmpfname);
+    return NULL;
 }
 
 /**
 * NOTE: Caller MUST have the mutex.
 * Adds into nbytes the number of bytes read, into npkts the number of pkts read.
 * RETURNS:  0 if normal
-*           -1 if read up to a FIN
+*           FIN if read up to a FIN
 */
-int consumer_read(unsigned int *totbytes,unsigned int *totpkts) {
+int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     struct win_node* at;
     unsigned int nodes = 0;
     unsigned int bytes = 0;
     int rtn = 0;
+    ssize_t n = 0;
+    ssize_t totn = 0;
     at = w->base;
 
     for(; (at->datalen >= 0) && (at->pkt != NULL); at = at->next) {
@@ -531,10 +548,21 @@ int consumer_read(unsigned int *totbytes,unsigned int *totpkts) {
         nodes++;
         if ((at->pkt->flags & FIN) == FIN) {
             _NOTE("%s\n", "consumer has reached FIN");
-            rtn = -1;
+            rtn = FIN;
             break;
         }
         printf("%s", (char*)((at->pkt) + DATA_OFFSET));
+        /* write all bytes in the packet to the file. */
+        do {
+            n = write(filefd, ((at->pkt) + DATA_OFFSET + totn), (size_t) at->datalen - totn);
+            if (n < 0) {
+                perror("ERROR consumer_read().write()");
+                close(filefd);
+                exit(EXIT_FAILURE);
+            }
+            totn += n;
+        } while(totn < at->datalen);
+        /* all bytes have been written */
         bytes += at->datalen;
         free(at->pkt);
         at->datalen = -1;
