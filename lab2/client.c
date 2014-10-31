@@ -97,9 +97,6 @@ int main(void) {
         my_addr.sin_addr.s_addr = iface_ptr->ip;
     }
 
-    /* print_sock_name(sockfd, &p_serveraddr); */
-    print_iface_list_sock_name(ifaces);
-
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(serv_fd < 0){
@@ -119,6 +116,11 @@ int main(void) {
     print_sock_name(serv_fd, &bind_addr);
 
     /* connect to server ip */
+    if(0x100007F == my_addr.sin_addr.s_addr) {
+        _DEBUG("%s\n", "I am connected to 127.0.0.1, so changing server ip");
+        serv_addr.sin_addr.s_addr = 0x100007F;
+    }
+
     err = connect(serv_fd, (const struct sockaddr*)&serv_addr, sizeof(serv_addr));
     if(err < 0){
         perror("connect()");
