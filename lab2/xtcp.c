@@ -1,6 +1,9 @@
 #include "xtcp.h"
+#include "rtt.h"
 
 pthread_mutex_t w_mutex;
+struct rtt_info   rttinfo;
+struct itimerval newtimer;
 
 void ntohpkt(struct xtcphdr *hdr) {
     hdr->seq = ntohl(hdr->seq);
@@ -358,6 +361,10 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         return 0;
     }
 
+    if(pkt->ack_seq > window->base->pkt->ack_seq) {
+        rtt_stop(&rttinfo);
+    }
+
     while(pkt->ack_seq > window->base->pkt->ack_seq) {
         rtn++;
         if(window->base == NULL || window->base->pkt == NULL) {
@@ -368,11 +375,21 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         _DEBUG("looking at %" PRIu32 ", have %" PRIu32 "\n", window->servlastackrecv, pkt->ack_seq);
         _DEBUG("%s\n", "freeing ACKed packet");
         free(window->base->pkt);
+        window->base->pkt = NULL;
         window->base->datalen = -1;
+        window->base = window->base->next;
+
+        if(!is_wnd_empty(window)) {
+            _DEBUG("%s\n", "refreshing timer");
+            rtt_newpack(&rttinfo);
+            rtt_start_timer(&rttinfo, &newtimer);
+        }
     }
 
     window->lastadvwinrecvd = pkt->advwin;
     _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
+    window->servlastackrecv = pkt->ack_seq;
+    _DEBUG("New servlastackrecv: %d\n", window->servlastackrecv);
 
     return rtn;
 }
@@ -558,4 +575,12 @@ void unget_lock(pthread_mutex_t* lock) {
         perror("CONSUMER: ERROR pthread_mutex_unlock()");
         exit(EXIT_FAILURE);
     }
+}
+
+int is_wnd_empty(struct window* wnd) {
+    return wnd->servlastackrecv >= wnd->servlastseqsent;
+}
+
+int is_wnd_full(struct window* wnd) {
+    return wnd->servlastseqsent >= (wnd->servlastackrecv + MIN(wnd->cwin, MIN(wnd->lastadvwinrecvd, wnd->maxsize)));
 }

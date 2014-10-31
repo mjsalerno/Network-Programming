@@ -21,9 +21,6 @@ int remove_client(struct client_list** head, pid_t pid);
 void proc_exit(int i);
 void quick_send(int sock, uint16_t flags);
 static void sig_alrm(int signo);
-int is_wnd_full();
-int is_wnd_empty();
-void refresh_timer();
 int recv_acks(int sock, int always_block);
 
 #endif
