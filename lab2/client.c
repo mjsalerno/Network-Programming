@@ -3,6 +3,7 @@
 static uint32_t seq;
 static uint32_t ack_seq; /* also used by wnd as next expected seq */
 static uint16_t advwin;
+static struct iface_info* ifaces;
 
 extern double pkt_loss_thresh; /* packet loss percentage */
 static double u; /* (!!in ms!!) mean of the exponential distribution func */
@@ -19,6 +20,7 @@ int main(void) {
     /* char buf[BUFF_SIZE + 1]; */
     /* config/xtcp vars */
     int seed;
+    struct iface_info* iface_ptr;
 
     pthread_t consumer_tid;
     void *consumer_rtn;
@@ -40,7 +42,7 @@ int main(void) {
     memset((void *)&serv_addr, 0, sizeof(serv_addr));
     my_addr.sin_family = AF_INET;
     /* my IP defaults to "arbitrary" when server non_local */
-    my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    /* my_addr.sin_addr.s_addr = htonl(INADDR_ANY); now using ify stuff */
     my_addr.sin_port = htons(0);
     serv_addr.sin_family = AF_INET;
     /* read the config */
@@ -83,6 +85,20 @@ int main(void) {
     _DEBUG("config file args below:\nipv4:%s \nport:%hu \nfname:%s \n"
             "winsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
         ip4_str, knownport, fname, advwin, seed, pkt_loss_thresh, u);
+
+    /* do iffy info */
+    ifaces = make_iface_list();
+    print_iface_list(ifaces);
+    inet_aton(ip4_str, &(my_addr.sin_addr));
+    iface_ptr = get_matching_iface(ifaces, my_addr.sin_addr.s_addr);
+    if(iface_ptr == NULL) {
+        my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    } else {
+        my_addr.sin_addr.s_addr = iface_ptr->ip;
+    }
+
+    /* print_sock_name(sockfd, &p_serveraddr); */
+    print_iface_list_sock_name(ifaces);
 
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
