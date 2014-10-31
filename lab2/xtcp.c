@@ -236,7 +236,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
         _ERROR("%s\n", "srv_add_send() w is NULL!\n");
         exit(EXIT_FAILURE);
     }
-    if(data == NULL) {
+    if(data == NULL && 0) {
         _ERROR("%s\n", "srv_add_send() data is NULL, can't add/send NULL!\n");
         exit(EXIT_FAILURE);
     }
@@ -355,6 +355,11 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
 
+    if(is_wnd_empty(window)) {
+        _ERROR("%s\n", "The window is empty, why am I getting ACKs?");
+        return 0;
+    }
+
     /* dup ack */
     if(window->servlastackrecv == pkt->ack_seq){
         _NOTE("got dup ack: %" PRIu32 "\n", pkt->ack_seq);
@@ -368,7 +373,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         rtt_stop(&rttinfo);
     }
 
-    while(pkt->ack_seq > window->base->pkt->ack_seq) {
+    while(window->base->pkt->ack_seq && (pkt->ack_seq > window->base->pkt->ack_seq)) {
         rtn++;
         if(window->base == NULL || window->base->pkt == NULL) {
             _ERROR("%s\n", "was about to touch NULL");
