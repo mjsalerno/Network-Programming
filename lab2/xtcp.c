@@ -86,17 +86,21 @@ void print_window(struct window *w){
     #ifdef DEBUG
     printf("DEBUG |window| nodes:\n");
     do {
-        printf("========= node %3d ========\n", n);
-        printf("|Datalen: %15d |\n", curr->datalen);
-        printf("|Pkt ptr: %15p |\n", (void *)curr->pkt);
         if(curr->pkt != NULL) {
-            printf("|Pkt seq: %15"PRIu32" |\n", curr->pkt->seq);
-        }else{
-            printf("|Pkt seq:          ------ |\n");
+            printf("========= node %3d ========         ======================\n", n);
+            printf("|Datalen: %15d |         |SEQ:     %11"PRIu32"|\n", curr->datalen, curr->pkt->seq);
+            printf("|Pkt ptr: %15p |   ----> |ACK_SEQ: %11" PRIu32"|\n", (void *)curr->pkt, curr->pkt->ack_seq);
+            printf("|This:    %15p |         |Flags:   %11x|\n", (void *)curr, curr->pkt->flags);
+            printf("|Next:    %15p |         |Advwin:  %11" PRIu16"|\n", (void *)curr->next, curr->pkt->advwin);
+            printf("========= node %3d ========         ======================\n", n);
+        } else {
+            printf("========= node %3d ========\n", n);
+            printf("|Datalen: %15d |\n", curr->datalen);
+            printf("|Pkt ptr: %15p |\n", (void *)curr->pkt);
+            printf("|This:    %15p |\n", (void *)curr);
+            printf("|Next:    %15p |\n", (void *)curr->next);
+            printf("========= node %3d ========\n", n);
         }
-        printf("|This:    %15p |\n", (void *)curr);
-        printf("|Next:    %15p |\n", (void *)curr->next);
-        printf("========= node %3d ========\n", n);
         curr = curr->next;
         n++;
     } while(curr != head);
