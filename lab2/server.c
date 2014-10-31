@@ -681,7 +681,7 @@ int recv_acks(int sock, int always_block) {
                 case ACK:
                     break;
                 default:
-                    _ERROR("%s\n", "client sent me bad flag: %" PRIu16 ", quiting", ((struct xtcphdr*)pkt)->flags);
+                    _ERROR("client sent me bad flag: %" PRIu16 ", quiting", ((struct xtcphdr*)pkt)->flags);
                     break;
             }
             acks++;
