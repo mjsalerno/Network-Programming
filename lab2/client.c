@@ -22,8 +22,8 @@ int main(void) {
     int seed;
     struct iface_info* iface_ptr;
 
-    pthread_t consumer_tid;
-    void *consumer_rtn;
+    /*pthread_t consumer_tid;
+    void *consumer_rtn;*/
 
     /* serv_fd -- the main server connection socket, reconnected later */
     int serv_fd;
@@ -149,14 +149,14 @@ int main(void) {
 
     /* pthread_create consumer thread */
     _DEBUG("%s\n", "creating pthread for consumer...");
+    /*
     err = pthread_create(&consumer_tid, NULL, &consumer_main, fname);
     if(0 > err){
         errno = (int)err;
         perror("ERROR: consumer pthread_create()");
         close(serv_fd);
         exit(EXIT_FAILURE);
-    }
-
+    }*/
 
     printf("waiting for the file...\n");
 
@@ -180,13 +180,14 @@ int main(void) {
 
     /* wake up when the window is empty */
     _DEBUG("%s\n", "joining on consumer thread.....");
+    /*
     err = pthread_join(consumer_tid, &consumer_rtn);
     if(err > 0) {
         errno = (int)err;
         perror("ERROR: pthread_join()");
         close(serv_fd);
         exit(EXIT_FAILURE);
-    }
+    }*/
 
     _DEBUG("%s\n", "success! closing serv_fd then exiting...");
     close(serv_fd);
@@ -482,19 +483,22 @@ void *consumer_main(void *fname) {
     int fin_found = ACK;
     int err;
     char *tmpfname;
+    char suffix[] = ".tmp";
     int filefd;
     srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
     _NOTE("%s","CONSUMER: consumer created\n");
     /* create a template filename for mkstemp */
-    tmpfname = malloc(strlen(fname)+6+1);
+    tmpfname = malloc(strlen(fname) + 6 + strlen(suffix) + 1);
     if(tmpfname == NULL){
         _ERROR("%s","ERROR consumer_main().malloc()\n");
         exit(EXIT_FAILURE);
     }
     strcpy(tmpfname, fname);
-    strcpy((tmpfname+strlen(fname)), "XXXXXX");
-    filefd = mkstemp(tmpfname);
+    strcpy((tmpfname + strlen(fname)), "XXXXXX");
+    strcpy((tmpfname + strlen(fname) + 6), suffix);
+    printf("%s\n", tmpfname);
+    filefd = mkstemps(tmpfname, (int)strlen(suffix));
     if(filefd < 0){
         perror("ERRROR consumer_main().mkstemp()");
         exit(EXIT_FAILURE);
@@ -514,8 +518,10 @@ void *consumer_main(void *fname) {
 
         fin_found = consumer_read(filefd, &totbytes, &totpkts);
 
+
         unget_lock(&w_mutex);
     }
+    _NOTE("CONSUMER: done! Total: %u bytes across %u pkts", totbytes, totpkts);
 
     err = pthread_mutex_destroy(&w_mutex);
     if(err > 0){
@@ -523,7 +529,7 @@ void *consumer_main(void *fname) {
         perror("CONSUMER: ERROR pthread_mutex_destroy()");
         exit(EXIT_FAILURE);
     }
-
+    close(filefd);
     free(tmpfname);
     return NULL;
 }
@@ -544,7 +550,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     at = w->base;
 
     for(; (at->datalen >= 0) && (at->pkt != NULL); at = at->next) {
-        _NOTE("consumer looking at win_node 3%u\n", nodes);
+        _NOTE("consumer looking at win_node #%u\n", nodes);
         nodes++;
         if ((at->pkt->flags & FIN) == FIN) {
             _NOTE("%s\n", "consumer has reached FIN");
@@ -560,6 +566,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
                 close(filefd);
                 exit(EXIT_FAILURE);
             }
+            _NOTE("consumer wrote %ld bytes to the file\n", n);
             totn += n;
         } while(totn < at->datalen);
         /* all bytes have been written */
@@ -575,7 +582,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
 
     *totbytes += bytes;
     *totpkts += nodes;
-    _NOTE("CONSUMER read %ubytes int %u pkts\n", bytes, nodes);
+    _NOTE("CONSUMER read %u bytes across %u pkts\n", bytes, nodes);
     print_window(w);
     return rtn;
 }
