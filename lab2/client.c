@@ -566,7 +566,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
                 close(filefd);
                 exit(EXIT_FAILURE);
             }
-            _NOTE("consumer wrote %ld bytes to the file\n", n);
+            _NOTE("consumer wrote %ld bytes to the file\n", (long int)n);
             totn += n;
         } while(totn < at->datalen);
         /* all bytes have been written */
