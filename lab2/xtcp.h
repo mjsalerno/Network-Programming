@@ -69,7 +69,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
 void new_ack_recvd(struct window *window, struct xtcphdr *pkt);
 
 
-void clisend_lossy(int sockfd, void *pkt, size_t datalen);
+void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen);
 
 
 void free_window(struct window* wnd);

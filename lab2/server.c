@@ -499,7 +499,7 @@ redo_hs1:
 
     _DEBUG("select(): %d\n", err);
 
-    while(!FD_ISSET(child_sock, &rset) && count < 4) {
+    while(!FD_ISSET(child_sock, &rset) && count < 12) {
         count++;
         _DEBUG("%s\n", "hs2 time out, re-sending over both sockets ...");
 
@@ -656,7 +656,7 @@ int recv_acks(int sock, int always_block) {
             if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
                 fprintf(stderr, "send_file.get_ack(%d", err);
                 perror(")");
-                return -1;
+                exit(EXIT_FAILURE);
             } else {                                                       /* no ACKs */
                 _DEBUG("EWOULDBLOCK: ACKs recvd: %d\n", acks);
                 break;

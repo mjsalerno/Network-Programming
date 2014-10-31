@@ -289,7 +289,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     /* move on to third handshake */
     /* init the window and the wnd_base_seq */
     /* consumer not alive, don't lock */
-    w = init_window(advwin, 0, 0, ack_seq-1, ack_seq-1+advwin);
+    w = init_window(advwin, 0, 0, ack_seq, ack_seq);
 
     sendpkt = alloc_pkt(seq, ack_seq, ACK, advwin, NULL, 0);
     printf("try send hs3: \n");
@@ -483,22 +483,24 @@ void *consumer_main(void *null) {
     int err;
     srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
+    _NOTE("%s","CONSUMER: consumer created\n");
 
-    while(fin_found--) {
+    /* fixme: break when fin found */
+    while(fin_found) {
         msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
 
         usecs = 1000 * (unsigned int) round(msecs_d);
 
 
         usleep(usecs);
-        get_lock(&w_mutex);
+        /*get_lock(&w_mutex);
 
-        _DEBUG("CONSUMER: slept for:  %fms\n", msecs_d);
+        _NOTE("CONSUMER: woke up after sleeping %fms, has the lock\n", msecs_d);*/
 
-        /* todo: read from wnd */
-        consumer_read();
+        /* fixme: read from wnd */
+        /*consumer_read();*/
 
-        unget_lock(&w_mutex);
+        /*unget_lock(&w_mutex);*/
     }
 
     err = pthread_mutex_destroy(&w_mutex);

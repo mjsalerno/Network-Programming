@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 
-struct rtt_info {
+struct rtt_info { /* fixme: add field for pre-doubled RTO */
     suseconds_t    rtt_rtt;	    /* most recent measured RTT, in us */
     suseconds_t    rtt_srtt;	/* smoothed RTT estimator, in us */
                                 /* rtt_srtt stored scaled by 1/g i.e. 8 */

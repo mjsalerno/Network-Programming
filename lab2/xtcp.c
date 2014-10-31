@@ -39,6 +39,7 @@ void print_hdr(struct xtcphdr *hdr) {
 
 /**
 * malloc's a pkt for you
+* returns in HOST order
 */
 void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_win, void *data, size_t datalen) {
     struct xtcphdr *pkt;
@@ -202,11 +203,13 @@ void srv_send_base(int sockfd, struct window *w) {
         print_window(w);
         exit(EXIT_FAILURE);
     }
+    htonpkt(w->base->pkt);
     err = send(sockfd, w->base->pkt , (size_t)w->base->datalen, 0);
     if(err < 0){
         perror("ERROR srv_send_base().send()");
         exit(EXIT_FAILURE);
     }
+    ntohpkt(w->base->pkt);
 }
 
 /**
@@ -386,20 +389,22 @@ void fast_retransmit(struct window* w) {
 /**
 * pkt in HOST order please
 */
-void clisend_lossy(int sockfd, void *pkt, size_t datalen){
+void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen) {
     ssize_t err;
     /* simulate packet loss on sends */
     if(DROP_PKT()) {
         _NOTE("%s", "DROPPED SEND'ing PKT: ");
-        print_hdr((struct xtcphdr *) pkt);
     } else {
-        ntohpkt((struct xtcphdr*)pkt);
+        htonpkt(pkt);
         err = send(sockfd, pkt, (DATA_OFFSET + datalen), 0);
         if (err < 0) {
             perror("xtcp.send_lossy()");
             exit(EXIT_FAILURE);
         }
+        ntohpkt(pkt);
+        _NOTE("%s", "SENT PKT: ");
     }
+    print_hdr(pkt);
 }
 
 
@@ -447,7 +452,7 @@ int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w)
 
         _DEBUG("%s", "found win_node to add pkt\n");
 
-        if (curr->datalen < 0 || curr->pkt != NULL) { /* win_node is occupied */
+        if (curr->datalen > 0 && curr->pkt != NULL) { /* win_node is occupied */
             if (seqtoadd != curr->pkt->seq) {
                 _ERROR("%s\n", "found win_node occupied with different seq!");
                 print_window(w);
@@ -520,7 +525,7 @@ struct win_node* get_node(uint32_t seqtoget, struct window *w) {
 
     curr = base;
     do {
-        _DEBUG("looking at win_node #%d ...", n);
+        _DEBUG("looking at win_node #%d ...\n", n);
         if(seqtoget ==  (w->clibaseseq + n)) {
             _DEBUG("Found %"PRIu32" in win_node #%d\n", seqtoget, n);
             return curr;
@@ -548,6 +553,7 @@ void get_lock(pthread_mutex_t* lock) {
         perror("CONSUMER: ERROR pthread_mutex_lock()");
         exit(EXIT_FAILURE);
     }
+    _INFO("%s\n", "Locked the window.");
 }
 
 void unget_lock(pthread_mutex_t* lock) {
@@ -558,4 +564,5 @@ void unget_lock(pthread_mutex_t* lock) {
         perror("CONSUMER: ERROR pthread_mutex_unlock()");
         exit(EXIT_FAILURE);
     }
+    _INFO("%s\n", "Released the window.");
 }

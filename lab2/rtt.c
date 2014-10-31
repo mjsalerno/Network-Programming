@@ -31,8 +31,8 @@ void rtt_init(struct rtt_info *ptr) {
         perror("rtt_init.gettimeofday()");
         exit(EXIT_FAILURE);
     }
-    ptr->rtt_base_sec = tv.tv_sec;      /* # sec since 1/1/1970 at start */
-    ptr->rtt_base_usec = tv.tv_usec;    /* # us since 1/1/1970 at start */
+    ptr->rtt_base_sec = tv.tv_sec;      /* # sec since 1/1/1970, updated on rtt_start_timer() */
+    ptr->rtt_base_usec = tv.tv_usec;    /* # us since 1/1/1970, updated on rtt_start_timer()  */
 
     ptr->rtt_nrexmt = 0;
     ptr->rtt_rtt    = 0;
@@ -57,7 +57,7 @@ suseconds_t rtt_ts(struct rtt_info *ptr) {
         perror("rtt_ts.gettimeofday()");
         exit(EXIT_FAILURE);
     }
-    /* fixme: double check!*/
+
     ts = ((tv.tv_sec - ptr->rtt_base_sec) * 1000000) + ((tv.tv_usec - ptr->rtt_base_usec));
     return(ts);
 }
@@ -69,9 +69,16 @@ void rtt_newpack(struct rtt_info *ptr) {
 
 /**
 * Fills in itv with the current RTO.
+
+* USE AS:
+* struct itimerval newtimer;
+* rtt_start_timer(ptr, &newtimer);
+* setitimer(ITIMER_REAL, &newtimer, NULL)
 *
 */
 void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
+    struct timeval	tv;
+    int err;
     suseconds_t  startrto = rtt_minmax((ptr->rtt_rto + 500000));
     _NOTE("start rto is %ld\n", (long)startrto);
     /*itv->it_value.tv_sec = startrto >> 20;*/ /* 2^20 usecs is almost 1 sec */
@@ -80,34 +87,31 @@ void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
         itv->it_value.tv_usec = 0;
     } else if(startrto >= 2000000) {
         itv->it_value.tv_sec = 2;
-        itv->it_value.tv_usec = itv->it_value.tv_usec - 2000000;
+        itv->it_value.tv_usec = startrto - 2000000;
     } else if(startrto >= 1000000){
         itv->it_value.tv_sec = 1;
-        itv->it_value.tv_usec = itv->it_value.tv_usec - 1000000;
+        itv->it_value.tv_usec = startrto - 1000000;
     } else {
         itv->it_value.tv_sec = 1;
         itv->it_value.tv_usec = 0;
     }
     itv->it_interval.tv_sec = 0;
     itv->it_interval.tv_usec = 0;
-    _NOTE("timer filled for %ld secs %ld usecs\n", (long)itv->it_value.tv_sec, (long)itv->it_value.tv_usec);
+    _NOTE("timer filled for %ld.%06ldsecs\n", (long)itv->it_value.tv_sec, (long)itv->it_value.tv_usec);
     rtt_debug(ptr);
-    /* DONT DO:
-     * alarm(rtt_start(&foo))
-     *
-     * USE AS:
-     * struct itimerval newtimer;
-     * rtt_start_timer(&newtimer);
-     * setitimer(ITIMER_REAL, &newtimer, NULL)
-     */
 
-    /* different approach below to consider?
-     *   clock_gettime(CLOCK_MONOTONIC, )
-     *   uses: struct timespec {time_t tv_sec; long tv_nsec;}
-     */
+    /* move our base time forward */
+    err = gettimeofday(&tv, NULL);
+    if(err < 0){
+        perror("rtt_ts.gettimeofday()");
+        exit(EXIT_FAILURE);
+    }
+    ptr->rtt_base_sec = tv.tv_sec;
+    ptr->rtt_base_usec = tv.tv_usec;
 }
 
 /*
+ * Subsuquent calls to rtt_stop() must be followed by a call to rtt_start_timer()
  *
  * A response was received.
  * Stop the timer and update the appropriate values in the structure
