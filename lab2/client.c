@@ -515,6 +515,7 @@ void *consumer_main(void *null) {
 
 /**
 * fixme: after reading fin die!
+* fixme: count total bytes/pkts read and return if read FIN
 */
 int consumer_read() {
     struct win_node* at;
