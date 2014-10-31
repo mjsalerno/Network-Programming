@@ -356,6 +356,8 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
             _DEBUG("incremented cwin, new cwin: %d\n", window->cwin);
         }
     }
+
+    print_window(window);
 }
 
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
@@ -610,5 +612,5 @@ int is_wnd_empty(struct window* wnd) {
 }
 
 int is_wnd_full(struct window* wnd) {
-    return wnd->servlastseqsent >= (wnd->servlastackrecv + MIN(wnd->cwin, MIN(wnd->lastadvwinrecvd, wnd->maxsize)));
+    return wnd->servlastseqsent >= (wnd->servlastackrecv + MIN(wnd->cwin, MIN(wnd->lastadvwinrecvd, wnd->maxsize))) - 1;
 }
