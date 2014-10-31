@@ -2,8 +2,12 @@
 #define	RTT_H
 
 /*#include	"unp.h" */
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/time.h>
 
-struct rtt_info {
+struct rtt_info { /* fixme: add field for pre-doubled RTO */
     suseconds_t    rtt_rtt;	    /* most recent measured RTT, in us */
     suseconds_t    rtt_srtt;	/* smoothed RTT estimator, in us */
                                 /* rtt_srtt stored scaled by 1/g i.e. 8 */
@@ -22,14 +26,12 @@ struct rtt_info {
 #define	RTT_MAXNREXMT 	12  	/* max # times to retransmit */
 
 /* function prototypes */
-void	    rtt_debug  (struct rtt_info *          );
-void	    rtt_init   (struct rtt_info *          );
-void	    rtt_newpack(struct rtt_info *          );
-suseconds_t rtt_start  (struct rtt_info *          );
-void	    rtt_stop   (struct rtt_info *, suseconds_t);
-int		    rtt_timeout(struct rtt_info *          );
-suseconds_t rtt_ts     (struct rtt_info *          );
-
-extern int	rtt_d_flag;	/* can be set to nonzero for addl info */
+void	    rtt_debug  (struct rtt_info *);
+void	    rtt_init   (struct rtt_info *);
+void	    rtt_newpack(struct rtt_info *);
+suseconds_t rtt_ts(struct rtt_info *ptr);
+void        rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv);
+void        rtt_stop   (struct rtt_info *ptr);
+int		    rtt_timeout(struct rtt_info *);
 
 #endif

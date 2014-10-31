@@ -21,18 +21,8 @@
 
 #define TIME_OUT 2
 
-#define E_ISFULL   -4
-/*#define E_WASREMOVED    -3*/
-/*#define E_CANTFIT       -2*/
-#define E_OCCUPIED -1
-
-/* for extern'ing in client and server */
-uint32_t seq;           /* SEQ number */
-uint32_t ack_seq;       /* ACK number */
-
-uint16_t advwin;        /* current advwin */
-
 double pkt_loss_thresh; /* packet loss percentage */
+#define DROP_PKT() (drand48() < (pkt_loss_thresh))
 
 struct xtcphdr {
     uint32_t seq;
@@ -42,52 +32,57 @@ struct xtcphdr {
     /*uint16_t datalen;*/
 };
 
+struct win_node {
+    int datalen;
+    struct xtcphdr* pkt;
+    struct win_node* next;
+};
+
+struct window {
+    int maxsize;
+    int numpkts; /* for client this is the number of total ordered/unordered pkts */
+    int lastadvwinrecvd;
+    uint32_t servlastackrecv;
+    uint32_t servlastseqsent;
+    int cwin;
+    int ssthresh;
+    int dupacks;
+    uint32_t clibaseseq;
+    uint32_t clilastunacked;
+    struct win_node *base;
+};
+
+void ackrecvd(struct window*, struct xtcphdr*);
+
+
+
 void print_hdr(struct xtcphdr *hdr);
-/*
-Example:
-void *packet = malloc(sizeof(struct xtcphdr) + datalen)
-make_pkt(packet, .....)
- */
-void make_pkt(void *hdr, uint16_t flags, uint16_t advwin, void *data, size_t datalen);
+void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn,
+        uint16_t flags, uint16_t adv_win, void *data, size_t datalen);
+
 void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen, char **wnd, int is_new, uint16_t* cli_wnd);
-int clisend(int sockfd, uint16_t flags, void *data, size_t datalen);
+int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen,
+        char **wnd, int is_new, uint16_t* cli_wnd);
+void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct window *w);
+void new_ack_recvd(struct window *window, struct xtcphdr *pkt);
 
-int print_wnd_check(const char **wnd);
-int can_add_to_wnd(uint32_t seq);
-int add_to_wnd(uint32_t index, const char* pkt, const char** wnd);
-char* remove_from_wnd(const char** wnd);
-char* get_from_wnd(uint32_t index, const char** wnd);
-void free_wnd(char** wnd);
-char** init_wnd(uint32_t first_seq_num);
-int dst_from_base_wnd(uint32_t n);
-void print_wnd(const char** wnd);
-int ge_base(uint32_t ack_seq_1);
-int is_wnd_full();
-int is_wnd_empty();
 
-/**
-* clirecv -- for the client/receiver/acker
-* Returns: >0 bytes recv'd
-*           0 on FIN recv'd
-*          -1 on RST recv'd
-*          -2 on failure, with perror printed
-* DESC:
-* Blocks until a packet is recv'ed from sockfd. If it's a FIN, immediately return 0.
-* If it's not a FIN then try to drop it based on pkt_loss_thresh.
-* -if dropped, pretend it never happened and continue to block in select()
-* -if kept:
-*   -if RST then return -1
-*   -else ACK
-* NOTES:
-* Sends ACKs and duplicate ACKS.
-* If a dup_ack is sent go back to block in select().
-* NULL terminates the data sent.
-*/
-int clirecv(int sockfd, char **wnd);
-int cli_ack(int sockfd, char **wnd);
-int cli_dup_ack(int sockfd);
+void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen);
+
+
+void free_window(struct window* wnd);
+struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv_last_ack_seq_recvd,
+        uint32_t cli_last_seqn_recvd, uint32_t cli_base_seqn);
+void print_window(struct window *windo);
+void srv_send_base(int sockfd, struct window *w);
+int cli_add_send(int sockfd, struct xtcphdr *pkt, int datalen, struct window* w);
+int remove_aked_pkts(struct window *window, struct xtcphdr *pkt);
+struct win_node* get_node(uint32_t seqtoget, struct window *w);
+void get_lock(pthread_mutex_t* lock);
+void unget_lock(pthread_mutex_t* lock);
+int is_wnd_empty(struct window* wnd);
+int is_wnd_full(struct window* wnd);
 
 #endif /*XTCP_H*/

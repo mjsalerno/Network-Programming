@@ -1,11 +1,13 @@
 README
 =====================================
 Michael Salerno, XXXXXXXXX, cse533-XX
-Scott Harvey, 108272691, cse533-11
+Scott Harvey,    108272691, cse533-11
 =====================================
 
-
+We re-did the sliding window 4 times.
 
 ===========================
 CHANGES TO: rtt.c, unprtt.h
 ===========================
+
+Initial RTO is 1 second, as in new TCP implementations.

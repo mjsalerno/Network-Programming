@@ -1,16 +1,14 @@
 #include "client.h"
 
-extern uint32_t seq;
-extern uint32_t ack_seq; /* also used by wnd as next expected seq */
-extern uint16_t advwin;
-
-static char** wnd; /* will point to malloc()'d array from init_wnd()*/
+static uint32_t seq;
+static uint32_t ack_seq; /* also used by wnd as next expected seq */
+static uint16_t advwin;
 
 extern double pkt_loss_thresh; /* packet loss percentage */
-
 static double u; /* (!!in ms!!) mean of the exponential distribution func */
 
-pthread_mutex_t wnd_mutex;
+static struct window* w;
+extern pthread_mutex_t w_mutex;
 
 int main(void) {
     ssize_t err; /* for error checking */
@@ -20,7 +18,6 @@ int main(void) {
     char ip4_str[INET_ADDRSTRLEN];
     /* char buf[BUFF_SIZE + 1]; */
     /* config/xtcp vars */
-    uint16_t orig_win_size;
     int seed;
 
     pthread_t consumer_tid;
@@ -69,9 +66,6 @@ int main(void) {
         "client.in:3: error getting transfer file name");
     /* 4. fill in file to transfer */
     advwin = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
-    orig_win_size = advwin;
-    orig_win_size++;
-    orig_win_size--;
 
     /* 5. fill in seed */
     seed = int_from_config(file, "client.in:5: error getting seed");
@@ -88,7 +82,7 @@ int main(void) {
 
     _DEBUG("config file args below:\nipv4:%s \nport:%hu \nfname:%s \n"
             "winsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
-        ip4_str, knownport, fname, orig_win_size, seed, pkt_loss_thresh, u);
+        ip4_str, knownport, fname, advwin, seed, pkt_loss_thresh, u);
 
     /* get a socket to talk to the server */
     serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -137,7 +131,7 @@ int main(void) {
 
     /* pthread_create consumer thread */
     _DEBUG("%s\n", "creating pthread for consumer...");
-    err = pthread_create(&consumer_tid, NULL, &consumer_main, (void *)wnd);
+    err = pthread_create(&consumer_tid, NULL, &consumer_main, NULL);
     if(0 > err){
         errno = (int)err;
         perror("ERROR: consumer pthread_create()");
@@ -146,26 +140,29 @@ int main(void) {
     }
 
 
-    _DEBUG("%s\n", "waiting for the file ...");
+    printf("waiting for the file...\n");
+
     for(EVER) {
-        print_wnd((const char**)wnd);
-        _DEBUG("%s\n", "calling clirecv()");
-        err = clirecv(serv_fd, wnd);
+
+        _DEBUG("%s\n", "calling clirecv() to recv file data");
+        err = clirecv(serv_fd, w);
         _DEBUG("clirecv() returned: %d\n", (int)err);
         if (err <= -2) {
             _DEBUG("%s\n", "client exit(EXIT_FAILURE)");
             exit(EXIT_FAILURE);
         }
         else if(err == -1){
-            _DEBUG("%s\n", "Got RST, ending client...");
-            break;
+            _ERROR("%s\n", "Got a RST, ending client...");
+            close(serv_fd);
+            exit(EXIT_SUCCESS);
         }
         else if(err == 0) {
-            _DEBUG("%s\n", "Done getting file...");
+            _DEBUG("%s\n", "Done recv'ing the file...");
             break;
         }
         /* got actual data, loop back around for more */
         _DEBUG("%s\n", "clirecv() got actual data, loop back around for more");
+
     }
 
     /* wake up when the window is empty */
@@ -177,17 +174,21 @@ int main(void) {
         close(serv_fd);
         exit(EXIT_FAILURE);
     }
-    /* todo: use consumer_rtn ??*/
+
+    /* todo: use consumer return ?? */
 
     _DEBUG("%s\n", "success! closing serv_fd then exiting...");
     close(serv_fd);
     exit(EXIT_SUCCESS);
 }
 
-
+/**
+* -1 if timedout, 0 if connected.
+*/
 int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     char pktbuf[MAX_PKT_SIZE];
     struct xtcphdr *hdr; /* just to cast pktbuf to xtcphdr type */
+    struct xtcphdr *sendpkt;
     /* select vars */
     fd_set rset;
     int maxfpd1 = 0;
@@ -199,20 +200,17 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     seq = (uint32_t)lrand48();
     ack_seq = 0;
 
-    /* todo: timeout  on oldest packet */
+    sendpkt = alloc_pkt(seq, ack_seq, SYN, advwin, fname, strlen(fname));
 
     sendagain: /* jump here if server doesn't respond */
     if(attemp >= 3) {
         fprintf(stderr, "Too many retries......Exiting....Goodbye\n");
+        free(sendpkt);
         return -1;
     }
     attemp++;
     printf("try send hs1\n");
-    err = clisend(serv_fd, SYN, fname, strlen(fname));
-    if(err < 0){
-        _DEBUG("handshakes.clisend() returned: %d\n", (int)err);
-        return -1;
-    }
+    clisend(serv_fd, sendpkt, strlen(fname));
     /* don't increment seq until we know this sent */
 
     _DEBUG("%s\n", "waiting for hs2...");
@@ -230,19 +228,31 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
         err = select(maxfpd1, &rset, NULL, NULL, &timer);
         if(err < 0) {
             /* EINTR can't occur yet */
-            perror("hs1.select()");
-            return -1;
+            perror("handshakes().select()");
+            exit(EXIT_FAILURE);
         }
         /* check if the serv_fd is set */
         if(FD_ISSET(serv_fd, &rset)) {
             _DEBUG("%s\n", "recv()'ing something");
             n = recv(serv_fd, pktbuf, sizeof(pktbuf), 0);
             if (n < 0) {
-                perror("recv()");
-                return -1;
+                perror("handshakes().recv()");
+                exit(EXIT_FAILURE);
             }
-            /* we recv()'ed something so break from select */
-            break;
+            /* we recv()'ed so test if we should keep it */
+            _DEBUG("%s\n", "recv'd a packet, should we drop it?");
+            if(DROP_PKT()) {
+                /* we dropped it, note it, and continue */
+                _NOTE("%s", "DROPPED RECV'ing PKT: ");
+                ntohpkt((struct xtcphdr*)pktbuf);
+                print_hdr((struct xtcphdr *)pktbuf);
+                continue;
+            }else {
+                /* we recv()'ed something so break from select */
+                _DEBUG("%s\n", "we kept it.");
+                break;
+            }
+
         }
         else { /* so the select timed out */
             _DEBUG("%s\n", "timeout() while waiting for hs2, resending hs1");
@@ -250,6 +260,7 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
             goto sendagain;
         }
     }
+    free(sendpkt);
     /* the server responded so now inc seq */
     ++seq;
     /* validate the something was a SYN-ACK */
@@ -264,36 +275,29 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
     print_hdr(hdr);
     ack_seq = hdr->seq + 1; /* we expect their seq + 1 */
 
-    /* pick the smallest advwin */
-    advwin = ((hdr)->advwin < advwin) ? (hdr)->advwin : advwin;
-    _DEBUG("new advwin: %d\n", advwin);
-
     /* copy the passed port into the serv_addr */
     memcpy(&serv_addr->sin_port, pktbuf + DATA_OFFSET, sizeof(serv_addr->sin_port));
     /* re connect() with new port */
     err = connect(serv_fd, (const struct sockaddr*)serv_addr, sizeof(struct sockaddr));
     if (err < 0) {
         perror("re connect()");
-        return -1;
+        exit(EXIT_FAILURE);
     }
     printf("re-connect()'ed to -- ");
     print_sock_peer(serv_fd, serv_addr);
 
     /* move on to third handshake */
     /* init the window and the wnd_base_seq */
-    wnd = init_wnd(ack_seq);
-    if(wnd == NULL){
-        return -1;
-    }
+    /* consumer not alive, don't lock */
+    w = init_window(advwin, 0, 0, ack_seq, ack_seq);
 
-    /* todo: back by ARQ */
+    sendpkt = alloc_pkt(seq, ack_seq, ACK, advwin, NULL, 0);
     printf("try send hs3: \n");
-    /* don't use cli_ack() here */
-    err = clisend(serv_fd, ACK, NULL, 0);
-    if(err < 0){
-        return -1;
-    }
 
+    /* todo: put hs2 into window */
+    clisend(serv_fd, sendpkt, 0);
+
+    free(sendpkt);
     return 0;
 
 }
@@ -320,6 +324,122 @@ int validate_hs2(struct xtcphdr* hdr, int len){
 }
 
 /**
+* TODO: return code for we are done (we have sent an ACK for the FIN pkt)
+* clirecv -- for the client/receiver
+* Returns: >0 bytes recv'd
+*           0 on FIN recv'd
+*          -1 on RST recv'd
+* DESC:
+* Blocks until a packet is recv'ed from sockfd. If it's a FIN, note the seq num and recv
+* until you have ACKed that you expect the FIN's seq_num.
+* If it's not a FIN then try to drop it based on pkt_loss_thresh.
+* -if dropped, pretend it never happened and continue to block in select()
+* -if kept:
+*   -if RST then return -1
+*   -else ACK
+* NOTES:
+* Sends ACKs and duplicate ACKS.
+* If a dup_ack is sent go back to block in select().
+* NULL terminates the data sent.
+*/
+int clirecv(int sockfd, struct window* w) {
+    ssize_t bytes = 0;
+    int err;
+    fd_set rset;
+    char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
+    if(pkt == NULL){
+        perror("clirecv().malloc()");
+        exit(EXIT_FAILURE);
+    }
+    for(EVER) {
+        /*continue_with_select: */
+        /* todo: remove this print? */
+        _DEBUG("%s\n", "select()'ing on server socket for pkts");
+
+        get_lock(&w_mutex);
+        print_window(w);
+        unget_lock(&w_mutex);
+
+        FD_ZERO(&rset);
+        FD_SET(sockfd, &rset);
+        /* todo: add 12 * 3 or 40 second timeout on select() */
+
+        err = select(sockfd + 1, &rset, NULL, NULL, NULL);
+        if(err < 0){
+            if(err == EINTR) {
+                continue;
+            }
+            perror("clirecv().select()");
+            free(pkt);
+            exit(EXIT_FAILURE);
+        }
+        if(FD_ISSET(sockfd, &rset)){
+            /* recv the server's datagram */
+            bytes = recv(sockfd, pkt, MAX_PKT_SIZE, 0);
+            if(bytes < 0){
+                perror("clirecv().recv()");
+                free(pkt);
+                exit(EXIT_FAILURE);
+            }else if(bytes < 12){
+                _DEBUG("clirecv().recv() not long enough to be pkt: %dbytes\n", (int)bytes);
+                continue;
+            }
+            ntohpkt((struct xtcphdr *)pkt); /* host order please */
+            pkt[bytes] = 0; /* NULL terminate the ASCII text */
+
+            /* if it's a FIN or RST don't try to drop it, we're closing dirty! */
+            if((((struct xtcphdr*)pkt)->flags & FIN) == FIN) {
+                /* FIXME: buffer FIN */
+                _DEBUG("%s\n", "clirecv()'d a FIN packet.");
+                free(pkt);
+                return 0;
+            }
+            if((((struct xtcphdr*)pkt)->flags & RST) == RST){
+                _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
+                free(pkt);
+                return -1;
+            }
+            /* not a FIN: try to drop it */
+            if(DROP_PKT()) {
+                /* drop the pkt */
+                _NOTE("%s", "DROPPED RECV'ing PKT: ");
+                print_hdr((struct xtcphdr *) pkt);
+                continue;
+            } else {
+                /**
+                * keep the pkt:
+                * Pretend like the code after the "break;" is in here.
+                * However, because it's not in here it will use a goto
+                * instead of a continue later.
+                */
+                _DEBUG("keeping pkt with seq: %"PRIu32", add and send from window.\n", ((struct xtcphdr*)pkt)->seq);
+                err = cli_add_send(sockfd, (struct xtcphdr*)pkt, (int)bytes, w);
+                /* todo: check return codes */
+                /* fixme: don't break here? */
+                return 1;
+            }
+        } else{
+            /* todo: add timeout */
+        }
+        /* end of select for(EVER) */
+    }
+    /* fixme: what is here? */
+    return -1;
+}
+
+/**
+* The client only directly calls this function twice, for the SYN and first ACK.
+* It provides packet loss to the client's sends.
+*
+* pkt is in HOST ORDER please!
+*/
+void clisend(int sockfd, struct xtcphdr *pkt, size_t datalen) {
+    _DEBUG("%s\n", "printing hdr to send");
+    print_hdr((struct xtcphdr*)pkt);
+    clisend_lossy(sockfd, pkt, datalen);
+}
+
+/**
 * init the wnd mutex
 */
 int init_wnd_mutex(void){
@@ -339,7 +459,7 @@ int init_wnd_mutex(void){
         return -1;
     }
 
-    err = pthread_mutex_init(&wnd_mutex, &attr);
+    err = pthread_mutex_init(&w_mutex, &attr);
     if(err > 0){
         errno = err;
         perror("ERROR pthread_mutex_init()");
@@ -356,45 +476,61 @@ int init_wnd_mutex(void){
     return 0;
 }
 
-void *consumer_main(void *wnd) {
+void *consumer_main(void *null) {
     double msecs_d;
     unsigned int usecs;
     int fin_found = 5;
     int err;
     srand48(time(NULL));
     /* u is in milliseconds ms! not us, not ns*/
+    _NOTE("%s","CONSUMER: consumer created\n");
 
-    while(fin_found--) {
+    /* fixme: break when fin found */
+    while(fin_found) {
         msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
 
         usecs = 1000 * (unsigned int) round(msecs_d);
-        _DEBUG("CONSUMER: sleeping for:  %fms\n", msecs_d);
+
 
         usleep(usecs);
-        err = pthread_mutex_lock(&wnd_mutex);
-        if(err > 0){
-            errno = err;
-            perror("CONSUMER: ERROR pthread_mutex_destroy()");
-            exit(EXIT_FAILURE);
-        }
+        /*get_lock(&w_mutex);
 
-        /* todo: read from wnd */
+        _NOTE("CONSUMER: woke up after sleeping %fms, has the lock\n", msecs_d);*/
 
-        pthread_mutex_unlock(&wnd_mutex);
-        if(err > 0){
-            errno = err;
-            perror("CONSUMER: ERROR pthread_mutex_destroy()");
-            exit(EXIT_FAILURE);
-        }
+        /* fixme: read from wnd */
+        /*consumer_read();*/
+
+        /*unget_lock(&w_mutex);*/
     }
 
-    err = pthread_mutex_destroy(&wnd_mutex);
+    err = pthread_mutex_destroy(&w_mutex);
     if(err > 0){
         errno = err;
         perror("CONSUMER: ERROR pthread_mutex_destroy()");
         exit(EXIT_FAILURE);
     }
     /* todo: change */
-    return wnd;
+    return null;
 }
 
+/**
+* fixme: after reading fin die!
+*/
+int consumer_read() {
+    struct win_node* at;
+    int count = 0;
+    at = w->base;
+
+    for(; at->datalen > 0; at = at->next, ++count) {
+        if ((at->pkt->flags & FIN) == FIN) {
+            _NOTE("%s\n", "consumer has reached FIN");
+            break;
+        }
+        printf("%s", (char*)((at->pkt) + DATA_OFFSET));
+        at->datalen = -1;
+    }
+
+    w->base = at;
+
+    return count;
+}
