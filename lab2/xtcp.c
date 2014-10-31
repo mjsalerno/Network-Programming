@@ -316,7 +316,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
 void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
     int count = 0;
     static int total_acks = 0;
-    if(pkt->ack_seq > window->servlastseqsent) {
+    if(pkt->ack_seq > window->servlastseqsent + 1) {
         _ERROR("Client ACKing something i never sent, last SEQ sent: %" PRIu32 " ACK got: %" PRIu32 "\n", window->servlastseqsent, pkt->ack_seq);
         exit(EXIT_FAILURE);
     } else if(pkt->ack_seq < window->servlastackrecv) {
@@ -357,7 +357,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
 
-    if(is_wnd_empty(window)) {
+    if(is_wnd_empty(window) || window->base->pkt == NULL) {
         _ERROR("%s\n", "The window is empty, why am I getting ACKs?");
         return 0;
     }
@@ -375,14 +375,10 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         rtt_stop(&rttinfo);
     }
 
-    while(window->base->pkt->ack_seq && (pkt->ack_seq > window->base->pkt->ack_seq)) {
+    while(window->base->pkt != NULL && (pkt->ack_seq > window->base->pkt->seq)) {
         rtn++;
-        if(window->base == NULL || window->base->pkt == NULL) {
-            _ERROR("%s\n", "was about to touch NULL");
-            exit(EXIT_FAILURE);
-        }
 
-        _DEBUG("looking at %" PRIu32 ", have %" PRIu32 "\n", window->servlastackrecv, pkt->ack_seq);
+        _DEBUG("looking at %" PRIu32 ", have %" PRIu32 "\n", window->base->pkt->seq, pkt->ack_seq);
         _DEBUG("%s\n", "freeing ACKed packet");
         free(window->base->pkt);
         window->base->pkt = NULL;
@@ -390,6 +386,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         window->base = window->base->next;
 
         if(!is_wnd_empty(window)) {
+            /* todo: might be wrong */
             _DEBUG("%s\n", "refreshing timer");
             rtt_newpack(&rttinfo);
             rtt_start_timer(&rttinfo, &newtimer);
@@ -602,7 +599,7 @@ void unget_lock(pthread_mutex_t* lock) {
 }
 
 int is_wnd_empty(struct window* wnd) {
-    return wnd->servlastackrecv >= wnd->servlastseqsent;
+    return wnd->servlastackrecv > wnd->servlastseqsent;
 }
 
 int is_wnd_full(struct window* wnd) {
