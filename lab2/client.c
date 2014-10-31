@@ -86,6 +86,13 @@ int main(void) {
             "winsize:%hu \nseed:%d \np:%5.4f \nu:%5.4f\n\n",
         ip4_str, knownport, fname, advwin, seed, pkt_loss_thresh, u);
 
+    /* get a socket to talk to the server */
+    serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(serv_fd < 0){
+        perror("socket()");
+        exit(EXIT_FAILURE);
+    }
+
     /* do iffy info */
     ifaces = make_iface_list();
     print_iface_list(ifaces);
@@ -94,15 +101,18 @@ int main(void) {
     if(iface_ptr == NULL) {
         my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     } else {
+        int optval = 1;
+        _INFO("%s\n", "found local iface, using SO_DONTROUTE");
+        err = setsockopt(serv_fd, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(int));
+
+        if(err < 0) {
+            perror("main.setsockopt()");
+            free_iface_info(ifaces);
+            exit(EXIT_FAILURE);
+        }
         my_addr.sin_addr.s_addr = iface_ptr->ip;
     }
 
-    /* get a socket to talk to the server */
-    serv_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if(serv_fd < 0){
-        perror("socket()");
-        exit(EXIT_FAILURE);
-    }
     /* bind to my ip */
     err = bind(serv_fd, (struct sockaddr *)&my_addr, sizeof(my_addr));
     if(err < 0){
@@ -191,6 +201,7 @@ int main(void) {
 
     _DEBUG("%s\n", "success! closing serv_fd and cleaning up, then exiting...");
     free_window(w);
+    free_iface_info(ifaces);
     close(serv_fd);
     exit(EXIT_SUCCESS);
 }
