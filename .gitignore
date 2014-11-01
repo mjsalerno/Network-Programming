@@ -1,5 +1,7 @@
 # Created by https://www.gitignore.io
 
+*.html
+
 ### C ###
 # Object files
 *.o

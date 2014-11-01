@@ -144,8 +144,6 @@ int main(int argc, const char **argv) {
         newCli = add_client(&cliList, cliaddr.sin_addr.s_addr, cliaddr.sin_port);
         if(newCli == NULL) {
             _DEBUG("%s\n", "Server: dup clinet, not doing anything");
-
-            ntohpkt((struct xtcphdr*)pkt);
             printf("GOT: ");
             print_hdr((struct xtcphdr *) pkt);
             continue;

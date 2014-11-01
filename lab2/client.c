@@ -67,6 +67,11 @@ int main(void) {
         "client.in:3: error getting transfer file name");
     /* 4. fill in file to transfer */
     advwin = (uint16_t) int_from_config(file, "client.in:4: error getting window size");
+    if(advwin <= 0) {
+        fprintf(stderr, "client.in:4: window size must be > 0\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
 
     /* 5. fill in seed */
     seed = int_from_config(file, "client.in:5: error getting seed");
@@ -198,7 +203,7 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    _DEBUG("%s\n", "success! closing serv_fd and cleaning up, then exiting...");
+    _DEBUG("%s\n", "success! closing socket and cleaning up, then exiting...");
     free_window(w);
     free_iface_info(ifaces);
     close(serv_fd);
@@ -555,33 +560,39 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     struct xtcphdr *pkt;
     int rtn = 0;
     ssize_t n = 0;
-    ssize_t totn = 0;
+    ssize_t nleft = 0;
     at = w->base;
     if(w->numpkts == w->maxsize){
         wasfull = 1;
     }
 
+    if(w->numpkts <= 0){
+        _NOTE("consumer window was empty, num pkts: %d\n", w->numpkts);
+        return rtn;
+    }
+
     for(; (at->datalen >= 0) && (at->pkt != NULL); at = at->next) {
-        _NOTE("consumer looking at win_node #%u\n", nodes);
+        _DEBUG("consumer looking at win_node #%u\n", nodes);
         nodes++;
         if ((at->pkt->flags & FIN) == FIN) {
             _NOTE("%s\n", "consumer has reached FIN");
             rtn = FIN;
             break;
         }
-        printf("%s", (char*)((at->pkt) + DATA_OFFSET));
-        /* write all bytes in the packet to the file. */
+        printf("%s\n", ((char*)((at->pkt)) + DATA_OFFSET));
+        /* protect against partial writes, write data in pkt to file. */
         do {
-            n = write(filefd, ((at->pkt) + DATA_OFFSET + totn), (size_t) at->datalen - totn);
+            n = write(filefd, (((char*)(at->pkt)) + DATA_OFFSET + nleft), (size_t) at->datalen - nleft);
             if (n < 0) {
                 perror("ERROR consumer_read().write()");
                 close(filefd);
                 exit(EXIT_FAILURE);
             }
             _NOTE("consumer wrote %ld bytes to the file\n", (long int)n);
-            totn += n;
-        } while(totn < at->datalen);
-        /* all bytes have been written */
+            nleft += n;
+        } while(nleft < at->datalen);
+        nleft = 0;
+        /* now all bytes have been written */
         bytes += at->datalen;
         free(at->pkt);
         at->datalen = -1;
@@ -595,8 +606,9 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     *totbytes += bytes;
     *totpkts += nodes;
     _NOTE("CONSUMER read %u bytes across %u pkts\n", bytes, nodes);
-    print_window(w);
-    if(wasfull) { /* send window update */
+    /*print_window(w);*/
+    if(wasfull && rtn != FIN) { /* send window update if was full, but not if FIN reached */
+        _NOTE("%s", "consumer emptied window, sending window update\n");
         pkt = alloc_pkt(seq, w->clilastunacked, ACK, (uint16_t) (w->maxsize - w->numpkts), NULL, 0);
         clisend_lossy(serv_fd, pkt, 0);
         free(pkt);

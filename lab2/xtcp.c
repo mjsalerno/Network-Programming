@@ -66,9 +66,16 @@ void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn, uint16_t flags, uint16_t adv_w
 * Nice fancy print function. Extra goodies if DEBUG is defined.
 */
 void print_window(struct window *w){
-    struct win_node* head = w->base;
-    struct win_node* curr = head;
+    struct win_node* head;
+    struct win_node* curr;
     int n = -1;
+
+    if(w == NULL) {
+        _ERROR("%s", "window is NULL, init your window!\n");
+        exit(EXIT_FAILURE);
+    }
+    head = w->base;
+    curr = head;
     n++; /* for -pedantic -Wextra */
     printf("|window| maxwnd: %5d, cwin: %5d, ssthresh: %5d, base: %p\n",
             w->maxsize, w->cwin, w->ssthresh, (void*)w->base);
@@ -181,10 +188,6 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     w->clibaseseq = cli_base_seqn;
     w->clilastunacked = cli_last_seqn_recvd;
     w->base = alloc_window_nodes((size_t)maxsize);
-    if(w->base == NULL){
-        perror("init_window().alloc_window()");
-        exit(EXIT_FAILURE);
-    }
     return w;
 }
 
@@ -197,16 +200,15 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
 void srv_send_base(int sockfd, struct window *w) {
     ssize_t err;
     if(w == NULL) {
-        fprintf(stderr, "ERROR: srv_send_base() w is NULL\n");
+        _ERROR("%s", "window is NULL, init your window!\n");
         exit(EXIT_FAILURE);
     }
     if(w->base == NULL) {
-        fprintf(stderr, "ERROR: srv_send_base() w->base is NULL, init your window!\n");
-        print_window(w);
+        _ERROR("%s", "w->base is NULL, init your window!\n");
         exit(EXIT_FAILURE);
     }
     if(w->base->pkt == NULL) {
-        fprintf(stderr, "ERROR: srv_send_base() w->base->pkt is NULL, can't send NULL dummy!\n");
+        _ERROR("%s", "w->base->pkt is NULL, can't send NULL dummy!\n");
         print_window(w);
         exit(EXIT_FAILURE);
     }
@@ -534,9 +536,20 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
     print_window(w);
     unget_lock(&w_mutex);
 
+    if(finreached != FIN) {
+        clisend_lossy(sockfd, ackpkt, 0);
+    } else {
+        /* if ACKing the FIN then don't drop it, we're closing dirty! The server waits for this ACK */
+        htonpkt(pkt);
+        if ((send(sockfd, pkt, (DATA_OFFSET + (size_t)datalen), 0)) < 0) {
+            perror("xtcp.send_lossy()");
+            exit(EXIT_FAILURE);
+        }
+        ntohpkt(pkt);
+        _NOTE("%s", "SENT ACK for FIN:\n");
+        print_hdr(pkt);
+    }
 
-
-    clisend_lossy(sockfd, ackpkt, 0);
     free(ackpkt);
     return finreached;
 }
