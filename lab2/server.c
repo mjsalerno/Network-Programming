@@ -322,6 +322,8 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         /* the timer wont be called for us since we are the last pkt */
         rtt_newpack(&rttinfo);
         rtt_start_timer(&rttinfo, &newtimer);
+        /*fixme: fix the timers*/
+        /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
     }
     srv_add_send(child_sock, NULL, 0, FIN, wnd);
 
@@ -359,7 +361,7 @@ void proc_exit(int i) {
             }
 
         } else if(WIFSIGNALED(stat)) {
-            _DEBUG("dead child sig: %s\n", strsignal(WTERMSIG(stat)));
+            _ERROR("dead child sig: %s\n", strsignal(WTERMSIG(stat)));
 
         } else {
             printf("proc_exit(): There was an error");
@@ -619,6 +621,8 @@ int send_file(char* fname, int sock) {
             if (is_wnd_empty(wnd)) {
                 rtt_newpack(&rttinfo);
                 rtt_start_timer(&rttinfo, &newtimer);
+                /*fixme: fix the timers*/
+                /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
                 _NOTE("%s\n", "the window is empty, refreshing timer");
             }
 
@@ -687,7 +691,7 @@ int recv_acks(int sock, int always_block) {
             switch(((struct xtcphdr*)pkt)->flags) {
                 case FIN:
                     _NOTE("%s\n", "client sent me a FIN, quiting");
-                    exit(EXIT_FAILURE);
+                    return FIN;
                 case RST:
                     _NOTE("%s\n", "client sent me a RST, quiting");
                     exit(EXIT_FAILURE);

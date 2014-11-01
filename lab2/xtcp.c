@@ -404,6 +404,8 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
             _DEBUG("%s\n", "refreshing timer");
             rtt_newpack(&rttinfo);
             rtt_start_timer(&rttinfo, &newtimer);
+            /*fixme: fix the timers*/
+            /*setitimer(ITIMER_REAL, &newtimer, NULL);/*
         }
     }
 
@@ -456,7 +458,7 @@ skip_send:
         FD_SET(sock, &fdset);
         timer.tv_sec = MIN(++count, 3);
         timer.tv_usec = 0;
-        _INFO("probing window: %d\n", count);
+        _INFO("probing window count: %d\n", count);
 
         erri = select(sock + 1, &fdset, NULL, NULL, &timer);
         if(erri < 0) {
