@@ -23,7 +23,7 @@ get_ifi_info_plus.o: get_ifi_info_plus.c config.h unp.h unpifiplus.h
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
-	-rm -f  test client server *.o
+	-rm -f  test client server *.o *.tmp*
 
 touch:
 	touch *.c *.h
