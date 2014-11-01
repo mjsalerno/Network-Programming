@@ -414,10 +414,79 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     return rtn;
 }
 
+void quick_send(int sock, uint16_t flags, struct window* wnd) {
+    struct xtcphdr hdr;
+    ssize_t err;
+
+    hdr.advwin = 0;
+    hdr.ack_seq = 0;
+    hdr.flags = flags;
+    hdr.seq = wnd->servlastseqsent;
+    htonpkt(&hdr);
+
+    err = send(sock, &hdr, sizeof(struct xtcphdr), 0);
+    if(err < 0) {
+        perror("quick_send.send()");
+        exit(EXIT_FAILURE);
+    }
+}
+
 void fast_retransmit(struct window* w) {
     _NOTE("%s\n", "Sending Fast Retransmit");
     w->ssthresh = MAX(((w->servlastseqsent - w->base->pkt->seq)/ 2), 2);
     /* todo: finish me*/
+}
+
+void probe_window(int sock, struct window* wnd) {
+    int erri;
+    ssize_t  errs;
+    int count = 0;
+    int tog = 0;
+    fd_set fdset;
+    struct timeval timer;
+    char buff[MAX_PKT_SIZE];
+
+    while(wnd->lastadvwinrecvd < 1) {
+
+        quick_send(sock, 0, wnd);
+skip_send:
+        tog = !tog;
+        FD_ZERO(&fdset);
+        FD_SET(sock, &fdset);
+        timer.tv_sec = MIN(++count, 3);
+        timer.tv_usec = 0;
+        _INFO("probing window: %d\n", count);
+
+        erri = select(sock + 1, &fdset, NULL, NULL, &timer);
+        if(erri < 0) {
+            perror("probe_window.select()");
+            exit(EXIT_FAILURE);
+        } if(erri == 0) {
+            _INFO("%s\n", "probe not answered");
+            continue;
+        } else if(FD_ISSET(sock, &fdset)) {
+            errs = recv(sock, buff, sizeof(buff), 0);
+            if(errs < 0) {
+                perror("probe_window.recv()");
+                exit(EXIT_FAILURE);
+            }
+            ntohpkt((struct xtcphdr*)&buff);
+
+            _INFO("probe new window response: %d\n", ((struct xtcphdr*)buff)->advwin);
+
+            if(((struct xtcphdr*)buff)->advwin < 1) {
+                if(tog) {
+                    goto skip_send;
+                } else {
+                    continue;
+                }
+            } else {
+                new_ack_recvd(wnd, (struct xtcphdr*)buff);
+            }
+        } else {
+            _ERROR("%s\n", "Something bad happened in the probe");
+        }
+    }
 }
 
 /**

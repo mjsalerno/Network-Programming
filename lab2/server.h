@@ -19,7 +19,6 @@ int send_file(char* fname, int sock);
 void free_clients(struct client_list* head);
 int remove_client(struct client_list** head, pid_t pid);
 void proc_exit(int i);
-void quick_send(int sock, uint16_t flags);
 static void sig_alrm(int signo);
 int recv_acks(int sock, int always_block);
 
