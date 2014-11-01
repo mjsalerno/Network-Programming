@@ -363,9 +363,12 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
 
-    if(is_wnd_empty(window) || window->base->pkt == NULL) {
-        _ERROR("%s\n", "The window is empty, why am I getting ACKs?");
+    if((is_wnd_empty(window) || window->base->pkt == NULL) && window->lastadvwinrecvd != 0) {
+        _ERROR("The window is empty, why am I getting ACKs? advwin: %d\n", window->lastadvwinrecvd);
         return 0;
+    } else if((is_wnd_empty(window) || window->base->pkt == NULL) && window->lastadvwinrecvd == 0) {
+        _INFO("got a window update, was: %d, now: %d", window->lastadvwinrecvd, pkt->advwin);
+        window->lastadvwinrecvd = pkt->advwin;
     }
 
     /* dup ack */
@@ -373,6 +376,8 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         _NOTE("got dup ack: %" PRIu32 "\n", pkt->ack_seq);
         window->dupacks++;
         _NOTE("new dupack: %" PRIu32 "\n", window->dupacks);
+        window->lastadvwinrecvd = pkt->advwin;
+        _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
         /* todo: do fast retrans */
         return 0;
     }

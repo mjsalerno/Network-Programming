@@ -153,7 +153,7 @@ int main(int argc, const char **argv) {
 
 
         /* pick the smallest advwin */
-        ini_advwin = ((struct xtcphdr*)pkt)->advwin < ini_advwin ? ((struct xtcphdr*)pkt)->advwin : ini_advwin;
+        ini_advwin = MIN(ini_advwin, ((struct xtcphdr*)pkt)->advwin);
         _DEBUG("new advwin: %d\n", ini_advwin);
 
         print_hdr((struct xtcphdr *) pkt);
@@ -271,7 +271,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     /* init window */
     _DEBUG("%s\n", "init_wnd()");
-    wnd = init_window(3, start_seq, 1, 0, 0);
+    wnd = init_window(ini_advwin, start_seq, 1, 0, 0);
     print_window(wnd);
 
     _DEBUG("%s\n", "doing hs2 ...");
@@ -662,9 +662,10 @@ int recv_acks(int sock, int always_block) {
 
     for(EVER) {
 
-        if ((is_wnd_full(wnd) || always_block) && !is_wnd_empty(wnd)) {
+        if ((is_wnd_full(wnd) || always_block || wnd->lastadvwinrecvd == 0) && (!is_wnd_empty(wnd) || wnd->lastadvwinrecvd == 0)) {
             flag = 0;
             _DEBUG("%s\n", "wnd IS full or quitting, recv WILL block");
+            /* todo: window probe */
         } else {
             flag = MSG_DONTWAIT;
             _DEBUG("%s\n", "wnd NOT full, recv WONT block: MSG_DONTWAIT");
