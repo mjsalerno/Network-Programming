@@ -4,5 +4,5 @@ test
 *.in
 config.h
 *file
-*.tmp
+*.tmp*
 

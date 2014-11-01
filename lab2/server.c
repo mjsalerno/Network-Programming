@@ -342,10 +342,6 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     exit(EXIT_SUCCESS);
 }
 
-void quick_send(int sock, uint16_t flags) {
-    srv_add_send(sock, NULL, 0, flags, wnd);
-}
-
 void proc_exit(int i) {
     int stat = i;
     pid_t pid;
@@ -613,7 +609,7 @@ int send_file(char* fname, int sock) {
                 printf("server.send_file(): There was an error reading the file\n");
                 clearerr(file);
                 fclose(file);
-                quick_send(sock, RST);
+                quick_send(sock, RST, wnd);
                 exit(EXIT_FAILURE);
 
             } else if (feof(file) && n < 1) {
@@ -633,7 +629,7 @@ int send_file(char* fname, int sock) {
             if (sigsetjmp(jmpbuf, 1) != 0) {
                 if (rtt_timeout(&rttinfo) < 0) {
                     _ERROR("%s\n", "The packet has timed out, giving up\n");
-                    quick_send(sock, RST);
+                    quick_send(sock, RST, wnd);
                     fclose(file);
                     exit(EXIT_FAILURE);
                 } else {
@@ -661,6 +657,11 @@ int recv_acks(int sock, int always_block) {
     char pkt[MAX_PKT_SIZE];
 
     for(EVER) {
+
+        if(wnd->lastadvwinrecvd < 1) {
+            _DEBUG("The client advwin is %d, starting probe\n", wnd->lastadvwinrecvd);
+            probe_window(sock, wnd);
+        }
 
         if ((is_wnd_full(wnd) || always_block || wnd->lastadvwinrecvd == 0) && (!is_wnd_empty(wnd) || wnd->lastadvwinrecvd == 0)) {
             flag = 0;

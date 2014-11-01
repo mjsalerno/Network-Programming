@@ -84,5 +84,7 @@ void get_lock(pthread_mutex_t* lock);
 void unget_lock(pthread_mutex_t* lock);
 int is_wnd_empty(struct window* wnd);
 int is_wnd_full(struct window* wnd);
+void probe_window(int sock, struct window* wnd);
+void quick_send(int sock, uint16_t flags, struct window* wnd);
 
 #endif /*XTCP_H*/
