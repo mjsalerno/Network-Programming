@@ -201,6 +201,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     /* dont clost the par_sock */
     iface_ptr->sock = -1;
+    childaddr.sin_addr.s_addr = iface_ptr->ip
 
     _DEBUG("child.filename: %s\n", fname);
     child_sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -212,8 +213,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     iface_ptr = get_matching_iface_by_ip(ifaces, cliaddr.sin_addr.s_addr);
     if(iface_ptr == NULL) {
-        _ERROR("%s\n", "could not find the correct iface");
-        childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        _ERROR("%s\n", "could not find the local ip, will route");
 
     } else {
         int optval = 1;
@@ -227,7 +227,6 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
             free_iface_info(ifaces);
             return -1;
         }
-        childaddr.sin_addr.s_addr = iface_ptr->ip;
         _DEBUG("will bind to: %s\n", inet_ntoa(childaddr.sin_addr));
     }
 
