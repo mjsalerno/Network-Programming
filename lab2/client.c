@@ -578,6 +578,9 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
         if ((at->pkt->flags & FIN) == FIN) {
             _NOTE("%s\n", "consumer has reached FIN");
             rtn = FIN;
+            free(at->pkt); /* free the FIN */
+            at->datalen = -1;
+            at->pkt = NULL;
             break;
         }
         printf("%s\n", ((char*)((at->pkt)) + DATA_OFFSET));

@@ -182,7 +182,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     w->lastadvwinrecvd = maxsize;
     w->servlastackrecv = srv_last_ack_seq_recvd;
     w->servlastseqsent = srv_last_seq_sent;
-    /* todo: change to 1 */
+    /* fixme: change to 1 */
     w->cwin = 65536;
     w->ssthresh = 65536;
     w->dupacks = 0;
@@ -264,9 +264,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
 
     seqtoadd = ((struct xtcphdr*) pkt)->seq;
     if(seqtoadd != (w->servlastseqsent + 1)){
-        fprintf(stderr, "ERROR: srv_add_send() seqtoadd: %"PRIu32" != "
-                        "(w->servlastseqsent + 1): %"PRIu32"\n", seqtoadd,
-                (w->servlastseqsent + 1));
+        _ERROR("seqtoadd: %"PRIu32" != (w->servlastseqsent + 1): %"PRIu32"\n", seqtoadd, (w->servlastseqsent + 1));
         print_window(w);
         exit(EXIT_FAILURE);
     }
@@ -280,25 +278,26 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
         n++;
         curr = curr->next;
         if(curr == NULL) {
-            _ERROR("%s\n", "srv_add_send() a win_node is NULL, init your window!\n");
+            _ERROR("%s\n", "a win_node is NULL, init your window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
         if(curr == base) {
-            _ERROR("%s\n", "srv_add_send() reached the base while trying to add to window!\n");
+            _ERROR("%s\n", "reached the base while trying to add to window!\n");
             print_window(w);
             exit(EXIT_FAILURE);
         }
     }
-    /* curr is now at the win_node we want? */
+    /* curr is now at the win_node we want */
     if(curr->datalen >= 0 || curr->pkt != NULL) {
-        _ERROR("%s\n", "srv_add_send() curr->pkt not empty!\n");
+        _ERROR("%s\n", "curr->pkt not empty!\n");
         print_window(w);
         exit(EXIT_FAILURE);
     } else {
         _DEBUG("%s", "Found win_node for pkt. Adding to window.\n");
         curr->datalen = (int)datalen;
         curr->pkt = pkt;
+        curr->ts = rtt_ts(&rttinfo);
     }
 
     htonpkt(pkt);

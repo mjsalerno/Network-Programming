@@ -42,7 +42,8 @@ void rtt_init(struct rtt_info *ptr) {
     /* first RTO at (srtt + (4 * rttvar)) = 3 seconds */
 }
 
-/*
+/**
+ * The ts are stored in the win_nodes or sends.
  * Return the current timestamp.
  * Our timestamps are suseconds_t's that count microseconds since
  * rtt_init() was called.
