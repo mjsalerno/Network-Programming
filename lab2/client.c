@@ -106,7 +106,7 @@ int main(void) {
     ifaces = make_iface_list();
     print_iface_list(ifaces);
     inet_aton(ip4_str, &(my_addr.sin_addr));
-    iface_ptr = get_matching_iface(ifaces, my_addr.sin_addr.s_addr);
+    iface_ptr = get_matching_iface_by_ip(ifaces, my_addr.sin_addr.s_addr);
     if(iface_ptr == NULL) {
         my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     } else {
