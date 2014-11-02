@@ -583,6 +583,7 @@ int send_file(char* fname, int sock) {
         fclose(file);
         exit(EXIT_FAILURE);
     }
+    rtt_init(&rttinfo);                                 /* init the base time from which ts are taken */
 
     for(EVER) {
 
@@ -601,6 +602,8 @@ int send_file(char* fname, int sock) {
 
             } else if (feof(file) && n < 1) {
                 printf("File finished uploading ...\n");
+                unblock_sigalrm();                            /* un-block SIGALRM */
+                recv_acks(sock, 1);                         /* wait for all ACKs and then break */
                 break;
             }
 
@@ -637,7 +640,7 @@ int send_file(char* fname, int sock) {
                     if(!is_wnd_empty(wnd)) {
                         _DEBUG("%s\n", "refreshing timer");
                         rtt_newpack(&rttinfo);
-                        rtt_start_timer(&rttinfo, &newtimer);
+                        /*rtt_start_timer(&rttinfo, &newtimer);*/       /* un-needed */
                         /*fixme: fix the timers*/
                         _SPEC("%s\n", "setting timer");
                         setitimer(ITIMER_REAL, &newtimer, NULL);
@@ -650,7 +653,7 @@ int send_file(char* fname, int sock) {
 
         unblock_sigalrm();                            /* unblock SIGALRM */
     }
-
+    /* we return with SIGALRM's un-blocked */
     newtimer.it_value.tv_sec = 0;
     newtimer.it_value.tv_usec = 0;
     _SPEC("%s\n", "STOPPING timer");

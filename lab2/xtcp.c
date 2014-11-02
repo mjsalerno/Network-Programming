@@ -96,6 +96,7 @@ void print_window(struct window *w){
         if(curr->pkt != NULL) {
             printf("========= node %3d ========         ======================\n", n);
             printf("|Datalen: %15d |         |SEQ:     %11"PRIu32"|\n", curr->datalen, curr->pkt->seq);
+            printf("|ts:     %16ld |         |                    |\n", (long int)curr->ts);
             printf("|Pkt ptr: %15p |   ----> |ACK_SEQ: %11" PRIu32"|\n", (void *)curr->pkt, curr->pkt->ack_seq);
             printf("|This:    %15p |         |Flags:   %11x|\n", (void *)curr, curr->pkt->flags);
             printf("|Next:    %15p |         |Advwin:  %11" PRIu16"|\n", (void *)curr->next, curr->pkt->advwin);
@@ -103,6 +104,7 @@ void print_window(struct window *w){
         } else {
             printf("========= node %3d ========\n", n);
             printf("|Datalen: %15d |\n", curr->datalen);
+            printf("|ts:      %15ld |\n", (long int)curr->ts);
             printf("|Pkt ptr: %15p |\n", (void *)curr->pkt);
             printf("|This:    %15p |\n", (void *)curr);
             printf("|Next:    %15p |\n", (void *)curr->next);
@@ -214,6 +216,7 @@ void srv_send_base(int sockfd, struct window *w) {
         exit(EXIT_FAILURE);
     }
     htonpkt(w->base->pkt);
+    w->base->ts = rtt_ts(&rttinfo); /* update the timestamp, just in case we timeout again.*/
     err = send(sockfd, w->base->pkt , (DATA_OFFSET + (size_t)w->base->datalen), 0);
     if(err < 0){
         perror("ERROR srv_send_base().send()");
@@ -419,7 +422,11 @@ int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
 
     if(normal_ack) {
         _DEBUG("%s\n", "stopping the timer ...");
-        rtt_stop(&rttinfo, prev_ts);
+        /* only update our rtt estimates if:   */
+        /* this ACK is not for the base                  or        nrexmt == 0     */
+        if(pkt->ack_seq != (window->servlastackrecv + 1) || rttinfo.rtt_nrexmt == 0) {
+            rtt_stop(&rttinfo, prev_ts);
+        }
         newtimer.it_value.tv_sec = 0;
         newtimer.it_value.tv_usec = 0;
         _SPEC("%s\n", "STOPPING timer");
