@@ -188,27 +188,28 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     int err;
     int child_sock;
     socklen_t len;
+    struct iface_info* par_iffy;
     struct sigaction sa;
 
     _DEBUG("%s\n", "In child");
 
-    iface_ptr = get_iface_from_sock(ifaces, par_sock);
-    if(iface_ptr == NULL) {
+    par_iffy = get_iface_from_sock(ifaces, par_sock);
+    if(par_iffy == NULL) {
         _DEBUG("%s\n", "could not find the iface with that socket");
+        close_sock_iface_info(ifaces, -1);
         free_iface_info(ifaces);
         return -1;
     }
 
-    /* dont clost the par_sock */
-    iface_ptr->sock = -1;
-    childaddr.sin_addr.s_addr = iface_ptr->ip
+    _DEBUG("%s\n", "closing all sockets");
+    close_sock_iface_info(ifaces, par_sock);
 
     _DEBUG("child.filename: %s\n", fname);
     child_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     bzero(&childaddr, sizeof(childaddr));
     childaddr.sin_family = AF_INET;
-    childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    childaddr.sin_addr.s_addr = par_iffy->ip;
     childaddr.sin_port = htons(0);
 
     iface_ptr = get_matching_iface_by_ip(ifaces, cliaddr.sin_addr.s_addr);
@@ -714,7 +715,6 @@ int recv_acks(int sock, int always_block) {
                 default:
                     _ERROR("client sent me bad flag: %X, quiting\n", ((struct xtcphdr*)pkt)->flags);
                     exit(EXIT_FAILURE);
-                    break;
             }
             acks++;
             printf("GOT: ");
