@@ -390,8 +390,10 @@ int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
         _NOTE("new dupack: %" PRIu32 "\n", window->dupacks);
         window->lastadvwinrecvd = pkt->advwin;
         _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
-        fast_retransmit(window);
-        srv_send_base(sock, window);
+        if(window->dupacks > 2) {
+            fast_retransmit(window);
+            srv_send_base(sock, window);
+        }
         return 0;
     }
 
@@ -722,7 +724,7 @@ void unget_lock(pthread_mutex_t* lock) {
 }
 
 int is_wnd_empty(struct window* wnd) {
-    return (wnd->servlastackrecv > wnd->servlastseqsent) && (wnd->base->pkt != NULL);
+    return (wnd->servlastackrecv > wnd->servlastseqsent);
 }
 
 int is_wnd_full(struct window* wnd) {
