@@ -327,6 +327,7 @@ struct iface_info*  get_matching_iface_by_ip(struct iface_info* info, in_addr_t 
         if(((ptr->mask & ip) == ptr->subnet) && (long_mask < ptr->mask)) {
             _DEBUG("%s\n", "this is the longest matching so far");
             long_ptr = ptr;
+            long_mask = ptr->mask;
         }
     }
 

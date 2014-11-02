@@ -583,7 +583,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
             at->pkt = NULL;
             break;
         }
-        printf("%s\n", ((char*)((at->pkt)) + DATA_OFFSET));
+        printf("%s", ((char*)((at->pkt)) + DATA_OFFSET));
         /* protect against partial writes, write data in pkt to file. */
         do {
             n = write(filefd, (((char*)(at->pkt)) + DATA_OFFSET + nleft), (size_t) at->datalen - nleft);
@@ -602,6 +602,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
         at->datalen = -1;
         at->pkt = NULL;
     }
+    printf("\n");
 
     w->clibaseseq += nodes;
     w->base = at;
