@@ -213,6 +213,7 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
         sockfd = socket(AF_INET, SOCK_DGRAM, 0);
         if(sockfd < 1) {
             perror("bind_to_iface_list()");
+            exit(EXIT_FAILURE);
         }
         bzero(&servaddr, sizeof(servaddr));
         servaddr.sin_family = AF_INET;

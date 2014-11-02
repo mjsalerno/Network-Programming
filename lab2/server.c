@@ -210,9 +210,9 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
     childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     childaddr.sin_port = htons(0);
 
-    iface_ptr = get_matching_iface_by_sock(ifaces, par_sock);
+    iface_ptr = get_matching_iface_by_ip(ifaces, cliaddr.sin_addr.s_addr);
     if(iface_ptr == NULL) {
-        _DEBUG("%s\n", "could not find the correct iface");
+        _ERROR("%s\n", "could not find the correct iface");
         childaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     } else {
