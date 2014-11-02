@@ -314,7 +314,11 @@ struct iface_info* get_matching_iface(struct iface_info* info, in_addr_t ip) {
         }
     }
 
-    _DEBUG("LONGEST MASK: %X\n", long_ptr->mask);
+    if(long_ptr != NULL) {
+        _DEBUG("LONGEST MASK: %X\n", long_ptr->mask);
+    } else {
+        _DEBUG("%s\n", "did not find any local ip, will rout");
+    }
     return long_ptr;
 }
 
