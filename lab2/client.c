@@ -78,6 +78,11 @@ int main(void) {
     /* 6. fill in seed */
     pkt_loss_thresh = double_from_config(file,
         "client.in:6: error getting packet loss percentage");
+    if(pkt_loss_thresh < 0 || pkt_loss_thresh > 1) {
+        fprintf(stderr, "client.in:6: packet loss percentage must be [0, 1]\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
     /* 7. fill in mean */
     u = double_from_config(file, "client.in:7: error getting mean");
 
@@ -497,7 +502,7 @@ void *consumer_main(void *fname) {
     char *tmpfname;
     char midffix[] = ".tmp";
     int filefd;
-    srand48(time(NULL));
+    srand48(0);
     /* u is in milliseconds ms! not us, not ns*/
     _NOTE("%s","CONSUMER: consumer created\n");
     /* create a template filename for mkstemp */
@@ -588,7 +593,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
                 close(filefd);
                 exit(EXIT_FAILURE);
             }
-            _NOTE("consumer wrote %ld bytes to the file\n", (long int)n);
+            _DEBUG("consumer wrote %ld bytes to the file\n", (long int)n);
             nleft += n;
         } while(nleft < at->datalen);
         nleft = 0;

@@ -335,7 +335,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 
     if(window->cwin < window->ssthresh) {
         /* slow start */
-        _INFO("we are in slow start cwin: %d, ssthresh: %d", window->cwin, window->ssthresh);
+        _INFO("we are in slow start, cwin: %d, ssthresh: %d\n", window->cwin, window->ssthresh);
         window->cwin = window->cwin + 1;
         count = remove_aked_pkts(window, pkt);
         _DEBUG("number of ACKs: %d\n", count);
@@ -347,6 +347,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
         *  if numacks == cwin
         *  then cwin++, num acks = 0
         **/
+        _INFO("we are in congestion cntrl, cwin: %d, ssthresh: %d\n", window->cwin, window->ssthresh);
         count = remove_aked_pkts(window, pkt);
         total_acks += count;
 
