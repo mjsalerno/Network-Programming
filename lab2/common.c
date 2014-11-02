@@ -297,7 +297,7 @@ void print_iface_list_sock_name(struct iface_info* info) {
     }
 }
 
-struct iface_info* get_matching_iface(struct iface_info* info, in_addr_t ip) {
+struct iface_info*  get_matching_iface_by_ip(struct iface_info* info, in_addr_t ip) {
     struct iface_info* ptr;
     struct iface_info* long_ptr = NULL;
     in_addr_t long_mask = 0;
@@ -314,8 +314,25 @@ struct iface_info* get_matching_iface(struct iface_info* info, in_addr_t ip) {
         }
     }
 
-    _DEBUG("LONGEST MASK: %X\n", long_ptr->mask);
+    if(long_ptr != NULL) {
+        _DEBUG("LONGEST MASK: %X\n", long_ptr->mask);
+    } else {
+        _DEBUG("%s\n", "did not find any local ip, will rout");
+    }
     return long_ptr;
+}
+
+struct iface_info*  get_matching_iface_by_sock(struct iface_info* info, int sock) {
+    struct iface_info* ptr;
+
+    for(ptr = info; ptr != NULL; ptr = ptr->next) {
+        if(ptr->sock == sock) {
+            _DEBUG("%s\n", "found matching socket");
+            return ptr;
+        }
+    }
+
+    return NULL;
 }
 
 char *sock_ntop_host(const struct sockaddr *sa, socklen_t salen) {
