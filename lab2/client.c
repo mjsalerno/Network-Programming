@@ -339,18 +339,18 @@ int handshakes(int serv_fd, struct sockaddr_in *serv_addr, char *fname) {
 int validate_hs2(struct xtcphdr* hdr, int len){
     if(hdr->flags != (SYN|ACK)){
         fprintf(stderr, "hs2 not a SYN-ACK, flags: %d\n", hdr->flags);
-        /* todo: RST/ free */
+        print_hdr(hdr);
         return -1;
     }
     /* now validate the SEQ and ACK nums */
     if(hdr->ack_seq != seq){
         fprintf(stderr, "ERROR: hs2 unexpected ack_seq: %d, expected: %d\n", hdr->ack_seq, seq+1);
-        /* todo: RST/ free */
+        print_hdr(hdr);
         return -1;
     }
     if(len != DATA_OFFSET + 2){
         fprintf(stderr, "hs2 not %d bytes, size: %d\n", DATA_OFFSET + 2, len);
-        /* todo: RST/ free */
+        print_hdr(hdr);
         return -1;
     }
     return 0;

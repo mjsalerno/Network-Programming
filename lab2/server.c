@@ -307,13 +307,13 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
 
     if(is_wnd_full(wnd)) {
         /* need to wait untill we have enough window space */
-        recv_acks(child_sock, 0);
+        recv_acks(child_sock, 0, 0);
     }
 
     srv_add_send(child_sock, NULL, 0, FIN, wnd);
 
     _NOTE("%s\n", "Waiting for client to ACK all pkts ...");
-    recv_acks(child_sock, 1);
+    recv_acks(child_sock, 1, 1);
 
     _DEBUG("%s\n", "cleaning up sockets ...");
     close(child_sock);
@@ -534,24 +534,30 @@ redo_hs2:
             exit(EXIT_FAILURE);
         }
     }
-    ntohpkt(hdr);
-    wnd->servlastseqsent = hdr->seq;
-    free(hdr);
 
     /* will happen when breaking out of while above */
     if(!FD_ISSET(child_sock, &rset)) {
         printf("The handshake is broken, exiting child\n");
+        free(hdr);
         exit(EXIT_FAILURE);
     }
 
     do {
         n = recv(child_sock, pktbuf, sizeof(pktbuf), 0);
         if (n < 0 && errno != EINTR) {
+            if(errno == ECONNREFUSED) {
+                goto redo_hs1;
+            }
             perror("hs2.recvfrom()");
             close(child_sock);
+            free(hdr);
             exit(EXIT_FAILURE);
         }
     } while(errno == EINTR && n < 0);
+
+    ntohpkt(hdr);
+    wnd->servlastseqsent = hdr->seq;
+    free(hdr);
 
     ntohpkt((struct xtcphdr*) pktbuf);
     wnd->servlastackrecv =((struct xtcphdr*) pktbuf)->ack_seq;
@@ -603,7 +609,7 @@ int send_file(char* fname, int sock) {
             } else if (feof(file) && n < 1) {
                 printf("File finished uploading ...\n");
                 unblock_sigalrm();                            /* un-block SIGALRM */
-                recv_acks(sock, 1);                         /* wait for all ACKs and then break */
+                recv_acks(sock, 1, 0);                         /* wait for all ACKs and then break */
                 break;
             }
 
@@ -648,7 +654,7 @@ int send_file(char* fname, int sock) {
                 }
             }
         } else {
-            recv_acks(sock, 0);
+            recv_acks(sock, 0, 0);
         }
 
         unblock_sigalrm();                            /* unblock SIGALRM */
@@ -665,7 +671,7 @@ int send_file(char* fname, int sock) {
 /**
 * Caller should un-block SIGALRM.
 */
-int recv_acks(int sock, int always_block) {
+int recv_acks(int sock, int always_block, int finsent) {
     int flag;
     int err;
     int acks = 0;
@@ -673,7 +679,7 @@ int recv_acks(int sock, int always_block) {
 
     for(EVER) {
 
-        if(wnd->lastadvwinrecvd < 1) {
+        if(wnd->lastadvwinrecvd < 1 && !finsent) {
             _DEBUG("The client advwin is %d, starting probe\n", wnd->lastadvwinrecvd);
             probe_window(sock, wnd);
         }
@@ -681,7 +687,6 @@ int recv_acks(int sock, int always_block) {
         if ((is_wnd_full(wnd) || always_block || wnd->lastadvwinrecvd == 0) && (!is_wnd_empty(wnd) || wnd->lastadvwinrecvd == 0)) {
             flag = 0;
             _DEBUG("%s\n", "wnd IS full or quitting, recv WILL block");
-            /* todo: window probe */
         } else {
             flag = MSG_DONTWAIT;
             _DEBUG("%s\n", "wnd NOT full, recv WONT block: MSG_DONTWAIT");
@@ -715,7 +720,6 @@ int recv_acks(int sock, int always_block) {
                 default:
                     _ERROR("client sent me bad flag: %X, quiting\n", ((struct xtcphdr*)pkt)->flags);
                     exit(EXIT_FAILURE);
-                    break;
             }
             acks++;
             printf("GOT: ");

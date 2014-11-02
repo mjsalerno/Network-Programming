@@ -535,7 +535,7 @@ skip_send:
 void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen) {
     ssize_t err;
     /* simulate packet loss on sends */
-    if(DROP_PKT()) {
+    if(DROP_PKT() && 0) {
         _NOTE("%s", "DROPPED SEND'ing PKT:\n");
     } else {
         htonpkt(pkt);
