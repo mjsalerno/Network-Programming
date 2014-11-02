@@ -371,6 +371,8 @@ void new_ack_recvd(int sock, struct window *window, struct xtcphdr *pkt) {
 int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
     int restart_timer = 0;
+    int normal_ack = 0;
+    suseconds_t prev_ts = 0;
 
     if((is_wnd_empty(window) || window->base->pkt == NULL) && window->lastadvwinrecvd != 0) {
         _ERROR("The window is empty, why am I getting ACKs? advwin: %d\n", window->lastadvwinrecvd);
@@ -397,16 +399,9 @@ int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
         return 0;
     }
 
-    if(pkt->ack_seq > window->base->pkt->seq) { /* normal ACK*/
-        _DEBUG("%s\n", "stopping the timer ...");
-        /* fixme: take out the timestamp */
-        rtt_stop(&rttinfo);
-        /*fixme: fix the timers*/
-        newtimer.it_value.tv_sec = 0;
-        newtimer.it_value.tv_usec = 0;
-        _SPEC("%s\n", "STOPPING timer");
-        setitimer(ITIMER_REAL, &newtimer, NULL);
-        restart_timer = 1;
+    if(pkt->ack_seq > window->base->pkt->seq) { /* normal ACK */
+        normal_ack = 1; /* need to know for after the while loop */
+        window->dupacks = 0;
     }
 
     while(window->base->pkt != NULL && (pkt->ack_seq > window->base->pkt->seq)) {
@@ -417,9 +412,19 @@ int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
         free(window->base->pkt);
         window->base->pkt = NULL;
         window->base->datalen = -1;
+        prev_ts =  window->base->ts;
+        window->base->ts = 0;
         window->base = window->base->next;
-        window->dupacks = 0;
+    }
 
+    if(normal_ack) {
+        _DEBUG("%s\n", "stopping the timer ...");
+        rtt_stop(&rttinfo, prev_ts);
+        newtimer.it_value.tv_sec = 0;
+        newtimer.it_value.tv_usec = 0;
+        _SPEC("%s\n", "STOPPING timer");
+        setitimer(ITIMER_REAL, &newtimer, NULL);
+        restart_timer = 1;
     }
 
     window->lastadvwinrecvd = pkt->advwin;

@@ -39,6 +39,7 @@ void rtt_init(struct rtt_info *ptr) {
     ptr->rtt_srtt   = 0;
     ptr->rtt_sdev   = 250000 << 2; /* to start the rtt_rto at 1 second */
     ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
+    ptr->rtt_dub_rto = ptr->rtt_rto;
     /* first RTO at (srtt + (4 * rttvar)) = 3 seconds */
 }
 
@@ -78,7 +79,11 @@ void rtt_newpack(struct rtt_info *ptr) {
 *
 */
 void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
-    suseconds_t  startrto = rtt_minmax(ptr->rtt_rto);
+    suseconds_t  startrto;
+    if(ptr->rtt_nrexmt == 0) {
+        ptr->rtt_dub_rto = ptr->rtt_rto;
+    }
+    startrto = rtt_minmax(ptr->rtt_dub_rto);
     _NOTE("start rto is %ld\n", (long)startrto);
     /*itv->it_value.tv_sec = startrto >> 20;*/ /* 2^20 usecs is almost 1 sec */
     if(startrto >= 3000000) {
@@ -164,12 +169,12 @@ void rtt_stop(struct rtt_info *ptr, suseconds_t ts) {
  * the lines of what is done in line 77 of rtt_stop, Fig. 22.13).
  */
 int rtt_timeout(struct rtt_info *ptr) {
-    /* fixme: don't double rto*/
-    ptr->rtt_rto <<= 1;		/* double next RTO */
-    ptr->rtt_rto = rtt_minmax(ptr->rtt_rto);
+    ptr->rtt_dub_rto = ptr->rtt_dub_rto << 1;		/* double next RTO */
+    ptr->rtt_dub_rto = rtt_minmax(ptr->rtt_dub_rto);
 
-    if (++ptr->rtt_nrexmt > RTT_MAXNREXMT)
-        return(-1);			/* time to give up for this packet */
+    if (++ptr->rtt_nrexmt > RTT_MAXNREXMT) {
+        return (-1);            /* time to give up for this packet */
+    }
     rtt_debug(ptr);
     return(0);
 }
@@ -180,5 +185,5 @@ int rtt_timeout(struct rtt_info *ptr) {
 void rtt_debug(struct rtt_info *ptr) {
 
     _NOTE("rtt = %ldus, srtt>>3 = %ldus, sdev>>2 = %ldus, rto = %ldus\n",
-            ptr->rtt_rtt, ptr->rtt_srtt >> 3, ptr->rtt_sdev >> 2, ptr->rtt_rto);
+            ptr->rtt_rtt, ptr->rtt_srtt >> 3, ptr->rtt_sdev >> 2, ptr->rtt_dub_rto);
 }
