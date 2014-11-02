@@ -608,13 +608,14 @@ int send_file(char* fname, int sock) {
                 rtt_start_timer(&rttinfo, &newtimer);
                 /*fixme: fix the timers*/
                 setitimer(ITIMER_REAL, &newtimer, NULL);
+                _SPEC("%s\n", "setting timer");
                 _NOTE("%s\n", "the window is empty, refreshing timer");
             }
 
             srv_add_send(sock, data, n, 0,wnd);
 
             if (sigsetjmp(jmpbuf, 1) != 0) {
-                _ERROR("%s\n", "in the jump thingy");
+                _DEBUG("%s\n", "in the jump thingy");
                 if (rtt_timeout(&rttinfo) < 0) {
                     _ERROR("%s\n", "The packet has timed out, giving up\n");
                     quick_send(sock, RST, wnd);
@@ -631,10 +632,11 @@ int send_file(char* fname, int sock) {
                         _ERROR("%s\n", "the window was empty, cant resend base.");
 
                     if(!is_wnd_empty(wnd)) {
-                        _ERROR("%s\n", "refreshing timer");
+                        _DEBUG("%s\n", "refreshing timer");
                         rtt_newpack(&rttinfo);
                         rtt_start_timer(&rttinfo, &newtimer);
                         /*fixme: fix the timers*/
+                        _SPEC("%s\n", "setting timer");
                         setitimer(ITIMER_REAL, &newtimer, NULL);
                     }
                 }
@@ -648,6 +650,7 @@ int send_file(char* fname, int sock) {
 
     newtimer.it_value.tv_sec = 0;
     newtimer.it_value.tv_usec = 0;
+    _SPEC("%s\n", "STOPPING timer");
     setitimer(ITIMER_REAL, &newtimer, NULL); /* stop the timer */
     fclose(file);
     return 1;
@@ -704,7 +707,8 @@ int recv_acks(int sock, int always_block) {
                 case ACK:
                     break;
                 default:
-                    _ERROR("client sent me bad flag: %" PRIu16 ", quiting\n", ((struct xtcphdr*)pkt)->flags);
+                    _ERROR("client sent me bad flag: %X, quiting\n", ((struct xtcphdr*)pkt)->flags);
+                    exit(EXIT_FAILURE);
                     break;
             }
             acks++;
@@ -714,7 +718,7 @@ int recv_acks(int sock, int always_block) {
                     ((struct xtcphdr *)pkt)->seq,
                     ((struct xtcphdr *)pkt)->ack_seq);
 
-            new_ack_recvd(wnd, (struct xtcphdr*)pkt);
+            new_ack_recvd(sock, wnd, (struct xtcphdr*)pkt);
 
             unblock_sigalrm();
         }

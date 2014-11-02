@@ -319,7 +319,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
 * Caller has blocked SIGALRM.
 *
 */
-void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
+void new_ack_recvd(int sock, struct window *window, struct xtcphdr *pkt) {
     int count = 0;
     static int total_acks = 0;
     if(pkt->ack_seq > window->servlastseqsent + 1) {
@@ -338,7 +338,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
         _INFO("we are in slow start, cwin: %d, ssthresh: %d\n", window->cwin, window->ssthresh);
         window->cwin = window->cwin + 1;
         _DEBUG("incremented cwin, new cwin: %d\n", window->cwin);
-        count = remove_aked_pkts(window, pkt);
+        count = remove_aked_pkts(sock, window, pkt);
         _DEBUG("number of ACKs: %d\n", count);
         window->cwin += count;
         _DEBUG("new cwin: %d\n", window->cwin);
@@ -349,7 +349,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
         *  then cwin++, num acks = 0
         **/
         _INFO("we are in congestion cntrl, cwin: %d, ssthresh: %d\n", window->cwin, window->ssthresh);
-        count = remove_aked_pkts(window, pkt);
+        count = remove_aked_pkts(sock, window, pkt);
         total_acks += count;
 
         _DEBUG("number of ACKs: %d\n", count);
@@ -367,7 +367,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 /**
 * Caller has blocked SIGALRM.
 */
-int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
+int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
     int restart_timer = 0;
 
@@ -381,12 +381,16 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
 
     /* dup ack */
     if(window->servlastackrecv == pkt->ack_seq) {
+        if(window->lastadvwinrecvd > 0) {
+            return 1;
+        }
         _NOTE("got dup ack: %" PRIu32 "\n", pkt->ack_seq);
         window->dupacks++;
         _NOTE("new dupack: %" PRIu32 "\n", window->dupacks);
         window->lastadvwinrecvd = pkt->advwin;
         _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
-        /* todo: do fast retrans */
+        fast_retransmit(window);
+        srv_send_base(sock, window);
         return 0;
     }
 
@@ -396,7 +400,8 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         /*fixme: fix the timers*/
         newtimer.it_value.tv_sec = 0;
         newtimer.it_value.tv_usec = 0;
-        setitimer(ITIMER_REAL, NULL, NULL);
+        _SPEC("%s\n", "STOPPING timer");
+        setitimer(ITIMER_REAL, &newtimer, NULL);
         restart_timer = 1;
     }
 
@@ -409,21 +414,23 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         window->base->pkt = NULL;
         window->base->datalen = -1;
         window->base = window->base->next;
+        window->dupacks = 0;
 
-    }
-
-    if(restart_timer && !is_wnd_empty(window)) {
-        _ERROR("%s\n", "refreshing timer");
-        rtt_newpack(&rttinfo);
-        rtt_start_timer(&rttinfo, &newtimer);
-        /*fixme: fix the timers*/
-        setitimer(ITIMER_REAL, &newtimer, NULL);
     }
 
     window->lastadvwinrecvd = pkt->advwin;
     _DEBUG("New lastadvwinrecvd: %d\n", window->lastadvwinrecvd);
     window->servlastackrecv = pkt->ack_seq;
     _DEBUG("New servlastackrecv: %d\n", window->servlastackrecv);
+
+    if(restart_timer && !is_wnd_empty(window)) {
+        _DEBUG("%s\n", "refreshing timer");
+        rtt_newpack(&rttinfo);
+        rtt_start_timer(&rttinfo, &newtimer);
+        /*fixme: fix the timers*/
+        _SPEC("%s\n", "setting timer");
+        setitimer(ITIMER_REAL, &newtimer, NULL);
+    }
 
     return rtn;
 }
@@ -447,8 +454,8 @@ void quick_send(int sock, uint16_t flags, struct window* wnd) {
 
 void fast_retransmit(struct window* w) {
     _NOTE("%s\n", "Sending Fast Retransmit");
+    w->dupacks = 0;
     w->ssthresh = MAX(((w->servlastseqsent - w->base->pkt->seq)/ 2), 2);
-    /* todo: finish me*/
 }
 
 void probe_window(int sock, struct window* wnd) {
@@ -497,7 +504,7 @@ skip_send:
             } else {
                 /* should have SIGALRM blocked */
                 block_sigalrm();
-                new_ack_recvd(wnd, (struct xtcphdr*)buff);
+                new_ack_recvd(sock, wnd, (struct xtcphdr*)buff);
                 unblock_sigalrm();
             }
         } else {
@@ -713,7 +720,7 @@ void unget_lock(pthread_mutex_t* lock) {
 }
 
 int is_wnd_empty(struct window* wnd) {
-    return wnd->servlastackrecv > wnd->servlastseqsent;
+    return (wnd->servlastackrecv > wnd->servlastseqsent) && (wnd->base->pkt != NULL);
 }
 
 int is_wnd_full(struct window* wnd) {
