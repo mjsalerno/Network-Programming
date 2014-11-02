@@ -640,7 +640,6 @@ int send_file(char* fname, int sock) {
                     wnd->ssthresh = MAX(wnd->cwin / 2, 1);
                     wnd->cwin = 1;
                     srv_send_base(sock, wnd);
-                    break;
                 }
             }
         } else {
