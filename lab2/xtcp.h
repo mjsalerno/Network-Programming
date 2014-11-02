@@ -64,10 +64,8 @@ void *alloc_pkt(uint32_t seqn, uint32_t ack_seqn,
 void ntohpkt(struct xtcphdr *hdr);
 void htonpkt(struct xtcphdr *hdr);
 
-int srvsend(int sockfd, uint16_t flags, void *data, size_t datalen,
-        char **wnd, int is_new, uint16_t* cli_wnd);
 void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct window *w);
-void new_ack_recvd(struct window *window, struct xtcphdr *pkt);
+void new_ack_recvd(int sock, struct window *window, struct xtcphdr *pkt);
 
 
 void clisend_lossy(int sockfd, struct xtcphdr *pkt, size_t datalen);
@@ -79,7 +77,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
 void print_window(struct window *windo);
 void srv_send_base(int sockfd, struct window *w);
 int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, struct window* w);
-int remove_aked_pkts(struct window *window, struct xtcphdr *pkt);
+int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt);
 struct win_node* get_node(uint32_t seqtoget, struct window *w);
 void get_lock(pthread_mutex_t* lock);
 void unget_lock(pthread_mutex_t* lock);
@@ -89,5 +87,6 @@ void block_sigalrm(void);
 void unblock_sigalrm(void);
 void probe_window(int sock, struct window* wnd);
 void quick_send(int sock, uint16_t flags, struct window* wnd);
+void fast_retransmit(struct window* w);
 
 #endif /*XTCP_H*/
