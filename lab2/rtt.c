@@ -119,11 +119,11 @@ void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
  * NOTE suseconds_t is a signed type
  */
 void rtt_stop(struct rtt_info *ptr, suseconds_t ts) {
-    suseconds_t m = rtt_ts(ptr) - ts;
+    suseconds_t measuredRTT = rtt_ts(ptr) - ts;
     if(ts <= 0) {
         _ERROR("ts is %ld usecs since rtt_init() was called!\n", (long int)ts);
     }
-    ptr->rtt_rtt = m; /* update last measured RTT in usecs */
+    ptr->rtt_rtt = measuredRTT; /* update last measured RTT in usecs */
 
     /*
      * Update our estimators of RTT and mean deviation of RTT.
@@ -149,13 +149,13 @@ void rtt_stop(struct rtt_info *ptr, suseconds_t ts) {
      ************************
      */
 
-    m -= (ptr->rtt_srtt >> 3); /* rtt_srtt stored scaled by 1/g i.e. 8 */
-    ptr->rtt_srtt += m;
-    if (m < 0) {
-        m = -m;
+    measuredRTT -= (ptr->rtt_srtt >> 3); /* rtt_srtt stored scaled by 1/g i.e. 8 */
+    ptr->rtt_srtt += measuredRTT;
+    if (measuredRTT < 0) {
+        measuredRTT = -measuredRTT;
     }
-    m -= (ptr->rtt_sdev >> 2);
-    ptr->rtt_sdev += m;
+    measuredRTT -= (ptr->rtt_sdev >> 2);
+    ptr->rtt_sdev += measuredRTT;
     ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
     rtt_debug(ptr);
 }
@@ -171,19 +171,20 @@ void rtt_stop(struct rtt_info *ptr, suseconds_t ts) {
 int rtt_timeout(struct rtt_info *ptr) {
     ptr->rtt_dub_rto = ptr->rtt_dub_rto << 1;		/* double next RTO */
     ptr->rtt_dub_rto = rtt_minmax(ptr->rtt_dub_rto);
+    ++ptr->rtt_nrexmt;
+    _SPEC("TIMEOUT occured, nrexmt: %d\n", ptr->rtt_nrexmt);
 
-    if (++ptr->rtt_nrexmt > RTT_MAXNREXMT) {
+    if (ptr->rtt_nrexmt > RTT_MAXNREXMT) {
         return (-1);            /* time to give up for this packet */
     }
-    rtt_debug(ptr);
     return(0);
 }
 
 /*
- * Print debugging information on stderr, if the "rtt_d_flag" is nonzero.
+ * Print debugging information on stdout.
  */
 void rtt_debug(struct rtt_info *ptr) {
 
     _NOTE("rtt = %ldus, srtt>>3 = %ldus, sdev>>2 = %ldus, rto = %ldus\n",
-            ptr->rtt_rtt, ptr->rtt_srtt >> 3, ptr->rtt_sdev >> 2, ptr->rtt_dub_rto);
+            ptr->rtt_rtt, ptr->rtt_srtt >> 3, ptr->rtt_sdev >> 2, ptr->rtt_rto);
 }

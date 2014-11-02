@@ -17,9 +17,9 @@ struct rtt_info { /* fixme: add field for pre-doubled RTO */
 
     suseconds_t    rtt_rto;	    /* current RTO to use when rtt_nrexmt is 0, in us */
     suseconds_t    rtt_dub_rto;	/* the doubling RTO for timeouts, in us */
-    suseconds_t    rtt_nrexmt;	/* # times retransmitted: 0, 1, 2, ... */
-    time_t      rtt_base_sec;   /* sec since 1/1/1970 at start*/
-    suseconds_t rtt_base_usec;  /* us since 1/1/1970 at start*/
+    int            rtt_nrexmt;	/* # times retransmitted: 0, 1, 2, ... */
+    time_t         rtt_base_sec;   /* sec since 1/1/1970 at start*/
+    suseconds_t    rtt_base_usec;  /* us since 1/1/1970 at start*/
 };
 
 #define	RTT_RXTMIN      1000000	/* min retransmit timeout value, in us */
