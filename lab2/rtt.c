@@ -10,7 +10,7 @@ int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
  */
 #define	RTT_RTOCALC(ptr) ((ptr->rtt_srtt >> 3) + ptr->rtt_sdev)
 
-/*todo: both gettimeofday and setitimer operate on time_t (s) and suseconds_t (us) */
+/* note: both gettimeofday and setitimer operate on time_t (s) and suseconds_t (us) */
 
 static suseconds_t rtt_minmax(suseconds_t rto) {
     if (rto < RTT_RXTMIN) {

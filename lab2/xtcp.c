@@ -222,7 +222,7 @@ void srv_send_base(int sockfd, struct window *w) {
 }
 
 /**
-* todo: Please mask sigalrm, sigprocmask()
+* Caller has blocked SIGALRM.
 * Give me pkt in host order!! The window contains host order packets.
 *
 * Prints the window and the header sent.
@@ -316,7 +316,7 @@ void srv_add_send(int sockfd, void* data, size_t datalen, uint16_t flags, struct
 
 
 /**
-* todo: Please mask sigalrm, sigprocmask()
+* Caller has blocked SIGALRM.
 *
 */
 void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
@@ -337,6 +337,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
         /* slow start */
         _INFO("we are in slow start, cwin: %d, ssthresh: %d\n", window->cwin, window->ssthresh);
         window->cwin = window->cwin + 1;
+        _DEBUG("incremented cwin, new cwin: %d\n", window->cwin);
         count = remove_aked_pkts(window, pkt);
         _DEBUG("number of ACKs: %d\n", count);
         window->cwin += count;
@@ -363,6 +364,9 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
     print_window(window);
 }
 
+/**
+* Caller has blocked SIGALRM.
+*/
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
     int restart_timer = 0;
@@ -371,7 +375,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         _ERROR("The window is empty, why am I getting ACKs? advwin: %d\n", window->lastadvwinrecvd);
         return 0;
     } else if((is_wnd_empty(window) || window->base->pkt == NULL) && window->lastadvwinrecvd == 0) {
-        _INFO("got a window update, was: %d, now: %d", window->lastadvwinrecvd, pkt->advwin);
+        _INFO("got a window update,the last advwin was: %d, now: %d\n", window->lastadvwinrecvd, pkt->advwin);
         window->lastadvwinrecvd = pkt->advwin;
     }
 
@@ -491,7 +495,10 @@ skip_send:
                     continue;
                 }
             } else {
+                /* should have SIGALRM blocked */
+                block_sigalrm();
                 new_ack_recvd(wnd, (struct xtcphdr*)buff);
+                unblock_sigalrm();
             }
         } else {
             _ERROR("%s\n", "Something bad happened in the probe");
@@ -711,4 +718,18 @@ int is_wnd_empty(struct window* wnd) {
 
 int is_wnd_full(struct window* wnd) {
     return wnd->servlastseqsent >= (wnd->servlastackrecv + MIN(wnd->cwin, MIN(wnd->lastadvwinrecvd, wnd->maxsize))) - 1;
+}
+
+void block_sigalrm(void) {
+    sigset_t sigs;
+    sigemptyset(&sigs);
+    sigaddset(&sigs, SIGALRM);
+    sigprocmask(SIG_BLOCK, &sigs, NULL);                            /* block SIGALRM */
+}
+
+void unblock_sigalrm(void) {
+    sigset_t sigs;
+    sigemptyset(&sigs);
+    sigaddset(&sigs, SIGALRM);
+    sigprocmask(SIG_UNBLOCK, &sigs, NULL);                            /* unblock SIGALRM */
 }
