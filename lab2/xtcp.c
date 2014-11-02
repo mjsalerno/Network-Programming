@@ -389,7 +389,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         return 0;
     }
 
-    if(pkt->ack_seq > window->base->pkt->seq) {
+    if(pkt->ack_seq > window->base->pkt->seq) { /* normal ACK */
         _DEBUG("%s\n", "stopping the timer ...");
         rtt_stop(&rttinfo);
         /*fixme: fix the timers*/
@@ -624,12 +624,12 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
         clisend_lossy(sockfd, ackpkt, 0);
     } else {
         /* if ACKing the FIN then don't drop it, we're closing dirty! The server waits for this ACK */
-        htonpkt(pkt);
-        if ((send(sockfd, pkt, (DATA_OFFSET + (size_t)datalen), 0)) < 0) {
+        htonpkt(ackpkt);
+        if ((send(sockfd, ackpkt, (DATA_OFFSET + (size_t)datalen), 0)) < 0) {
             perror("xtcp.send_lossy()");
             exit(EXIT_FAILURE);
         }
-        ntohpkt(pkt);
+        ntohpkt(ackpkt);
         _NOTE("%s", "SENT ACK for FIN:\n");
         print_hdr(pkt);
     }

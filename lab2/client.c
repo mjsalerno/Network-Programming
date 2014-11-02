@@ -411,24 +411,20 @@ int clirecv(int sockfd, struct window* w) {
             pkt[bytes] = 0; /* NULL terminate the ASCII text for printing later */
 
             /* if it's a RST don't try to drop it, just quit! */
-            if((((struct xtcphdr*)pkt)->flags & RST) == RST){
+            if(((struct xtcphdr*)pkt)->flags & RST){
                 _DEBUG("%s\n", "clirecv()'d a RST packet!!! Server aborted connection!");
                 free(pkt);
                 return -RST;
             }
-            /* not a FIN: try to drop it */
-            if(DROP_PKT()) {
+            /* drop if not a FIN */
+            if(DROP_PKT() && !(((struct xtcphdr*)pkt)->flags & FIN)) {
                 /* drop the pkt */
                 _NOTE("%s", "DROPPED RECV'ing PKT: ");
                 print_hdr((struct xtcphdr *) pkt);
                 continue;
             } else {
-                /**
-                * keep the pkt:
-                * Pretend like the code after the "break;" is in here.
-                * However, because it's not in here it will use a goto
-                * instead of a continue later.
-                */
+                _NOTE("%s", "GOT PKT: ");
+                print_hdr((struct xtcphdr *) pkt);
                 _DEBUG("keeping pkt with seq: %"PRIu32", add and send from window.\n", ((struct xtcphdr*)pkt)->seq);
                 err = cli_add_send(sockfd, seq, (struct xtcphdr*)pkt, ((int)bytes - DATA_OFFSET), w);
                 if(err == FIN) { /* we ACKed the FIN */
