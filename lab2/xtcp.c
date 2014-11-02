@@ -389,8 +389,13 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         return 0;
     }
 
-    if(pkt->ack_seq > window->base->pkt->ack_seq) {
+    if(pkt->ack_seq > window->base->pkt->seq) {
+        _DEBUG("%s\n", "stopping the timer ...");
         rtt_stop(&rttinfo);
+        /*fixme: fix the timers*/
+        newtimer.it_value.tv_sec = 0;
+        newtimer.it_value.tv_usec = 0;
+        setitimer(ITIMER_REAL, NULL, NULL);
     }
 
     while(window->base->pkt != NULL && (pkt->ack_seq > window->base->pkt->seq)) {
