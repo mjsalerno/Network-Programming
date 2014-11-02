@@ -301,30 +301,13 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         _DEBUG("%s\n", "Something went wrong while sending the file.");
     }
 
-    while(!is_wnd_empty(wnd)) {
-        _DEBUG("%s\n", "QUITING: waiting for unACKed pkts");
-        err = recv_acks(child_sock, 1);
-        if(err < 0) {
-            _DEBUG("%s\n", "there was a problem getting ACKs");
-        } else {
-            _DEBUG("%s\n", "got ACK");
-        }
-
-        print_window(wnd);
-    }
-
     _NOTE("%s\n", "sending FIN");
 
     if(is_wnd_full(wnd)) {
         /* need to wait untill we have enough window space */
         recv_acks(child_sock, 0);
-    } else if(is_wnd_empty(wnd)) {
-        /* the timer wont be called for us since we are the last pkt */
-        rtt_newpack(&rttinfo);
-        rtt_start_timer(&rttinfo, &newtimer);
-        /*fixme: fix the timers*/
-        /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
     }
+
     srv_add_send(child_sock, NULL, 0, FIN, wnd);
 
     _NOTE("%s\n", "Waiting for client to ACK all pkts ...");
@@ -602,6 +585,8 @@ int send_file(char* fname, int sock) {
     for(EVER) {
 
         if(!is_wnd_full(wnd)) {
+            block_sigalrm();                            /* block SIGALRM */
+
             n = fread(data, 1, MAX_DATA_SIZE, file);
             tally += n;
             _DEBUG("send_file.fread(%lu)\n", (unsigned long) n);
@@ -622,7 +607,7 @@ int send_file(char* fname, int sock) {
                 rtt_newpack(&rttinfo);
                 rtt_start_timer(&rttinfo, &newtimer);
                 /*fixme: fix the timers*/
-                /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
+                setitimer(ITIMER_REAL, &newtimer, NULL);
                 _NOTE("%s\n", "the window is empty, refreshing timer");
             }
 
@@ -640,18 +625,25 @@ int send_file(char* fname, int sock) {
                     wnd->ssthresh = MAX(wnd->cwin / 2, 1);
                     wnd->cwin = 1;
                     srv_send_base(sock, wnd);
-                    break;
                 }
             }
         } else {
             recv_acks(sock, 0);
         }
+
+        unblock_sigalrm();                            /* unblock SIGALRM */
     }
 
+    newtimer.it_value.tv_sec = 0;
+    newtimer.it_value.tv_usec = 0;
+    setitimer(ITIMER_REAL, &newtimer, NULL); /* stop the timer */
     fclose(file);
     return 1;
 }
 
+/**
+* Caller should un-block SIGALRM.
+*/
 int recv_acks(int sock, int always_block) {
     int flag;
     int err;
@@ -686,7 +678,9 @@ int recv_acks(int sock, int always_block) {
                 _DEBUG("EWOULDBLOCK: ACKs recvd: %d\n", acks);
                 break;
             }
-        } else {                                                           /* got an ACK */
+        } else {                                                          /* got an ACK */
+            block_sigalrm();
+
             ntohpkt((struct xtcphdr*)pkt);
             switch(((struct xtcphdr*)pkt)->flags) {
                 case FIN:
@@ -709,6 +703,8 @@ int recv_acks(int sock, int always_block) {
                     ((struct xtcphdr *)pkt)->ack_seq);
 
             new_ack_recvd(wnd, (struct xtcphdr*)pkt);
+
+            unblock_sigalrm();
         }
     }
 

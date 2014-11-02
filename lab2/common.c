@@ -292,7 +292,6 @@ void print_iface_list_sock_name(struct iface_info* info) {
     ptr = info;
 
     for(; ptr != NULL; ptr = ptr->next) {
-        /* fixme: figure out what to pass */
         _DEBUG("passing socket: %d\n", ptr->sock);
         print_sock_name(ptr->sock, NULL);
     }
