@@ -404,7 +404,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
             rtt_newpack(&rttinfo);
             rtt_start_timer(&rttinfo, &newtimer);
             /*fixme: fix the timers*/
-            /*setitimer(ITIMER_REAL, &newtimer, NULL);/*
+            /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
         }
     }
 
