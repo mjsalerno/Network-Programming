@@ -140,6 +140,7 @@ struct win_node* alloc_window_nodes(size_t n) {
             exit(EXIT_FAILURE);
         }
         tail = tail->next;
+        tail->ts = 0;
         tail->datalen = -1;
         tail->pkt = NULL;
     }
@@ -192,7 +193,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
 }
 
 /**
-* todo: Please mask sigalrm, sigprocmask()
+* Caller must block SIGALRM.
 * Used when a timeout occurs. Sends the pkt at the base.
 *
 * Caller MUST check if the packet CAN be sent. min(cwin, lastadvwinrecvd, maxsize)
@@ -356,6 +357,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
         _DEBUG("new total_acks: %d\n", total_acks);
 
         if(total_acks >= window->cwin) {
+            total_acks = 0;
             window->cwin += 1;
             _DEBUG("incremented cwin, new cwin: %d\n", window->cwin);
         }
@@ -392,6 +394,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
 
     if(pkt->ack_seq > window->base->pkt->seq) { /* normal ACK*/
         _DEBUG("%s\n", "stopping the timer ...");
+        /* fixme: take out the timestamp */
         rtt_stop(&rttinfo);
         /*fixme: fix the timers*/
         newtimer.it_value.tv_sec = 0;

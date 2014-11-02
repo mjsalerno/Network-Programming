@@ -77,9 +77,7 @@ void rtt_newpack(struct rtt_info *ptr) {
 *
 */
 void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
-    struct timeval	tv;
-    int err;
-    suseconds_t  startrto = rtt_minmax((ptr->rtt_rto + 500000));
+    suseconds_t  startrto = rtt_minmax(ptr->rtt_rto);
     _NOTE("start rto is %ld\n", (long)startrto);
     /*itv->it_value.tv_sec = startrto >> 20;*/ /* 2^20 usecs is almost 1 sec */
     if(startrto >= 3000000) {
@@ -99,19 +97,10 @@ void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
     itv->it_interval.tv_usec = 0;
     _NOTE("timer filled for %ld.%06ldsecs\n", (long)itv->it_value.tv_sec, (long)itv->it_value.tv_usec);
     rtt_debug(ptr);
-
-    /* move our base time forward */
-    err = gettimeofday(&tv, NULL);
-    if(err < 0){
-        perror("rtt_ts.gettimeofday()");
-        exit(EXIT_FAILURE);
-    }
-    ptr->rtt_base_sec = tv.tv_sec;
-    ptr->rtt_base_usec = tv.tv_usec;
 }
 
 /*
- * Subsuquent calls to rtt_stop() must be followed by a call to rtt_start_timer()
+ * PARAMS: ts is a timestamp from the window.
  *
  * A response was received.
  * Stop the timer and update the appropriate values in the structure
@@ -119,12 +108,15 @@ void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
  * estimators of the RTT and its mean deviation.
  *
  * This function should be called right after turning off the
- * timer with alarm(0), or right after a timeout occurs.
+ * timer with setitimer() with a 0'd new_value or right after a timeout occurs.
  *
  * NOTE suseconds_t is a signed type
  */
-void rtt_stop(struct rtt_info *ptr) {
-    suseconds_t m = rtt_ts(ptr);
+void rtt_stop(struct rtt_info *ptr, suseconds_t ts) {
+    suseconds_t m = rtt_ts(ptr) - ts;
+    if(ts <= 0) {
+        _ERROR("ts is %ld usecs since rtt_init() was called!\n", (long int)ts);
+    }
     ptr->rtt_rtt = m; /* update last measured RTT in usecs */
 
     /*
@@ -171,6 +163,7 @@ void rtt_stop(struct rtt_info *ptr) {
  * the lines of what is done in line 77 of rtt_stop, Fig. 22.13).
  */
 int rtt_timeout(struct rtt_info *ptr) {
+    /* fixme: don't double rto*/
     ptr->rtt_rto <<= 1;		/* double next RTO */
     ptr->rtt_rto = rtt_minmax(ptr->rtt_rto);
 

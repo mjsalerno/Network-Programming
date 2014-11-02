@@ -26,12 +26,12 @@ struct rtt_info { /* fixme: add field for pre-doubled RTO */
 #define	RTT_MAXNREXMT 	12  	/* max # times to retransmit */
 
 /* function prototypes */
-void	    rtt_debug  (struct rtt_info *);
-void	    rtt_init   (struct rtt_info *);
+void	    rtt_debug(struct rtt_info *);
+void	    rtt_init(struct rtt_info *);
 void	    rtt_newpack(struct rtt_info *);
 suseconds_t rtt_ts(struct rtt_info *ptr);
 void        rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv);
-void        rtt_stop   (struct rtt_info *ptr);
+void        rtt_stop(struct rtt_info *ptr, suseconds_t ts);
 int		    rtt_timeout(struct rtt_info *);
 
 #endif

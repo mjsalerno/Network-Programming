@@ -35,6 +35,7 @@ struct xtcphdr {
 struct win_node {
     int datalen;
     struct xtcphdr* pkt;
+    suseconds_t ts;         /* time at which it was sent from the window */
     struct win_node* next;
 };
 
