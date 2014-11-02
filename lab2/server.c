@@ -323,7 +323,7 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         rtt_newpack(&rttinfo);
         rtt_start_timer(&rttinfo, &newtimer);
         /*fixme: fix the timers*/
-        /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
+        setitimer(ITIMER_REAL, &newtimer, NULL);
     }
     srv_add_send(child_sock, NULL, 0, FIN, wnd);
 
@@ -622,13 +622,14 @@ int send_file(char* fname, int sock) {
                 rtt_newpack(&rttinfo);
                 rtt_start_timer(&rttinfo, &newtimer);
                 /*fixme: fix the timers*/
-                /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
+                setitimer(ITIMER_REAL, &newtimer, NULL);
                 _NOTE("%s\n", "the window is empty, refreshing timer");
             }
 
             srv_add_send(sock, data, n, 0,wnd);
 
             if (sigsetjmp(jmpbuf, 1) != 0) {
+                _ERROR("%s\n", "in the jump thingy");
                 if (rtt_timeout(&rttinfo) < 0) {
                     _ERROR("%s\n", "The packet has timed out, giving up\n");
                     quick_send(sock, RST, wnd);
@@ -639,7 +640,18 @@ int send_file(char* fname, int sock) {
                     rtt_start_timer(&rttinfo, &newtimer);
                     wnd->ssthresh = MAX(wnd->cwin / 2, 1);
                     wnd->cwin = 1;
-                    srv_send_base(sock, wnd);
+                    if(!is_wnd_empty(wnd))
+                        srv_send_base(sock, wnd);
+                    else
+                        _ERROR("%s\n", "the window was empty, cant resend base.");
+
+                    if(!is_wnd_empty(wnd)) {
+                        _ERROR("%s\n", "refreshing timer");
+                        rtt_newpack(&rttinfo);
+                        rtt_start_timer(&rttinfo, &newtimer);
+                        /*fixme: fix the timers*/
+                        setitimer(ITIMER_REAL, &newtimer, NULL);
+                    }
                 }
             }
         } else {

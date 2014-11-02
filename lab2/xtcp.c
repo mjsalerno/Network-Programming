@@ -365,6 +365,7 @@ void new_ack_recvd(struct window *window, struct xtcphdr *pkt) {
 
 int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     int rtn = 0;
+    int restart_timer = 0;
 
     if((is_wnd_empty(window) || window->base->pkt == NULL) && window->lastadvwinrecvd != 0) {
         _ERROR("The window is empty, why am I getting ACKs? advwin: %d\n", window->lastadvwinrecvd);
@@ -375,7 +376,7 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     }
 
     /* dup ack */
-    if(window->servlastackrecv == pkt->ack_seq){
+    if(window->servlastackrecv == pkt->ack_seq) {
         _NOTE("got dup ack: %" PRIu32 "\n", pkt->ack_seq);
         window->dupacks++;
         _NOTE("new dupack: %" PRIu32 "\n", window->dupacks);
@@ -386,12 +387,13 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
     }
 
     if(pkt->ack_seq > window->base->pkt->seq) {
-        _DEBUG("%s\n", "stopping the timer ...");
+        _ERROR("%s\n", "stopping the timer ...");
         rtt_stop(&rttinfo);
         /*fixme: fix the timers*/
         newtimer.it_value.tv_sec = 0;
         newtimer.it_value.tv_usec = 0;
         setitimer(ITIMER_REAL, NULL, NULL);
+        restart_timer = 1;
     }
 
     while(window->base->pkt != NULL && (pkt->ack_seq > window->base->pkt->seq)) {
@@ -404,14 +406,14 @@ int remove_aked_pkts(struct window *window, struct xtcphdr *pkt) {
         window->base->datalen = -1;
         window->base = window->base->next;
 
-        if(!is_wnd_empty(window)) {
-            /* todo: might be wrong */
-            _DEBUG("%s\n", "refreshing timer");
-            rtt_newpack(&rttinfo);
-            rtt_start_timer(&rttinfo, &newtimer);
-            /*fixme: fix the timers*/
-            /*setitimer(ITIMER_REAL, &newtimer, NULL);*/
-        }
+    }
+
+    if(restart_timer && !is_wnd_empty(window)) {
+        _ERROR("%s\n", "refreshing timer");
+        rtt_newpack(&rttinfo);
+        rtt_start_timer(&rttinfo, &newtimer);
+        /*fixme: fix the timers*/
+        setitimer(ITIMER_REAL, &newtimer, NULL);
     }
 
     window->lastadvwinrecvd = pkt->advwin;
