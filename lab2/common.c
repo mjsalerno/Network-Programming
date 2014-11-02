@@ -164,10 +164,25 @@ void free_iface_info(struct iface_info* info) {
     if(info->next != NULL)
         free_iface_info(info->next);
 
-    if(info->sock > 0)
-        close(info->sock);
-
     free(info);
+
+}
+
+void close_sock_iface_info(struct iface_info* info, int sock) {
+    struct iface_info* ptr;
+    int err;
+    ptr = info;
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        if(ptr->sock == sock || ptr->sock < 1) {
+            continue;
+        }
+        err = close(ptr->sock);
+        if(err < 0) {
+            perror("common.close_sock_iface_info()");
+            exit(EXIT_FAILURE);
+        }
+    }
 
 }
 
@@ -213,6 +228,7 @@ int bind_to_iface_list(struct iface_info* info, uint16_t  port) {
         sockfd = socket(AF_INET, SOCK_DGRAM, 0);
         if(sockfd < 1) {
             perror("bind_to_iface_list()");
+            exit(EXIT_FAILURE);
         }
         bzero(&servaddr, sizeof(servaddr));
         servaddr.sin_family = AF_INET;

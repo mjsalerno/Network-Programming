@@ -69,6 +69,7 @@ struct iface_info* fd_is_set_iface_list(struct iface_info* info, fd_set* fdset);
 struct iface_info* get_iface_from_sock(struct iface_info* info, int sock);
 struct iface_info* get_matching_iface_by_ip(struct iface_info* info, in_addr_t ip);
 struct iface_info*  get_matching_iface_by_sock(struct iface_info* info, int sock);
+void close_sock_iface_info(struct iface_info* info, int sock);
 
 
 #endif /* COMMON_H */
