@@ -488,7 +488,8 @@ skip_send:
         tog = !tog;
         FD_ZERO(&fdset);
         FD_SET(sock, &fdset);
-        timer.tv_sec = MIN(++count, 3);
+        ++count;
+        timer.tv_sec = MIN(count, 3);
         timer.tv_usec = 0;
         _INFO("probing window count: %d\n", count);
 
