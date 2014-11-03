@@ -19,6 +19,7 @@ uint32_t ini_ack_seq;
 
 int main(int argc, const char **argv) {
     const char *path;
+    struct sigaction sa;
 
     FILE *file;
     unsigned short port;
@@ -84,8 +85,13 @@ int main(int argc, const char **argv) {
     /* print_sock_name(sockfd, &p_serveraddr); */
     print_iface_list_sock_name(ifaces);
 
-    if(SIG_ERR == signal(SIGCHLD, proc_exit)) {
-        perror("server.signal()");
+    sa.sa_handler = &proc_exit;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    err = sigaction(SIGCHLD, &sa, NULL);
+    if(err < 0) {
+        perror("ERROR sigaction()");
+        exit(EXIT_FAILURE);
     }
 
 
