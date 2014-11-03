@@ -1,7 +1,7 @@
 CC=clang
 CC=gcc
 FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros -DDEBUG
-LIBS = -lnsl -lresolv -lsocket -lm -lrt
+LIBS = -lnsl -lresolv -lsocket -lm 
 LIBS = -lm -pthread
 
 all: client server

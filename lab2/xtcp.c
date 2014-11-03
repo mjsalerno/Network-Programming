@@ -184,8 +184,7 @@ struct window* init_window(int maxsize, uint32_t srv_last_seq_sent, uint32_t srv
     w->lastadvwinrecvd = maxsize;
     w->servlastackrecv = srv_last_ack_seq_recvd;
     w->servlastseqsent = srv_last_seq_sent;
-    /* fixme: change to 1 */
-    w->cwin = 65536;
+    w->cwin = 1;
     w->ssthresh = 65536;
     w->dupacks = 0;
     w->clibaseseq = cli_base_seqn;
@@ -346,7 +345,7 @@ void new_ack_recvd(int sock, struct window *window, struct xtcphdr *pkt) {
         window->cwin += count;
         _DEBUG("new cwin: %d\n", window->cwin);
     } else {
-        /** todo: congestion cntrl
+        /** congestion cntrl
         *  count numacks
         *  if numacks == cwin
         *  then cwin++, num acks = 0
@@ -443,7 +442,6 @@ int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
         _DEBUG("%s\n", "refreshing timer");
         rtt_newpack(&rttinfo);
         rtt_start_timer(&rttinfo, &newtimer);
-        /*fixme: fix the timers*/
         _SPEC("%s\n", "setting timer");
         setitimer(ITIMER_REAL, &newtimer, NULL);
     }
@@ -584,9 +582,8 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
     /* recv'ed a pkt, it is in host order, and we will put it in the window */
     printf("recv'd packet ");
     print_hdr(pkt);
-    /* todo: remove */
-    printf("packet contents:\n");
-    printf("%s\n", (char*)pkt + DATA_OFFSET);
+    /*printf("packet contents:\n");
+    printf("%s\n", (char*)pkt + DATA_OFFSET);*/
 
 
     seqtoadd = pkt->seq;

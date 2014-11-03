@@ -12,7 +12,7 @@ static struct window* w;
 extern pthread_mutex_t w_mutex;
 
 /* serv_fd -- the main server connection socket, reconnected later */
-static int serv_fd; /*todo: not static? */
+static int serv_fd;
 
 int main(void) {
     ssize_t err; /* for error checking */

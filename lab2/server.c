@@ -220,9 +220,6 @@ int child(char* fname, int par_sock, struct sockaddr_in cliaddr) {
         int optval = 1;
         _DEBUG("%s\n", "found local iface, using SO_DONTROUTE");
         err = setsockopt(child_sock, SOL_SOCKET, SO_DONTROUTE, &optval, sizeof(int));
-        _ERROR("%s\n", "PRINTOUT!!");
-        print_iface_list_sock_name(iface_ptr);
-
         if(err < 0) {
             perror("child.setsockopt()");
             free_iface_info(ifaces);
