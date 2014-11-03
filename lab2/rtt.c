@@ -169,7 +169,7 @@ void rtt_stop(struct rtt_info *ptr, suseconds_t ts) {
 int rtt_timeout(struct rtt_info *ptr) {
     ptr->rtt_dub_rto = ptr->rtt_dub_rto << 1;		/* double next RTO */
     ptr->rtt_dub_rto = rtt_minmax(ptr->rtt_dub_rto);
-    ++ptr->rtt_nrexmt;
+    ptr->rtt_nrexmt =  ptr->rtt_nrexmt + 1;
     _SPEC("TIMEOUT occured, nrexmt: %d\n", ptr->rtt_nrexmt);
 
     if (ptr->rtt_nrexmt > RTT_MAXNREXMT) {

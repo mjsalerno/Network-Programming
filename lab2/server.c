@@ -645,14 +645,10 @@ int send_file(char* fname, int sock) {
                     wnd->cwin = 1;
                     if(!is_wnd_empty(wnd))
                         srv_send_base(sock, wnd);
-                    else
-                        _ERROR("%s\n", "the window was empty, cant resend base.");
+                    /*else
+                        _ERROR("%s\n", "the window was empty, cant resend base.");*/
 
                     if(!is_wnd_empty(wnd)) {
-                        _DEBUG("%s\n", "refreshing timer");
-                        rtt_newpack(&rttinfo);
-                        /*rtt_start_timer(&rttinfo, &newtimer);*/       /* un-needed */
-                        /*fixme: fix the timers*/
                         _SPEC("%s\n", "setting timer");
                         setitimer(ITIMER_REAL, &newtimer, NULL);
                     }

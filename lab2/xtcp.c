@@ -581,9 +581,9 @@ int cli_add_send(int sockfd, uint32_t seqn, struct xtcphdr *pkt, int datalen, st
     }
 
     /* recv'ed a pkt, it is in host order, and we will put it in the window */
-    printf("recv'd packet ");
+    /*printf("recv'd packet ");
     print_hdr(pkt);
-    /*printf("packet contents:\n");
+    printf("packet contents:\n");
     printf("%s\n", (char*)pkt + DATA_OFFSET);*/
 
 
