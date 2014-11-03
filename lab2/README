@@ -6,8 +6,81 @@ Scott Harvey,    108272691, cse533-11
 
 We re-did the sliding window 4 times.
 
-===========================
+================================
 CHANGES TO: rtt.c, unprtt.h
-===========================
+================================
 
-Initial RTO is 1 second, as in new TCP implementations.
+Besides the basics recommended/required by the A2 doc:
+
+We store most fields in MICROseconds (the type suseconds_t and abreviated as
+usec).
+
+We added 3 fields:
+	- time_t         rtt_base_sec;   /* sec since EPOCH at rtt_init() */
+	- suseconds_t    rtt_base_usec;  /* us since EPOCH at rtt_init() */
+	- suseconds_t    rtt_dub_rto;	 /* the doubling RTO for timeouts, in us */
+
+Initial RTO is 1 second, as in TCP RENO implementations.
+
+rtt_init():
+	This inits all fields to 0 except:
+		- sets base times (as above)
+		- sets rtt_sdev to 250000 << 2
+				(Which makes the initial rtt_rto 1000000usecs or 1 sec)
+
+rtt_ts():
+	Used to get a timestamp representing usecs since rtt_init() was called.
+	This is called when a pkt is sent and then the timestamp is stored in our
+	sliding window.
+		On a timeout, the pkt (the base pkt) has it's timestamp recalculated
+		when sending BECAUSE if this pkt time's out again ONLY THEN we take
+		call rtt_stop().
+		We DO use Karn's "Algorithm"/Rule.
+
+rtt_start_timer(): (was rtt_start())
+	We use setitimer so this fills in an struct itimerval{} for the caller.
+	Calls rtt_minmax() and makes sure that the itimerval.itvalue.tv_usec field
+	is never more than 999999 (more than 1 second in the usec field is BAD)
+
+rtt_stop():
+    Only called rtt_stop for an ACK that is cumulative, or it is an ACK for a
+    base that was only trasmitted once.
+    		( SEE above rtt_ts() for more info )
+    Uses integer arithmetic following Jacobson‐Karels Algorithm, their paper,
+    and the chapter 22 lecture notes.
+
+rtt_timeout():
+	Called on timeouts. It doubles the the current
+
+
+=======================================
+
+
+================================
+CHANGES TO: get_ifi_info_plus.c
+================================
+
+make_iface_list():
+    almost the same as the main of prifinfo_plus but instead of printing, it filled
+    out a list of structs. The struct held the values of the IP, mask, and subnet. This
+    list was then later used by the server/client to choose what IP to bind to and weather to
+    use SO_DONTROUTE or not.
+
+get_matching_iface():
+    this function looped through the list of iface structs and returned the
+    one that the client/server should connect to. It figured this out by doing
+    a bit wise and on the mast of the interface with the ip of the destination.
+    It then checked if the result was equal to the subnet of the interface.
+    The it returned the matching structure with the longest prefix matching.
+
+
+==================================
+TCP mechanisms
+==================================
+
+the handshake:
+    The first handshake is done by the client. The client sends the filename of the file
+    it wants to recive in the data section of the packet. If this fails it will be retransmitted up to 3 times.
+    from 2 to 6 seconds. The server then sends the second handshake. The server send over the new port that the
+    client should be connecting to. If this fails the server will resend the handshake over two connections, a connection
+    using the old port and the new port. This is done for up to 12 apttempts from 1 to 6 seconds. The final handshake is done by the client. This packet contains no data and is just a normal ack. If the third handshake get lost, the server will resend the second handshake and the client will simply duplicate ack it.

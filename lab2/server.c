@@ -638,6 +638,7 @@ int send_file(char* fname, int sock) {
                     exit(EXIT_FAILURE);
                 } else {
                     rtt_stop(&rttinfo, wnd->base->ts);
+                    wnd->dupacks = 0;
                     _NOTE("%s\n", "Packet timeout, resending");
                     rtt_start_timer(&rttinfo, &newtimer);
                     wnd->ssthresh = MAX(wnd->cwin / 2, 1);
