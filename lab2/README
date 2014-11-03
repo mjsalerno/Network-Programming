@@ -12,7 +12,7 @@ CHANGES TO: rtt.c, unprtt.h
 
 Besides the basics recommended/required by the A2 doc:
 
-We store most fields in MICROseconds (the type suseconds_t and abreviated as
+We store most fields in MICROseconds (the type suseconds_t and abbreviated as
 usec).
 
 We added 3 fields:
@@ -44,7 +44,7 @@ rtt_start_timer(): (was rtt_start())
 
 rtt_stop():
     Only called rtt_stop for an ACK that is cumulative, or it is an ACK for a
-    base that was only trasmitted once.
+    base that was only transmitted once.
     		( SEE above rtt_ts() for more info )
     Uses integer arithmetic following Jacobson‐Karels Algorithm, their paper,
     and the chapter 22 lecture notes.
@@ -72,7 +72,7 @@ make_iface_list():
 get_matching_iface():
     this function looped through the list of iface structs and returned the
     one that the client/server should connect to. It figured this out by doing
-    a bit wise and on the mast of the interface with the ip of the destination.
+    a bit wise and on the mast of the interface with the IP of the destination.
     It then checked if the result was equal to the subnet of the interface.
     The it returned the matching structure with the longest prefix matching.
 
@@ -83,7 +83,14 @@ TCP mechanisms
 
 the handshake:
     The first handshake is done by the client. The client sends the filename of the file
-    it wants to recive in the data section of the packet. If this fails it will be retransmitted up to 3 times.
+    it wants to receive in the data section of the packet. If this fails it will be retransmitted up to 3 times.
     from 2 to 6 seconds. The server then sends the second handshake. The server send over the new port that the
     client should be connecting to. If this fails the server will resend the handshake over two connections, a connection
-    using the old port and the new port. This is done for up to 12 apttempts from 1 to 6 seconds. The final handshake is done by the client. This packet contains no data and is just a normal ack. If the third handshake get lost, the server will resend the second handshake and the client will simply duplicate ack it.
+    using the old port and the new port. This is done for up to 12 attempts from 1 to 6 seconds. The final handshake is
+    done by the client. This packet contains no data and is just a normal ack. If the third handshake get lost, the server
+    will resend the second handshake and the client will simply duplicate ack it.
+
+Fast Retransmit:
+    When the server receives an ack for the same packet for a total of four times, the server
+    enters fast retransmit. Fast retransmit resets the duplicate ack count to 0 and sets ssthresh to
+    the max(servlastseqsent - seq)/ 2), 2). After this the packet is sent out.
