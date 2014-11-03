@@ -1,15 +1,18 @@
 README
-=====================================
+======================================
 Michael Salerno, 108512298, cse533-8
 Scott Harvey,    108272691, cse533-11
-=====================================
+======================================
 
 BUILDING IT!     makefile
 -------------------------
-For none of our debug printouts, just type:
+For none of our debug printouts and no color, just type:
 $ make
 
-For debug printouts, just type:
+For ANSI CoLoR, type (same printouts as no color but easier to read)
+$ make color
+
+For debug printouts with ANSI CoLoR, just type:
 $ make debug
 
 If you want the client program to save the transfered file, just type:
@@ -72,9 +75,6 @@ rtt_timeout():
 	rtt_nrexmt is 0.
 
 
-=======================================
-
-
 ================================
 CHANGES TO: get_ifi_info_plus.c
 ================================
@@ -99,7 +99,7 @@ TCP mechanisms
 
 xtcphdr:
     The xtcphdr is the header we used to let the UDP datagram act as TCP.
-    This structure contained the acknoledgement number, sequence number,
+    This structure contained the acknowledgment number, sequence number,
     flags, and the advertised window. The flags were a bitmap that was 16 bits wide.
     The flags that could be set were FIN, SYN, RST, and ACK.
 
@@ -134,7 +134,7 @@ All the state of the sliding window is kept in a struct window{}.
 It has fields for the number of pkts in the window, the last ack recv'd,
 the last advertised window recv'd, the last seq sent, the cwin, ssthresh,
 duplicate ack count, a ptr to the base of the circular win_node list.
-Packets themselves (struct xtcphdr{}) are malloc'd/free'd when they are 
+Packets themselves (struct xtcphdr{}) are malloc'd/free'd when they are
 inserted/removed from the window.
 
 
