@@ -4,7 +4,7 @@ Michael Salerno, 108512298, cse533-8
 Scott Harvey,    108272691, cse533-11
 =====================================
 
-We re-did the sliding window 4 times.
+We re-did the sliding window 4 times over 3 weeks, but we finally got it right.
 
 ================================
 CHANGES TO: rtt.c, unprtt.h
@@ -50,7 +50,10 @@ rtt_stop():
     and the chapter 22 lecture notes.
 
 rtt_timeout():
-	Called on timeouts. It doubles the the current
+	Called on timeouts. It keeps doubling the RTO until 12 retransmissions.
+	The original RTO for this pkt is backed up in the rtt_rto field and it
+	is restored when rtt_start_timer() is called for a new packet, i.e.
+	rtt_nrexmt is 0.
 
 
 =======================================
