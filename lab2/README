@@ -1,6 +1,6 @@
 README
 =====================================
-Michael Salerno, XXXXXXXXX, cse533-XX
+Michael Salerno, XXXXXXXXX, cse533-8
 Scott Harvey,    108272691, cse533-11
 =====================================
 
@@ -10,4 +10,47 @@ We re-did the sliding window 4 times.
 CHANGES TO: rtt.c, unprtt.h
 ===========================
 
-Initial RTO is 1 second, as in new TCP implementations.
+Besides the basics recommended/required by the A2 doc:
+
+We store most fields in MICROseconds (the type suseconds_t and abreviated as 
+usec).
+
+We added 3 fields:
+	- time_t         rtt_base_sec;   /* sec since EPOCH at rtt_init() */
+	- suseconds_t    rtt_base_usec;  /* us since EPOCH at rtt_init() */
+	- suseconds_t    rtt_dub_rto;	 /* the doubling RTO for timeouts, in us */
+
+Initial RTO is 1 second, as in TCP RENO implementations.
+
+rtt_init(): 
+	This inits all fields to 0 except:
+		- sets base times (as above)
+		- sets rtt_sdev to 250000 << 2
+				(Which makes the initial rtt_rto 1000000usecs or 1 sec)
+
+rtt_ts():
+	Used to get a timestamp representing usecs since rtt_init() was called.
+	This is called when a pkt is sent and then the timestamp is stored in our
+	sliding window.
+		On a timeout, the pkt (the base pkt) has it's timestamp recalculated
+		when sending BECAUSE if this pkt time's out again ONLY THEN we take 
+		call rtt_stop(). 
+		We DO use Karn's "Algorithm"/Rule.
+
+rtt_start_timer(): (was rtt_start())
+	We use setitimer so this fills in an struct itimerval{} for the caller.
+	Calls rtt_minmax() and makes sure that the itimerval.itvalue.tv_usec field
+	is never more than 999999 (more than 1 second in the usec field is BAD)
+
+rtt_stop():
+    Only called rtt_stop for an ACK that is cumulative, or it is an ACK for a
+    base that was only trasmitted once.
+    		( SEE above rtt_ts() for more info )
+    Uses integer arithmetic following Jacobson‐Karels Algorithm, their paper,
+    and the chapter 22 lecture notes.
+
+rtt_timeout():
+	Called on timeouts. It doubles the the current 
+
+
+=======================================

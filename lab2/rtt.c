@@ -2,8 +2,6 @@
 #include "rtt.h"
 #include "debug.h"
 
-int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
-
 /*
  * Calculate the RTO value based on current estimators:
  *		smoothed RTT plus four times the deviation
