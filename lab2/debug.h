@@ -11,7 +11,19 @@
 # define _DEBUG(fmt, args...) printf("DEBUG: %s:%s:%d: "fmt, __FILE__, __FUNCTION__, __LINE__, args)
 #else
 # define _DEBUG(fmt, args...)
-#endif
+#endif /* DEBUG */
+
+#ifdef HANDIN
+
+#define _ERROR(fmt, args...) fprintf(stderr,   "ERROR: "fmt, args)
+
+#define _NOTE(fmt, args...) printf("NOTICE: "fmt, args)
+
+#define _INFO(fmt, args...) printf("INFO: "fmt, args)
+
+#define _SPEC(fmt, args...) printf("SPEC: "fmt, args)
+
+#else
 
 #define _ERROR(fmt, args...) fprintf(stderr,   _RED "ERROR: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
 
@@ -21,4 +33,5 @@
 
 #define _SPEC(fmt, args...) printf(_GREEN "SPEC: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
 
-#endif
+#endif /* HANDIN */
+#endif /* DEBUG_H */
