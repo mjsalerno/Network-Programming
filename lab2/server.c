@@ -611,7 +611,7 @@ int send_file(char* fname, int sock) {
                 exit(EXIT_FAILURE);
 
             } else if (feof(file) && n < 1) {
-                printf("File finished uploading ...\n");
+                printf("Finished reading from file ...\n");
                 unblock_sigalrm();                            /* un-block SIGALRM */
                 recv_acks(sock, 1, 0);                         /* wait for all ACKs and then break */
                 break;
