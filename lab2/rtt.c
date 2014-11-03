@@ -82,7 +82,7 @@ void rtt_start_timer(struct rtt_info *ptr, struct itimerval *itv) {
         ptr->rtt_dub_rto = ptr->rtt_rto;
     }
     startrto = rtt_minmax(ptr->rtt_dub_rto);
-    _NOTE("start rto is %ld\n", (long)startrto);
+    /*_NOTE("start rto is %ld\n", (long)startrto);*/
     /*itv->it_value.tv_sec = startrto >> 20;*/ /* 2^20 usecs is almost 1 sec */
     if(startrto >= 3000000) {
         itv->it_value.tv_sec = 3;

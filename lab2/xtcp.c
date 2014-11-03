@@ -719,7 +719,7 @@ void get_lock(pthread_mutex_t* lock) {
         perror("CONSUMER: ERROR pthread_mutex_lock()");
         exit(EXIT_FAILURE);
     }
-    _INFO("%s\n", "Locked the window.");
+    /*_INFO("%s\n", "Locked the window.");*/
 }
 
 void unget_lock(pthread_mutex_t* lock) {
@@ -730,7 +730,7 @@ void unget_lock(pthread_mutex_t* lock) {
         perror("CONSUMER: ERROR pthread_mutex_unlock()");
         exit(EXIT_FAILURE);
     }
-    _INFO("%s\n", "Released the window.");
+    /*_INFO("%s\n", "Released the window.");*/
 }
 
 int is_wnd_empty(struct window* wnd) {

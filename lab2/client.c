@@ -635,7 +635,7 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     _NOTE("CONSUMER read %u bytes across %u pkts\n", bytes, nodes);
     /*print_window(w);*/
     if(wasfull && rtn != FIN) { /* send window update if was full, but not if FIN reached */
-        _NOTE("%s", "consumer emptied window, sending window update\n");
+        _NOTE("%s", "consumer \"unlocked\"/emptied window, sending window update\n");
         pkt = alloc_pkt(seq, w->clilastunacked, ACK, (uint16_t) (w->maxsize - w->numpkts), NULL, 0);
         clisend_lossy(serv_fd, pkt, 0);
         free(pkt);
