@@ -81,6 +81,12 @@ get_matching_iface():
 TCP mechanisms
 ==================================
 
+xtcphdr:
+    The xtcphdr is the header we used to let the UDP datagram act as TCP.
+    This structure contained the acknoledgement number, sequence number,
+    flags, and the advertised window. The flags were a bitmap that was 16 bits wide.
+    The flags that could be set were FIN, SYN, RST, and ACK.
+
 the handshake:
     The first handshake is done by the client. The client sends the filename of the file
     it wants to receive in the data section of the packet. If this fails it will be retransmitted up to 3 times.
