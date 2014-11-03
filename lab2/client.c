@@ -495,17 +495,19 @@ void *consumer_main(void *fname) {
     unsigned int usecs;
     int fin_found = ACK;
     int err;
-    int filefd = (int)strlen(fname);/* for -pendatic -Werror    we took out writing to the file for submissions */
-    /* ========== NOT WANTED FOR HANDIN ============ */
-    /*char *tmpfname;
-    char midffix[] = ".tmp";*/
+    int filefd = 0;
+#ifdef CREATE_FILE
+    char *tmpfname;
+    char midffix[] = ".tmp";
+#else
+    /* for -pendatic -Werror    we took out writing to the file for submissions */
+    filefd = (int)strlen(fname);
+#endif
 
-    srand48(0);
-    /* u is in milliseconds ms! not us, not ns*/
     _NOTE("%s","CONSUMER: consumer created\n");
-    /* ========== NOT WANTED FOR HANDIN ============ */
+#ifdef CREATE_FILE
     /* create a template filename for mkstemp */
-    /*
+
     tmpfname = malloc(strlen(fname) + 6 + strlen(midffix) + 1);
     if(tmpfname == NULL){
         _ERROR("%s","ERROR consumer_main().malloc()\n");
@@ -520,11 +522,14 @@ void *consumer_main(void *fname) {
         perror("ERRROR consumer_main().mkstemp()");
         exit(EXIT_FAILURE);
     }
-    */
-    /* ========== NOT WANTED FOR HANDIN ============ */
+#endif
+
+    srand48(0);
 
     /* stop when FIN found */
     while(fin_found != FIN) {
+        /* u is in milliseconds ms! not us, not ns*/
+
         msecs_d = -1 * u * log(drand48()); /* -1 × u × ln( drand48( ) ) */
 
         usecs = 1000 * (unsigned int) round(msecs_d);
@@ -548,8 +553,10 @@ void *consumer_main(void *fname) {
         perror("CONSUMER: ERROR pthread_mutex_destroy()");
         exit(EXIT_FAILURE);
     }
-    /*close(filefd);
-    free(tmpfname);*/
+#ifdef CREATE_FILE
+    close(filefd);
+    free(tmpfname);
+#endif
     return NULL;
 }
 
@@ -566,13 +573,17 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
     int wasfull = 0;
     struct xtcphdr *pkt;
     int rtn = 0;
-    /*ssize_t n = 0;
-    ssize_t nleft = 0;*/
+#ifdef CREATE_FILE
+    ssize_t n = 0;
+    ssize_t nleft = 0;
+#else
+    filefd++; /* for -pedantic -Werror */
+#endif
     at = w->base;
     if(w->numpkts == w->maxsize){
         wasfull = 1;
     }
-    filefd++; /* for -pedantic -Werror */
+
 
     if(w->numpkts <= 0){
         _NOTE("consumer window was empty, num pkts: %d\n", w->numpkts);
@@ -591,9 +602,9 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
             break;
         }
         printf("%s", ((char*)((at->pkt)) + DATA_OFFSET));
-        /* ========== NOT WANTED FOR HANDIN ============ */
+#ifdef CREATE_FILE
         /* protect against partial writes, write data in pkt to file. */
-        /*
+
         do {
             n = write(filefd, (((char*)(at->pkt)) + DATA_OFFSET + nleft), (size_t) at->datalen - nleft);
             if (n < 0) {
@@ -605,9 +616,9 @@ int consumer_read(int filefd, unsigned int *totbytes,unsigned int *totpkts) {
             nleft += n;
         } while(nleft < at->datalen);
         nleft = 0;
-        */
+
         /* now all bytes have been written */
-        /* ========== NOT WANTED FOR HANDIN ============ */
+#endif
         bytes += at->datalen;
         free(at->pkt);
         at->datalen = -1;
