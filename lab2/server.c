@@ -152,6 +152,7 @@ int main(int argc, const char **argv) {
             _DEBUG("%s\n", "Server: dup clinet, not doing anything");
             printf("GOT: ");
             print_hdr((struct xtcphdr *) pkt);
+            sigprocmask(SIG_UNBLOCK, &sigset, NULL);
             continue;
         }
 
@@ -702,6 +703,7 @@ int recv_acks(int sock, int always_block, int finsent) {
             if(errno != EWOULDBLOCK) {                                     /* there was actually an error */
                 fprintf(stderr, "send_file.get_ack(%d", err);
                 perror(")");
+                print_sock_name(sock, NULL);
                 exit(EXIT_FAILURE);
             } else {                                                       /* no ACKs */
                 _DEBUG("EWOULDBLOCK: ACKs recvd: %d\n", acks);
