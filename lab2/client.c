@@ -371,6 +371,7 @@ int validate_hs2(struct xtcphdr* hdr, int len){
 */
 int clirecv(int sockfd, struct window* w) {
     ssize_t bytes = 0;
+    struct sockaddr_in peer_addr;
     int err;
     fd_set rset;
     char *pkt = malloc(MAX_PKT_SIZE + 1); /* +1 for consumer and printf */
@@ -381,7 +382,10 @@ int clirecv(int sockfd, struct window* w) {
     for(EVER) {
         /*continue_with_select: */
         /* todo: remove this print? */
-        _DEBUG("%s\n", "select()'ing on server socket for pkts");
+        _ERROR("%s\n", "select()'ing on server socket for pkts");
+        printf("connect()'ed to --lwkelkwe ");
+
+        print_sock_peer(serv_fd, &peer_addr);
 
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
