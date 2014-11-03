@@ -386,9 +386,9 @@ int remove_aked_pkts(int sock,struct window *window, struct xtcphdr *pkt) {
 
     /* dup ack */
     if(window->servlastackrecv == pkt->ack_seq) {
-        if(window->lastadvwinrecvd > 0) {
+        /*if(window->lastadvwinrecvd > 0) {
             return 1;
-        }
+        }*/
         _NOTE("got dup ack: %" PRIu32 "\n", pkt->ack_seq);
         window->dupacks++;
         _NOTE("new dupack: %" PRIu32 "\n", window->dupacks);
