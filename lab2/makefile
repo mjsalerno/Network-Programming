@@ -1,9 +1,10 @@
 CC=clang
 CC=gcc
-FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros
-LIBS = -lnsl -lresolv -lsocket -lm 
+OLDFLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros
+LIBS = -lnsl -lresolv -lsocket -lm
 LIBS = -lm -pthread
 
+FLAGS = -g -Wall -Werror -Wextra -DHANDIN
 all: client server
 
 create_file: FLAGS=-g -Wall -Werror -Wextra -DCREATE_FILE
@@ -11,6 +12,9 @@ create_file: all
 
 debug: FLAGS=-g -Wall -Werror -Wextra -DDEBUG
 debug: all
+
+color: FLAGS=-g -Wall -Werror -Wextra
+color: all
 
 %: %.c
 
