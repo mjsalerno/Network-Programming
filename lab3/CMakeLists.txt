@@ -1,0 +1,44 @@
+cmake_minimum_required(VERSION 2.8.4)
+project(lab3)
+
+set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros")
+
+set(ODR_SOURCE_FILES
+    ODR.c
+    ODR.h
+    debug.h)
+
+set(SERVER_SOURCE_FILES
+    server.c
+    server.h
+    debug.h)
+
+set(CLIENT_SOURCE_FILES
+   client.c
+   client.h
+   debug.h)
+
+set(HW_SOURCE_FILES
+    get_hw_addrs.c
+    get_hw_addrs.h
+    debug.h)
+
+set(PRHW_SOURCE_FILES
+    prhwaddrs.c
+    get_hw_addrs.h)
+
+add_library(hwlib OBJECT ${HW_SOURCE_FILES})
+
+add_executable(ODR
+    ${ODR_SOURCE_FILES}
+    $<TARGET_OBJECTS:hwlib>)
+
+add_executable(server
+	${SERVER_SOURCE_FILES})
+
+add_executable(client
+	${CLIENT_SOURCE_FILES})
+
+add_executable(prhwaddrs
+    ${PRHW_SOURCE_FILES}
+    $<TARGET_OBJECTS:hwlib>)
