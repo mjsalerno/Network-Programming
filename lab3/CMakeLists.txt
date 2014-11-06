@@ -23,10 +23,6 @@ set(HW_SOURCE_FILES
     get_hw_addrs.h
     debug.h)
 
-set(PRHW_SOURCE_FILES
-    prhwaddrs.c
-    get_hw_addrs.h)
-
 add_library(hwlib OBJECT ${HW_SOURCE_FILES})
 
 add_executable(ODR
@@ -38,7 +34,3 @@ add_executable(server
 
 add_executable(client
 	${CLIENT_SOURCE_FILES})
-
-add_executable(prhwaddrs
-    ${PRHW_SOURCE_FILES}
-    $<TARGET_OBJECTS:hwlib>)

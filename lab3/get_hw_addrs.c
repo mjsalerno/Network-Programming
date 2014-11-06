@@ -1,5 +1,17 @@
 #include "get_hw_addrs.h"
 
+/* internal helper */
+struct hwa_info *Get_hw_addrs() {
+    struct hwa_info	*hwa;
+
+    if ( (hwa = get_hw_addrs()) == NULL) {
+        fprintf(stderr, "ERROR: get_hw_addrs()\n");
+        exit(EXIT_FAILURE);
+    }
+    return hwa;
+}
+
+/* Uses ioctl(2) to get MAC and H/W info about all interfaces */
 struct hwa_info *get_hw_addrs(void) {
 	struct hwa_info	*hwa, *hwahead, **hwapnext;
 	int	sockfd, len, lastlen, nInterfaces, i;
@@ -86,21 +98,11 @@ struct hwa_info *get_hw_addrs(void) {
 }
 
 void free_hwa_info(struct hwa_info *hwahead) {
-	struct hwa_info	*hwa, *hwanext;
+	struct hwa_info	*hwa, *hwa_next;
 
-	for (hwa = hwahead; hwa != NULL; hwa = hwanext) {
+	for (hwa = hwahead; hwa != NULL; hwa = hwa_next) {
 		free(hwa->ip_addr);
-		hwanext = hwa->hwa_next;	/* can't fetch hwa_next after free() */
-		free(hwa);			/* the hwa_info{} itself */
+		hwa_next = hwa->hwa_next;	/* can't fetch hwa_next after free() */
+		free(hwa);			        /* the hwa_info{} itself */
 	}
-}
-
-struct hwa_info *Get_hw_addrs() {
-	struct hwa_info	*hwa;
-
-	if ( (hwa = get_hw_addrs()) == NULL) {
-		fprintf(stderr, "ERROR: get_hw_addrs()\n");
-        exit(EXIT_FAILURE);
-    }
-	return hwa;
 }
