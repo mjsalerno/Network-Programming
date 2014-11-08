@@ -1,3 +1,5 @@
+#include "common.h"
+
 /*
 msg_recv function which will do a (blocking) read on the application domain socket and return with :
 int    giving socket descriptor for read
@@ -7,8 +9,8 @@ char*  giving ‘canonical’ IP address for the source node of message, in pres
 int*   giving source ‘port’ number
 */
 
-ssize_t void msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port) {
-    return -1;
+ssize_t msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port) {
+    return recv(sock, msg, msg_len, 0);
 }
 
 /*
@@ -20,6 +22,6 @@ char*       giving message to be sent
 size_t      len of the msg
 int flag    if set, force a route rediscovery to the destination node even if a non-‘stale’ route already exists (see below)
  */
-ssize_t void msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int flag) {
-    return -1;
+ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int flag) {
+    return send(sock, msg, msg_len, 0);
 }
