@@ -61,8 +61,9 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
             do {
                 printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
             } while(--i > 0);
+            printf("\n");
         }
 
-        printf("\n         interface index = %d\n\n", hwa_curr->if_index);
+        printf("         interface index = %d\n\n", hwa_curr->if_index);
     }
 }

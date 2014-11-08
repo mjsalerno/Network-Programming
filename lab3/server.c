@@ -1,14 +1,17 @@
 #include <time.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #include "server.h"
 
 int main(void) {
     int sock;
     int port;
     time_t ticks;
+    struct hostent *vm;
     struct sockaddr_un name;
+    struct in_addr vm_ip;
     char buff[BUFF_SIZE];
     char ip[INET_ADDRSTRLEN];
-
 
     /* Create socket from which to read. */
     sock = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -27,20 +30,33 @@ int main(void) {
         perror("binding name to datagram socket");
         exit(1);
     }
-    printf("socket -->%s\n", NAME);
+    printf("socket --> %s\n", NAME);
 
+    for(EVER) {
 
-    /* Read from the socket */
-    if (read(sock, buff, 1024) < 0)
-        perror("receiving datagram packet");
-    printf("-->%s\n", buff);
+        msg_recv(sock, buff, BUFF_SIZE, ip, &port);
 
-    msg_recv(sock, buff, BUFF_SIZE, ip, &port);
+        inet_aton(ip, &vm_ip);
+        vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
+        if (vm == NULL) {
+            herror("server.gethostbyaddr()");
+            exit(EXIT_FAILURE);
+        }
+        printf("server at node: %s", *(vm->h_aliases));
 
-    ticks = time(NULL);
-    snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
+        inet_aton("127.0.0.1", &vm_ip);
+        vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
+        if (vm == NULL) {
+            herror("server.gethostbyaddr()");
+            exit(EXIT_FAILURE);
+        }
+        printf("  responding to request from: %s\n", *(vm->h_aliases));
 
-    msg_send(sock, ip, port, buff, 3, 0);
+        ticks = time(NULL);
+        snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
+
+        msg_send(sock, ip, port, buff, 3, 0);
+    }
 
     close(sock);
     unlink(NAME);
