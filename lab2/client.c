@@ -400,7 +400,7 @@ int clirecv(int sockfd, struct window* w) {
             free(pkt);
             exit(EXIT_FAILURE);
         }
-        if(FD_ISSET(sockfd, &rset)){
+        if(FD_ISSET(sockfd, &rset)) {
             /* recv the server's datagram */
             bytes = recv(sockfd, pkt, MAX_PKT_SIZE, 0);
             if(bytes < 0){

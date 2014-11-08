@@ -1,3 +1,4 @@
+#!/bin/sh
 # scp all files to minix
 
 # must give login name for minix
