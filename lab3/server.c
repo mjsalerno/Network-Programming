@@ -24,6 +24,7 @@ int main(void) {
     name.sun_family = AF_UNIX;
     strcpy(name.sun_path, NAME);
 
+    unlink(NAME);
 
     /* Bind the UNIX domain address to the created socket */
     if (bind(sock, (struct sockaddr *) &name, sizeof(struct sockaddr_un))) {
