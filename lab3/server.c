@@ -43,7 +43,7 @@ int main(void) {
             herror("server.gethostbyaddr()");
             exit(EXIT_FAILURE);
         }
-        printf("server at node: %s", *(vm->h_aliases));
+        printf("server at node: %s", vm->h_name);
 
         inet_aton("127.0.0.1", &vm_ip);
         vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
@@ -51,7 +51,7 @@ int main(void) {
             herror("server.gethostbyaddr()");
             exit(EXIT_FAILURE);
         }
-        printf("  responding to request from: %s\n", *(vm->h_aliases));
+        printf("  responding to request from: %s\n", vm->h_name);
 
         ticks = time(NULL);
         snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
