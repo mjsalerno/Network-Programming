@@ -4,7 +4,7 @@
 # must give login name for minix
 if test "$#" -ne 1; then
 	echo "usage: $0 minixlogin"
-	return
+        exit	
 fi
 
 # transfer the makefile and all .c/.h

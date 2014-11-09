@@ -13,6 +13,9 @@ int main(void) {
     char buff[BUFF_SIZE];
     char ip[INET_ADDRSTRLEN];
 
+    gethostname(buff, BUFF_SIZE);
+    printf("host: %s\n", buff);
+
     /* Create socket from which to read. */
     sock = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sock < 0) {
@@ -22,16 +25,16 @@ int main(void) {
 
     /* Create name. */
     name.sun_family = AF_UNIX;
-    strcpy(name.sun_path, NAME);
+    strcpy(name.sun_path, KNOWN_PATH);
 
-    unlink(NAME);
+    unlink(KNOWN_PATH);
 
     /* Bind the UNIX domain address to the created socket */
     if (bind(sock, (struct sockaddr *) &name, sizeof(struct sockaddr_un))) {
         perror("binding name to datagram socket");
         exit(1);
     }
-    printf("socket --> %s\n", NAME);
+    printf("socket --> %s\n", KNOWN_PATH);
 
     for(EVER) {
 
@@ -60,7 +63,7 @@ int main(void) {
     }
 
     close(sock);
-    unlink(NAME);
+    unlink(KNOWN_PATH);
 
     return 1;
 }

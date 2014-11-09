@@ -11,7 +11,6 @@
 
 #include "common.h"
 
-#define NAME "name"
 #define PORT 6758
 
 #endif /* SERVER_H */
