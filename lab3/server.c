@@ -6,9 +6,13 @@
 int main(void) {
     int sock;
     int port;
+    ssize_t err;
     time_t ticks;
     struct hostent *vm;
     struct sockaddr_un name;
+    struct sockaddr_in cli_addr;
+    socklen_t len;
+
     struct in_addr vm_ip;
     char buff[BUFF_SIZE];
     char ip[INET_ADDRSTRLEN];
@@ -24,6 +28,7 @@ int main(void) {
     }
 
     /* Create name. */
+    bzero(&name, sizeof(struct sockaddr_un));
     name.sun_family = AF_UNIX;
     strcpy(name.sun_path, KNOWN_PATH);
 
@@ -38,7 +43,10 @@ int main(void) {
 
     for(EVER) {
 
-        msg_recv(sock, buff, BUFF_SIZE, ip, &port);
+        err = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);
+        if(err < 0) {
+            printf("there was an error from recv");
+        }
 
         inet_aton(ip, &vm_ip);
         vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
@@ -59,7 +67,10 @@ int main(void) {
         ticks = time(NULL);
         snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
 
-        msg_send(sock, ip, port, buff, 3, 0);
+        err = sendto(sock, buff, BUFF_SIZE, 0, (struct sockaddr*) &cli_addr, len);
+        if(err < 0) {
+            printf("there was an error sending");
+        }
     }
 
     close(sock);
