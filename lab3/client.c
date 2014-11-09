@@ -1,5 +1,4 @@
 #include <netdb.h>
-#include <zzip/zzip.h>
 #include "client.h"
 
 int main(int argc, char *argv[]) {

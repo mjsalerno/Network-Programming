@@ -5,7 +5,7 @@
 
 int main(void) {
     int sock;
-    int port;
+    /*int port;*/
     ssize_t err;
     time_t ticks;
     struct hostent *vm;
@@ -64,13 +64,19 @@ int main(void) {
         }
         printf("  responding to request from: %s\n", vm->h_name);
 
+        printf("here\n");
+
         ticks = time(NULL);
         snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
 
+        printf("here\n");
+
         err = sendto(sock, buff, BUFF_SIZE, 0, (struct sockaddr*) &cli_addr, len);
         if(err < 0) {
-            printf("there was an error sending");
+            printf("there was an error sending\n");
+            exit(EXIT_FAILURE);
         }
+        printf("here\n");
     }
 
     close(sock);
