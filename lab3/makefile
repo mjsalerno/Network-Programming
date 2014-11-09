@@ -10,7 +10,7 @@ LIBS =
 FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros
 FLAGS = -g -Wall -Werror 
 
-all: ODR server
+all: ODR server client
 
 %: %.c
 
