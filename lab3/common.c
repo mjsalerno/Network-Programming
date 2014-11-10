@@ -1,10 +1,14 @@
-#include <lber.h>
-#include <ldap.h>
 #include "common.h"
 #include "ODR.h"
 #include "debug.h"
 
 void fill_mesg(struct Mesg *m, char* ip, int port, char* data, size_t data_len, int flag);
+
+static struct sockaddr_un odr_addr = (struct sockaddr_un) {
+        .sun_family = AF_LOCAL,
+        .sun_path = ODR_PATH
+};
+static socklen_t odr_len = sizeof(odr_addr);
 
 /*
 msg_recv function which will do a (blocking) read on the application domain socket and return with :
@@ -29,12 +33,8 @@ size_t      len of the msg
 int flag    if set, force a route rediscovery to the destination node even if a non-‘stale’ route already exists (see below)
  */
 ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int flag) {
-    struct sockaddr_un odr_addr;
-    socklen_t len;
     struct Mesg *m;
-    odr_addr.sun_family = AF_LOCAL;
-    strncpy(odr_addr.sun_path, ODR_PATH, sizeof(odr_addr.sun_path) - 1);
-    len = sizeof(odr_addr);
+    ssize_t rtn;
 
     m = malloc(MESG_OFFSET + msg_len);
     if(m == NULL) {
@@ -43,7 +43,10 @@ ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int fl
     }
     fill_mesg(m, ip, port, msg, msg_len, flag);
 
-    return sendto(sock, msg, msg_len, 0, (struct sockaddr*)&odr_addr, len);
+    rtn = sendto(sock, m, (MESG_OFFSET + msg_len), 0, (struct sockaddr*)&odr_addr, odr_len);
+
+    free(m);
+    return rtn;
 }
 
 void fill_mesg(struct Mesg *m, char* ip, int port, char* data, size_t data_len, int flag) {
