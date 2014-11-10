@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <linux/if_ether.h>
+#include <sys/socket.h>
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
 
 #include "common.h"
 #include "get_hw_addrs.h"
