@@ -1,7 +1,7 @@
 #include <sys/un.h>
 #include <unistd.h>
-#include <linux/if_arp.h>
 #include "ODR.h"
+#include "debug.h"
 
 int main(void) {
     int err;
@@ -9,6 +9,8 @@ int main(void) {
     int unixfd, rawsock;
     struct sockaddr_un local_addr, cli_addr;
     struct sockaddr_ll raw_addr;
+    unsigned char src_mac[6] = {0x00, 0x01, 0x02, 0xFA, 0x70, 0xAA};
+    unsigned char dst_mac[6] = {0x00, 0x04, 0x75, 0xC8, 0x28, 0xE5};
     /*struct svc_entry svcs[MAX_NUM_SVCS];*/
     /*socklen_t len;*/
 
@@ -26,6 +28,17 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
     print_hw_addrs(hwahead);
+
+    rawsock = socket(AF_PACKET, SOCK_RAW, htons(PROTO));
+    if(rawsock < 0) {
+        perror("ERROR: socket(RAW)");
+        exit(EXIT_FAILURE);
+    }
+
+    /* todo: sending packet for test, remove it */
+    _DEBUG("%s", "sending packet...\n");
+    craft_frame(rawsock, &raw_addr, buff, src_mac, dst_mac, "sup", 4);
+    /*fixme ^^*/
 
 
     unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
@@ -132,7 +145,7 @@ void print_hw_addrs(struct hwa_info *hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, char src_mac[ETH_ALEN], char dst_mac[ETH_ALEN], char* data, size_t data_len) {
+void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         fprintf(stderr, "ERROR: craft_frame(): data_len too big\n");
@@ -157,6 +170,8 @@ void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, char sr
         raw_addr->sll_halen = ETH_ALEN;
         /* copy in the dest mac */
         memcpy(raw_addr->sll_addr, dst_mac, ETH_ALEN);
+        raw_addr->sll_addr[6] = 0;
+        raw_addr->sll_addr[7] = 0;
     }
 
     et->h_proto = htons(PROTO);
@@ -164,6 +179,7 @@ void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, char sr
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
     /* copy in the data */
+    /* todo: also copy the ODR hdr */
     memcpy(buff + sizeof(struct ethhdr), data, data_len);
 
     return buff;

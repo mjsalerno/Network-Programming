@@ -36,5 +36,6 @@ struct tbl_entry {
 };
 
 void print_hw_addrs(struct hwa_info	*hwahead);
+void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
 
 #endif /* ODR_H */
