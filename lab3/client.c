@@ -5,7 +5,7 @@ int main(int argc, char *argv[]) {
     socklen_t len;
     struct sockaddr_un my_addr, name_addr, srv_addr;
     socklen_t socklen = 0;
-    char fname[] = "socket_client_XXXXXX";  /* template for mkstemp */
+    char fname[] = TIME_CLI_PATH;  /* template for mkstemp */
     char srvname[BUFF_SIZE] = {0};
     char hostname[BUFF_SIZE] = {0};
     char buf[BUFF_SIZE] = {0};
@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     /* todo: remove*/
     srv_addr.sun_family = AF_LOCAL;
     /* fixme: remove TIME_SRV_PATH */
-    strcpy(srv_addr.sun_path, TIME_SRV_PATH);
+    strncpy(srv_addr.sun_path, TIME_SRV_PATH, sizeof(my_addr.sun_path)-1);
 
     err = gethostname(hostname, sizeof(hostname));  /* get my hostname */
     if(err < 0) {
