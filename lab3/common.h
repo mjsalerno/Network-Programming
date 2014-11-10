@@ -16,6 +16,7 @@
 #define BUFF_SIZE 1024
 #define EVER ;;
 #define TIME_SRV_PATH "socket_timesrv"
+#define TIME_CLI_PATH "socket_timecli_XXXXXX"
 #define ODR_PATH "socket_odr"
 
 ssize_t msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port);

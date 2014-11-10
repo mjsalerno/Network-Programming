@@ -1,4 +1,10 @@
+#include <lber.h>
+#include <ldap.h>
 #include "common.h"
+#include "ODR.h"
+#include "debug.h"
+
+void fill_mesg(struct Mesg *m, char* ip, int port, char* data, size_t data_len, int flag);
 
 /*
 msg_recv function which will do a (blocking) read on the application domain socket and return with :
@@ -23,5 +29,28 @@ size_t      len of the msg
 int flag    if set, force a route rediscovery to the destination node even if a non-‘stale’ route already exists (see below)
  */
 ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int flag) {
-    return send(sock, msg, msg_len, 0);
+    struct sockaddr_un odr_addr;
+    socklen_t len;
+    struct Mesg *m;
+    odr_addr.sun_family = AF_LOCAL;
+    strncpy(odr_addr.sun_path, ODR_PATH, sizeof(odr_addr.sun_path) - 1);
+    len = sizeof(odr_addr);
+
+    m = malloc(MESG_OFFSET + msg_len);
+    if(m == NULL) {
+        _ERROR("%s", "malloc()\n");
+        exit(EXIT_FAILURE);
+    }
+    fill_mesg(m, ip, port, msg, msg_len, flag);
+
+    return sendto(sock, msg, msg_len, 0, (struct sockaddr*)&odr_addr, len);
+}
+
+void fill_mesg(struct Mesg *m, char* ip, int port, char* data, size_t data_len, int flag) {
+    _DEBUG("%s", "Filling Mesg.\n");
+    m->port = port;
+    m->flag = flag;
+    m->len = data_len;
+    strncpy(m->ip, ip, INET_ADDRSTRLEN);
+    memcpy(m + MESG_OFFSET, data, data_len);
 }

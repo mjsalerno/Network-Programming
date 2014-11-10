@@ -6,9 +6,13 @@
 int main(void) {
     int err;
     struct hwa_info *hwahead;
-    int sockfd;
+    int unixfd;
     struct sockaddr_un my_addr, cli_addr;
+    /*struct svc_entry svcs[MAX_NUM_SVCS];*/
     /*socklen_t len;*/
+
+    /* select(2) vars */
+    fd_set rset;
 
     memset(&my_addr, 0, sizeof(my_addr));
     memset(&cli_addr, 0, sizeof(cli_addr));
@@ -20,8 +24,8 @@ int main(void) {
     print_hw_addrs(hwahead);
 
 
-    sockfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
-    if(sockfd < 0) {
+    unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
+    if(unixfd < 0) {
         perror("ERROR: socket()");
         free_hwa_info(hwahead);
         exit(EXIT_FAILURE);
@@ -32,19 +36,33 @@ int main(void) {
     strncpy(my_addr.sun_path, ODR_PATH, sizeof(my_addr.sun_path)-1);
     unlink(ODR_PATH);
 
-    err = bind(sockfd, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
+    err = bind(unixfd, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
     if(err < 0) {
         perror("ERROR: bind()");
         goto cleanup;
     }
 
+    FD_ZERO(&rset);
 
-    close(sockfd);
+    for(EVER) {
+        FD_SET(unixfd, &rset);
+        err = select(unixfd + 1, &rset, NULL, NULL, NULL);
+        if(err < 0) {
+            perror("ERROR: select()");
+            goto cleanup;
+        } else if(FD_ISSET(unixfd, &rset)) {
+            /* todo: add to list */
+        }
+
+    }
+
+
+    close(unixfd);
     unlink(ODR_PATH);
     free_hwa_info(hwahead); /* FREE HW list*/
     exit(EXIT_SUCCESS);
 cleanup:
-    close(sockfd);
+    close(unixfd);
     unlink(ODR_PATH);
     free_hwa_info(hwahead);
     exit(EXIT_FAILURE);
