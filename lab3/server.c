@@ -1,4 +1,3 @@
-#include <ldap.h>
 #include "server.h"
 
 int main(void) {
