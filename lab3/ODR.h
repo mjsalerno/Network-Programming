@@ -9,6 +9,7 @@
 #include "get_hw_addrs.h"
 
 #define MAX_NUM_SVCS 100
+
 struct svc_entry {
     int port;                   /* 0 reserved for timeservers */
     char sun_path[108];

@@ -1,5 +1,3 @@
-#include <lber.h>
-#include <ldap.h>
 #include "common.h"
 #include "ODR.h"
 #include "debug.h"
