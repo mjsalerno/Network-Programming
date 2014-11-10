@@ -1,86 +1,84 @@
-#include <time.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+#include <ldap.h>
 #include "server.h"
 
 int main(void) {
     int sock;
     /*int port;*/
-    ssize_t err;
+    ssize_t err, n;
     time_t ticks;
     struct hostent *vm;
     struct sockaddr_un name;
-    struct sockaddr_in cli_addr;
+    struct sockaddr_un cli_addr;
     socklen_t len;
 
     struct in_addr vm_ip;
     char buff[BUFF_SIZE];
+    char hostname[BUFF_SIZE];
     char ip[INET_ADDRSTRLEN];
 
-    gethostname(buff, BUFF_SIZE);
-    printf("host: %s\n", buff);
+    err = gethostname(hostname, sizeof(hostname));
+    if(err < 0) {
+        perror("ERROR: gethostname()");
+        exit(EXIT_FAILURE);
+    }
+    printf("host: %s\n", hostname);
 
     /* Create socket from which to read. */
     sock = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (sock < 0) {
         perror("opening datagram socket");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     /* Create name. */
     bzero(&name, sizeof(struct sockaddr_un));
     name.sun_family = AF_UNIX;
-    strcpy(name.sun_path, KNOWN_PATH);
+    strcpy(name.sun_path, TIME_SRV_PATH);
 
-    unlink(KNOWN_PATH);
+    unlink(TIME_SRV_PATH);
 
     /* Bind the UNIX domain address to the created socket */
-    if (bind(sock, (struct sockaddr *) &name, sizeof(struct sockaddr_un))) {
+    err = bind(sock, (struct sockaddr *) &name, sizeof(struct sockaddr_un));
+    if(err < 0) {
         perror("binding name to datagram socket");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
-    printf("socket --> %s\n", KNOWN_PATH);
+    printf("socket --> %s\n", TIME_SRV_PATH);
 
     for(EVER) {
-
-        err = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);
-        if(err < 0) {
-            printf("there was an error from recv");
+        _DEBUG("%s", "waiting for clients...\n");
+        /* todo: msg_recv */
+        len = sizeof(cli_addr);
+        n = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);
+        if(n < 0) {
+            perror("ERROR: recvfrom()");
         }
-
+        buff[n] = '\0';
+        _DEBUG("client! len: %d, from path: %s, mesg: %s\n", len, cli_addr.sun_path, buff);
+        /* todo: remove 127.0.0.1 */
+        strcpy(ip, "127.0.0.1");
         inet_aton(ip, &vm_ip);
         vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
         if (vm == NULL) {
             herror("server.gethostbyaddr()");
             exit(EXIT_FAILURE);
         }
-        printf("server at node: %s", vm->h_name);
-
-        inet_aton("127.0.0.1", &vm_ip);
-        vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
-        if (vm == NULL) {
-            herror("server.gethostbyaddr()");
-            exit(EXIT_FAILURE);
-        }
-        printf("  responding to request from: %s\n", vm->h_name);
-
-        printf("here\n");
+        printf("server at node: %s responding to request from: %s\n", hostname, vm->h_name);
 
         ticks = time(NULL);
-        snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
+        n = snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
 
-        printf("here\n");
-
-        err = sendto(sock, buff, BUFF_SIZE, 0, (struct sockaddr*) &cli_addr, len);
+        /* todo: msg_send */
+        sleep(5);
+        err = sendto(sock, buff, (size_t)n, 0, (struct sockaddr*) &cli_addr, len);
         if(err < 0) {
-            printf("there was an error sending\n");
+            perror("ERROR: sendto()");
             exit(EXIT_FAILURE);
         }
-        printf("here\n");
     }
 
     close(sock);
-    unlink(KNOWN_PATH);
+    unlink(TIME_SRV_PATH);
 
-    return 1;
+    exit(EXIT_SUCCESS);
 }

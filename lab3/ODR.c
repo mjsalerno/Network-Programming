@@ -1,19 +1,53 @@
+#include <sys/un.h>
+#include <unistd.h>
 #include "ODR.h"
+#include "common.h"
 
 int main(void) {
+    int err;
     struct hwa_info *hwahead;
+    int sockfd;
+    struct sockaddr_un my_addr, cli_addr;
+    /*socklen_t len;*/
 
+    memset(&my_addr, 0, sizeof(my_addr));
+    memset(&cli_addr, 0, sizeof(cli_addr));
 
     if ((hwahead = get_hw_addrs()) == NULL) {       /* get MAC addrs of our interfaces */
         fprintf(stderr, "ERROR: get_hw_addrs()\n");
         exit(EXIT_FAILURE);
     }
-
     print_hw_addrs(hwahead);
 
 
+    sockfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
+    if(sockfd < 0) {
+        perror("ERROR: socket()");
+        free_hwa_info(hwahead);
+        exit(EXIT_FAILURE);
+    }
+
+
+    my_addr.sun_family = AF_LOCAL;
+    strncpy(my_addr.sun_path, ODR_PATH, sizeof(my_addr.sun_path)-1);
+    unlink(ODR_PATH);
+
+    err = bind(sockfd, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
+    if(err < 0) {
+        perror("ERROR: bind()");
+        goto cleanup;
+    }
+
+
+    close(sockfd);
+    unlink(ODR_PATH);
     free_hwa_info(hwahead); /* FREE HW list*/
     exit(EXIT_SUCCESS);
+cleanup:
+    close(sockfd);
+    unlink(ODR_PATH);
+    free_hwa_info(hwahead);
+    exit(EXIT_FAILURE);
 }
 
 /* print the info about all interfaces in the hwa_info linked list */

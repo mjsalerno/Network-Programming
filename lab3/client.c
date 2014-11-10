@@ -1,4 +1,3 @@
-#include <netdb.h>
 #include "client.h"
 
 int main(int argc, char *argv[]) {
@@ -14,17 +13,27 @@ int main(int argc, char *argv[]) {
     struct in_addr srv_in_addr;
     char *errc;
 
+    fd_set rset;            /* select(2) vars for a timeout */
+    struct timeval tv;      /* select(2) vars for a timeout */
+
     memset(&my_addr, 0, sizeof(my_addr));
     memset(&name_addr, 0, sizeof(name_addr));
     memset(&srv_addr, 0, sizeof(srv_addr));
     /* todo: remove*/
     srv_addr.sun_family = AF_LOCAL;
-    strcpy(srv_addr.sun_path, KNOWN_PATH);
+    /* fixme: remove TIME_SRV_PATH */
+    strcpy(srv_addr.sun_path, TIME_SRV_PATH);
+
+    err = gethostname(hostname, sizeof(hostname));  /* get my hostname */
+    if(err < 0) {
+        perror("ERROR: gethostname()");
+        exit(EXIT_FAILURE);
+    }
 
     sockfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
     if(sockfd < 0) {
         perror("ERROR: socket()");
-        goto cleanup;
+        exit(EXIT_FAILURE);
     }
 
     filefd = mkstemp(fname);
@@ -32,12 +41,13 @@ int main(int argc, char *argv[]) {
         perror("ERROR: mkstemp()");
         goto cleanup;
     }
-    unlink(fname);		            /* we just use mkstemp to get a filename, so close the file, dumb? */
+    /* we just use mkstemp to get a filename, so close the file, dumb right? */
+    unlink(fname);
 
     my_addr.sun_family = AF_LOCAL;
     strncpy(my_addr.sun_path, fname, sizeof(my_addr.sun_path)-1);
 
-    err = bind(sockfd, (struct sockaddr*) &my_addr, (socklen_t)SUN_LEN(&my_addr));
+    err = bind(sockfd, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
     if(err < 0) {
         perror("ERROR: bind()");
         goto cleanup;
@@ -49,58 +59,75 @@ int main(int argc, char *argv[]) {
         perror("ERROR: getsockname()");
         goto cleanup;
     }
-    printf("bound name = %s, returned len = %d\n", name_addr.sun_path, len);
+    printf("socket bound to name: %s, len: %d\n", name_addr.sun_path, len);
 
-    /* prompts the user to choose one of vm1, ..., vm10 as a server node. */
-    printf("Enter server host (vm1,..., vm10):\n> ");
-    errc = fgets(srvname, sizeof(srvname), stdin);
-    if(errc == NULL) {
-        fprintf(stderr, "ERROR: fgets() returned NULL\n");
-        goto cleanup;
-    }
-    errc = strchr(srvname, '\n');
-    if(errc != NULL) {
-        *errc = 0;              /* replace '\n' with NULL term.*/
-    }
-    /* don't check if's a "vmXX", just call gethostbyname() */
-    he = gethostbyname(srvname);
-    if(he == NULL) {
-        herror("ERROR: gethostbyname()");
-        goto cleanup;
-    }
-    /* take out the first addr from the h_addr_list */
-    srv_in_addr = **((struct in_addr**)(he->h_addr_list));
-    printf("The server host is %s at %s\n", srvname, inet_ntoa(srv_in_addr));
+    for(EVER) {
 
-    err = gethostname(hostname, sizeof(hostname));
-    if(err < 0) {
-        perror("ERROR: gethostname()");
-        goto cleanup;
+        /* prompts the user to choose one of vm1, ..., vm10 as a server node. */
+        printf("Enter server host (vm1, vm2, ..., vm10):\n> ");
+        errc = fgets(srvname, sizeof(srvname), stdin);
+        if (errc == NULL) {
+            fprintf(stderr, "ERROR: fgets() returned NULL\n");
+            goto cleanup;
+        }
+        errc = strchr(srvname, '\n');
+        if (errc != NULL) {
+            *errc = 0;              /* replace '\n' with NULL term.*/
+        }
+        /* don't check if's a "vmXX", just call gethostbyname() */
+        he = gethostbyname(srvname);
+        if (he == NULL) {
+            herror("ERROR: gethostbyname()");
+            goto cleanup;
+        }
+        /* take out the first addr from the h_addr_list */
+        srv_in_addr = **((struct in_addr **) (he->h_addr_list));
+        printf("The server host is %s at %s\n", srvname, inet_ntoa(srv_in_addr));
+
+        /* todo: msg_send */
+        /* todo: if this is the 1st timeout, then msg_send rediscovery flag */
+        /* fixme: srv_addr always TIME_SRV_PATH */
+        err = (int) sendto(sockfd, "H", 2, 0, (struct sockaddr *) &srv_addr, sizeof(srv_addr));
+        if (err < 0) {
+            perror("ERROR: sendto()");
+            goto cleanup;
+        }
+        printf("client at node %s: sending request to server at %s\n", hostname, srvname);
+
+        FD_ZERO(&rset);
+        FD_SET(sockfd, &rset);
+        tv.tv_sec = 2;
+        tv.tv_usec = 0;
+        _DEBUG("waiting for reply, timeout is %ld secs....\n", (long) tv.tv_sec);
+        err = select(sockfd + 1, &rset, NULL, NULL, &tv);
+        if (err < 0) {
+            perror("ERROR: select()");
+            goto cleanup;
+        } else if (err == 0) {
+            /* timeout! */
+            printf("client at node %s: TIMEOUT on response from %s\n", hostname, srvname);
+            /* todo: set a flag for first timeout */
+            continue;
+
+        } else if (FD_ISSET(sockfd, &rset)) {
+            /* todo: msg_recv */
+            socklen = sizeof(srv_addr);
+            err = (int) recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *) &srv_addr, &socklen);
+            if (err < 0) {
+                perror("ERROR: sendto()");
+                goto cleanup;
+            }
+            buf[err] = 0;
+            printf("RESPONSE: %s\n", buf);
+        }
     }
 
-    /* todo: msg_send */
-    err = (int) sendto(sockfd, "H", 2, 0, (struct sockaddr*)&srv_addr, sizeof(srv_addr));
-    if(err < 0) {
-        perror("ERROR: sendto()");
-        goto cleanup;
-    }
-    printf("client at node %s sending request to server at %s\n", hostname, srvname);
-
-    _DEBUG(stdout, "");
-    /* todo: msg_recv */
-    socklen = sizeof(srv_addr);
-    err = (int) recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&srv_addr, &socklen);
-    if(err < 0) {
-        perror("ERROR: sendto()");
-        goto cleanup;
-    }
-    buf[err] = 0;
-    printf("RESPONSE: %s\n", buf);
-
+    close(sockfd);
     unlink(fname);		/* OK if this fails */
     exit(EXIT_SUCCESS);
     /* cleanup goto */
 cleanup:
+    close(sockfd);
     unlink(fname);		/* OK if this fails */
     exit(EXIT_FAILURE);
 }

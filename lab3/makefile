@@ -7,9 +7,8 @@ CC = gcc
 # LIBS =  /home/courses/cse533/Stevens/unpv13e/libunp.a
 LIBS =
 
-FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros
-FLAGS = -g -Wall -Werror 
-FLAGS = 
+FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros -DDEBUG
+FLAGS = -g -Wall -Werror -DDEBUG
 
 all: ODR server client
 

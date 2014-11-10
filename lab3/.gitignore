@@ -3,3 +3,5 @@ prhwaddrs
 client
 server
 *.o
+socket_*
+

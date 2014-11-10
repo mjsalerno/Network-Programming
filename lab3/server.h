@@ -8,8 +8,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/un.h>
+#include <time.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 
 #include "common.h"
+#include "debug.h"
 
 #define PORT 6758
 
