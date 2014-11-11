@@ -103,7 +103,7 @@ int main(void) {
             svc_mesg = (struct Mesg*) buf_svc_mesg;
             if(0 == strcmp(svc_mesg->ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
-                _DEBUG("%s", "GOT svc msg with local dest IP: %s\n", svc_mesg->ip);
+                _DEBUG("GOT svc msg with local dest IP: %s\n", svc_mesg->ip);
             } else {
                 /* todo: the dest IP is non-local */
             }
