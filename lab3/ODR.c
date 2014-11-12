@@ -66,33 +66,7 @@ int main(void) {
         perror("ERROR: socket(RAW)");
         exit(EXIT_FAILURE);
     }
-
-    /* todo: sending packet for test, remove it */
-    _DEBUG("%s", "sending packet...\n");
-    craft_frame(rawsock, index, &raw_addr, buff, src_mac, dst_mac, "sup", 4);
-    printf("sendinf over index: %d\n", raw_addr.sll_ifindex);
-    printf("from mac: (%02X:%02X:%02X:%02X:%02X:%02X)\n",
-            src_mac[0], src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5]);
-    printf("to mac: (%02X:%02X:%02X:%02X:%02X:%02X)\n",
-            raw_addr.sll_addr[0], raw_addr.sll_addr[1], raw_addr.sll_addr[2], raw_addr.sll_addr[3],
-            raw_addr.sll_addr[4], raw_addr.sll_addr[5]);
-
-    n = sendto(rawsock, buff, ETH_FRAME_LEN, 0, (struct sockaddr const *) &raw_addr, sizeof(struct sockaddr_ll));
-    if(n < 1) {
-        perror("sendto(RAW)");
-        exit(EXIT_FAILURE);
-    }
-
-    memset(&raw_addr, 0, sizeof(struct sockaddr_ll));
-    len = sizeof(struct sockaddr_ll);
-
-    n = recvfrom(rawsock, buff2, ETH_FRAME_LEN, 0, (struct sockaddr*)&raw_addr, &len);
-    if(n < 1) {
-        perror("error");
-        exit(EXIT_FAILURE);
-    }
-    printf("done: %s\n", buff2 + sizeof(struct ethhdr));
-    /*fixme ^^*/
+    
     return 1;
 
 
