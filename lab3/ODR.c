@@ -2,7 +2,6 @@
 #include <unistd.h>
 #include <time.h>
 #include "ODR.h"
-#include "common.h"
 #include "debug.h"
 
 static char host_ip[INET_ADDRSTRLEN];
@@ -20,30 +19,12 @@ int main(void) {
     /*socklen_t len;*/
 
     /* raw socket vars*/
-    struct sockaddr_ll raw_addr;
-    //mine
-    //unsigned char src_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
-    //unsigned char dst_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
-    //index = 1
+    //struct sockaddr_ll raw_addr;
 
-    //vm1 eth2 index
-    unsigned char src_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
-    unsigned char dst_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
-    int index = 3;
-
-    //vm1 eth2
-    //unsigned char src_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
-    //unsigned char dst_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
-
-    //vm2 eth1
-    //unsigned char src_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
-    //unsigned char dst_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
-    //int index = 3;
     /* select(2) vars */
     fd_set rset;
 
     char* buff = malloc(ETH_FRAME_LEN);
-    char* buff2 = malloc(ETH_FRAME_LEN);
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
     memset(&my_addr, 0, sizeof(my_addr));
