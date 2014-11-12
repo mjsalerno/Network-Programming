@@ -1,5 +1,6 @@
 #include <sys/un.h>
 #include <unistd.h>
+#include <time.h>
 #include "ODR.h"
 #include "common.h"
 #include "debug.h"
@@ -13,10 +14,9 @@ int main(void) {
     int unixfd, rawsock;
     struct sockaddr_un my_addr, cli_addr;
     socklen_t len;
-    struct svc_entry svcs[MAX_NUM_SVCS];
-    int nxt_port = 1;  /* the next lowest port number to use */
-    char buf_svc_mesg[MAX_MESG_SIZE];  /* buffer to Mesgs from services */
-    struct Mesg *svc_mesg;  /* to cast buf_svc_mesg */
+    struct svc_entry svcs[SVC_MAX_NUM];
+    char buf_svc_mesg[API_MSG_MAX];  /* buffer to Mesgs from services */
+    struct api_msg svc_mesg;  /* to cast buf_svc_mesg */
     /*socklen_t len;*/
     
     /* raw socket vars*/
@@ -91,21 +91,22 @@ int main(void) {
             if(n < 0) {
                 perror("ERROR: recvfrom(unixfd)");
                 goto cleanup;
+            } else if(n < sizeof(struct api_msg)) {
+                _ERROR("recv'd api_msg was too short!! n: %d\n", (int)n);
+                goto cleanup;
             }
+            memcpy(&svc_mesg, buf_svc_mesg, sizeof(svc_mesg));/*align the struct*/
 
-            if(!svc_contains_path(svcs, &cli_addr)) {   /* if I don't know about them */
-                svc_add(svcs, &nxt_port, &cli_addr);    /* then I add them */
-            } else {
-                /*fixme: this else occurs on servers? */
-                _ERROR("%s", "A service was already in the path, maybe it's a server?\n");
-            }
+            /* recvd_app_mesg(n, &svc_mesg, &cli_addr); */
 
-            svc_mesg = (struct Mesg*) buf_svc_mesg;
-            if(0 == strcmp(svc_mesg->ip, host_ip)) {
+            /* svc_add() */
+
+
+            if(0 == strcmp(svc_mesg.dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
-                _DEBUG("GOT svc msg with local dest IP: %s\n", svc_mesg->ip);
+                _DEBUG("GOT svc msg with local dest IP: %s\n", svc_mesg.dst_ip);
             } else {
-                /* todo: the dest IP is non-local */
+                /* fixme: the dest IP is non-local */
             }
 
             /* todo: where i left off, look at port in svc_mesg or something */
@@ -124,6 +125,10 @@ cleanup:
     unlink(ODR_PATH);
     free_hwa_info(hwahead);
     exit(EXIT_FAILURE);
+}
+
+int recvd_app_mesg(size_t bytes, struct api_msg *m, struct sockaddr_un *from_addr) {
+    return -1;
 }
 
 /* print the info about all interfaces in the hwa_info linked list */
@@ -281,8 +286,9 @@ void svc_init(struct svc_entry *svcs, size_t len) {
 
     svcs[0].port = 0;
     strcpy(svcs[0].sun_path, TIME_SRV_PATH);
+    time(&svcs[0].ttl);                     /* ttl for server never checked  */
 
-    for(; n < MAX_NUM_SVCS; n++) {
+    for(; n < SVC_MAX_NUM; n++) {
         svcs[n].port = -1;
         svcs[n].port = '\0';
     }
@@ -290,35 +296,51 @@ void svc_init(struct svc_entry *svcs, size_t len) {
 }
 
 /**
-* Always adds to the next lowest port number (lowest index).
-* Then finds the next lowest index which is un-occupied.
-* RETURNS: stores next port into nxt_port
+* Adds the svc to the list, or updates the svc's TTL.
+* Also loop through the svc list deleteing stale svcs.
+* RETURNS: port number
+*              - could be a new port, if service just added
+*              - or prev port number if service was updated.
 */
-void svc_add(struct svc_entry *svcs, int *nxt_port, struct sockaddr_un *svc_addr) {
-    int n = *nxt_port;
-    strncpy(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path) - 1);
+int svc_add(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
+    int n = 1;
+    /* the min port to add the new entry into, if needed! */
+    int minport = SVC_MAX_NUM;
+    /* let's not recompute the current time over and over*/
+    time_t now = time(NULL);
+
+    if(svc_addr->sun_path[0] == '\0') {
+        _ERROR("%s", "svc_addr->sun_path is empty!\n");
+        exit(EXIT_FAILURE);
+    }
+
+
     svcs[n].port = n;
-
-    while(++n < MAX_NUM_SVCS) {
-        if(svcs[n].port == -1) {
-            *nxt_port = n;
-            return;
+    /* delete the services whose TTL has expired! Must loop through. */
+    while(++n < SVC_MAX_NUM) {
+        if( 0 == strncmp(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path)-1)){
+            /* this svc is already in the list! Update TTL */
+            svcs[n].ttl = now;
+            return svcs[n].port;
+        } else if(svcs[n].port != -1){
+            /* delete an entry if its old*/
+            if((now - svcs[n].ttl) > SVC_TTL) {
+                svcs[n].port = -1;
+            }
         }
+        /* wasn't occupied or was deleted */
+        if (minport > n)
+            minport = n;
+    }
+    if(minport == SVC_MAX_NUM) {
+        _ERROR("%s", "The svc array is full!\n");
+        exit(EXIT_FAILURE);
     }
 
-    _SPEC("%s", "The svc array is full!\n");
-}
-
-/**
-* Always adds to the next lowest port number (lowest index).
-* If rm_port was lower than the curr nxt_port, then update nxt_port.
-*/
-void svc_rm(struct svc_entry* array, int *nxt_port, int rm_port) {
-    array[rm_port].port = -1;
-    array[rm_port].sun_path[0] = '\0';
-    if(rm_port < *nxt_port) {
-        *nxt_port = rm_port;
-    }
+    svcs[minport].port = minport;
+    svcs[minport].ttl = now;
+    strncpy(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path)-1);
+    return minport;
 }
 
 /* 1 if contains a service at the port number, 0 otherwise */
@@ -331,7 +353,7 @@ int svc_contains_port(struct svc_entry *svcs, int port) {
 int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
     int n = 0;
     char *new_path = svc_addr->sun_path;
-    for(; n < MAX_NUM_SVCS; ++n) {
+    for(; n < SVC_MAX_NUM; ++n) {
         if(0 == strncmp(new_path, svcs[n].sun_path, sizeof(svc_addr->sun_path))) {
             return 1;
         }
