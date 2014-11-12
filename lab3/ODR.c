@@ -15,8 +15,8 @@ int main(void) {
     struct sockaddr_un my_addr, cli_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
-    char buf_svc_mesg[API_MSG_MAX];  /* buffer to Mesgs from services */
-    struct api_msg svc_mesg;  /* to cast buf_svc_mesg */
+    char buf_svc_mesg[ODR_MSG_MAX];         /* buffer to Mesgs from services */
+    struct odr_msg svc_mesg;                /* to cast buf_svc_mesg */
     /*socklen_t len;*/
 
     /* raw socket vars*/
@@ -66,8 +66,6 @@ int main(void) {
         perror("ERROR: socket(RAW)");
         exit(EXIT_FAILURE);
     }
-    
-    return 1;
 
 
     unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
@@ -104,7 +102,7 @@ int main(void) {
             if(n < 0) {
                 perror("ERROR: recvfrom(unixfd)");
                 goto cleanup;
-            } else if(n < sizeof(struct api_msg)) {
+            } else if(n < sizeof(struct odr_msg)) {
                 _ERROR("recv'd api_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
@@ -140,7 +138,7 @@ cleanup:
     exit(EXIT_FAILURE);
 }
 
-int recvd_app_mesg(size_t bytes, struct api_msg *m, struct sockaddr_un *from_addr) {
+int recvd_app_mesg(size_t bytes, struct odr_msg *m, struct sockaddr_un *from_addr) {
     return -1;
 }
 

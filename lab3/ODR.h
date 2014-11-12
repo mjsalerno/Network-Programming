@@ -17,14 +17,6 @@ struct svc_entry {
     time_t ttl;                 /* time_to_live timestamp */
 };
 
-#define API_MSG_OFFSET (sizeof(struct api_msg))
-/* fixme: rough estimate of the max message length */
-#define API_MSG_MAX (API_MSG_OFFSET + 1500)
-struct api_msg {
-    int dst_port;
-    char dst_ip[INET_ADDRSTRLEN];
-    int reroute;
-};
 
 #define ODR_MSG_MAX 1522
 /* type: 0 for RREQ, 1 for RREP, and 2 for app payload */
@@ -58,8 +50,8 @@ int svc_contains_port(struct svc_entry *svcs, int port);
 int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
 
 /* funcs for using the sockets */
-int recvd_app_mesg(size_t bytes, struct api_msg *m, struct sockaddr_un *from_addr);
-int deliver_app_mesg(int unixfd, struct api_msg *m, size_t bytes);
+int recvd_app_mesg(size_t bytes, struct odr_msg *m, struct sockaddr_un *from_addr);
+int deliver_app_mesg(int unixfd, struct odr_msg *m, size_t bytes);
 
 /* funcs for raw pkt stuffs */
 void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);

@@ -23,9 +23,9 @@ ssize_t msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port) {
     /* todo: use recvfrom(), check if src was ODR_PATH */
 
     ssize_t n;
-    char buf_msg[API_MSG_MAX];        /* space to recv from ODR */
+    char buf_msg[ODR_MSG_MAX];        /* space to recv from ODR */
     struct odr_msg m;                      /* space to place stuff from buf_msg */
-    n = recv(sock, buf_msg, API_MSG_MAX, 0);
+    n = recv(sock, buf_msg, ODR_MSG_MAX, 0);
     if(n < 0) {
         return n;
     } else if(n < sizeof(struct odr_msg)) {
@@ -67,7 +67,7 @@ ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int fl
     }
     fill_mesg(m, ip, port, msg, msg_len, flag);
 
-    rtn = sendto(sock, m, (API_MSG_OFFSET + msg_len), 0, (struct sockaddr*)&odr_addr, odr_len);
+    rtn = sendto(sock, m, (sizeof(struct odr_msg) + msg_len), 0, (struct sockaddr*)&odr_addr, odr_len);
 
     free(m);
     return rtn;
@@ -81,5 +81,5 @@ void fill_mesg(struct odr_msg *m, char* ip, int port, char* data, size_t data_le
     m->reroute = flag;
     m->len = (int)data_len;
     strncpy(m->dst_ip, ip, INET_ADDRSTRLEN);
-    memcpy(m + API_MSG_OFFSET, data, data_len);
+    memcpy(m + sizeof(struct odr_msg), data, data_len);
 }
