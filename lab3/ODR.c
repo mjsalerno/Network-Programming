@@ -18,16 +18,32 @@ int main(void) {
     char buf_svc_mesg[API_MSG_MAX];  /* buffer to Mesgs from services */
     struct api_msg svc_mesg;  /* to cast buf_svc_mesg */
     /*socklen_t len;*/
-    
+
     /* raw socket vars*/
     struct sockaddr_ll raw_addr;
-    unsigned char src_mac[6] = {0x00, 0x01, 0x02, 0xFA, 0x70, 0xAA};
-    unsigned char dst_mac[6] = {0x00, 0x04, 0x75, 0xC8, 0x28, 0xE5};
+    //mine
+    //unsigned char src_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
+    //unsigned char dst_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
+    //index = 1
 
+    //vm1 eth2 index
+    unsigned char src_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
+    unsigned char dst_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
+    int index = 3;
+
+    //vm1 eth2
+    //unsigned char src_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
+    //unsigned char dst_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
+
+    //vm2 eth1
+    //unsigned char src_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
+    //unsigned char dst_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
+    //int index = 3;
     /* select(2) vars */
     fd_set rset;
 
     char* buff = malloc(ETH_FRAME_LEN);
+    char* buff2 = malloc(ETH_FRAME_LEN);
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
     memset(&my_addr, 0, sizeof(my_addr));
@@ -50,11 +66,8 @@ int main(void) {
         perror("ERROR: socket(RAW)");
         exit(EXIT_FAILURE);
     }
-
-    /* todo: sending packet for test, remove it */
-    _DEBUG("%s", "sending packet...\n");
-    craft_frame(rawsock, &raw_addr, buff, src_mac, dst_mac, "sup", 4);
-    /*fixme ^^*/
+    
+    return 1;
 
 
     unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
@@ -76,7 +89,7 @@ int main(void) {
     }
 
     svc_init(svcs, sizeof(svcs));   /* init the service array */
-    
+
     FD_ZERO(&rset);
     for(EVER) {
         FD_SET(unixfd, &rset);
@@ -192,7 +205,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
+void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         fprintf(stderr, "ERROR: craft_frame(): data_len too big\n");
@@ -201,13 +214,14 @@ void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigne
 
     if(raw_addr != NULL) {
         /*prepare sockaddr_ll*/
+        memset(raw_addr, 0, sizeof(struct sockaddr_ll));
 
         /*RAW communication*/
         raw_addr->sll_family = PF_PACKET;
         raw_addr->sll_protocol = htons(PROTO);
 
         /*todo: index of the network device*/
-        raw_addr->sll_ifindex = 2;
+        raw_addr->sll_ifindex = index;
 
         /*ARP hardware identifier is ethernet*/
         raw_addr->sll_hatype = 0;
@@ -360,4 +374,3 @@ int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
     }
     return 0;
 }
-

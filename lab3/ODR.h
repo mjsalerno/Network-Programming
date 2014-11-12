@@ -62,6 +62,6 @@ int recvd_app_mesg(size_t bytes, struct api_msg *m, struct sockaddr_un *from_add
 int deliver_app_mesg(int unixfd, struct api_msg *m, size_t bytes);
 
 /* funcs for raw pkt stuffs */
-void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
+void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
 
 #endif /* ODR_H */
