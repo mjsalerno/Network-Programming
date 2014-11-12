@@ -14,7 +14,8 @@ FILES=$(ls *.c *.h makefile)
 # remove the newlines
 PRJFILES=$(echo $FILES | tr '\n' ' ')
 
-echo "Trying to transfer:\n"$PRJFILES
+echo "Trying to transfer:"
+echo $PRJFILES
 # must have minix in ~/.ssh/config
 # 130.245.156.19
 scp $PRJFILES cse533-$1@minix:/users/cse533/students/cse533-$1/cse533
