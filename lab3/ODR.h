@@ -48,6 +48,6 @@ int svc_contains_port(struct svc_entry *svcs, int port);
 int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
 
 /* funcs for raw pkt stuffs */
-void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
+void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
 
 #endif /* ODR_H */

@@ -18,16 +18,32 @@ int main(void) {
     char buf_svc_mesg[MAX_MESG_SIZE];  /* buffer to Mesgs from services */
     struct Mesg *svc_mesg;  /* to cast buf_svc_mesg */
     /*socklen_t len;*/
-    
+
     /* raw socket vars*/
     struct sockaddr_ll raw_addr;
-    unsigned char src_mac[6] = {0x00, 0x01, 0x02, 0xFA, 0x70, 0xAA};
-    unsigned char dst_mac[6] = {0x00, 0x04, 0x75, 0xC8, 0x28, 0xE5};
+    //mine
+    //unsigned char src_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
+    //unsigned char dst_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
+    //index = 1
 
+    //vm1 eth2 index
+    unsigned char src_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
+    unsigned char dst_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
+    int index = 3;
+
+    //vm1 eth2
+    //unsigned char src_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
+    //unsigned char dst_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
+
+    //vm2 eth1
+    //unsigned char src_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
+    //unsigned char dst_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
+    //int index = 3;
     /* select(2) vars */
     fd_set rset;
 
     char* buff = malloc(ETH_FRAME_LEN);
+    char* buff2 = malloc(ETH_FRAME_LEN);
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
     memset(&my_addr, 0, sizeof(my_addr));
@@ -53,8 +69,31 @@ int main(void) {
 
     /* todo: sending packet for test, remove it */
     _DEBUG("%s", "sending packet...\n");
-    craft_frame(rawsock, &raw_addr, buff, src_mac, dst_mac, "sup", 4);
+    craft_frame(rawsock, index, &raw_addr, buff, src_mac, dst_mac, "sup", 4);
+    printf("sendinf over index: %d\n", raw_addr.sll_ifindex);
+    printf("from mac: (%02X:%02X:%02X:%02X:%02X:%02X)\n",
+            src_mac[0], src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5]);
+    printf("to mac: (%02X:%02X:%02X:%02X:%02X:%02X)\n",
+            raw_addr.sll_addr[0], raw_addr.sll_addr[1], raw_addr.sll_addr[2], raw_addr.sll_addr[3],
+            raw_addr.sll_addr[4], raw_addr.sll_addr[5]);
+
+    n = sendto(rawsock, buff, ETH_FRAME_LEN, 0, (struct sockaddr const *) &raw_addr, sizeof(struct sockaddr_ll));
+    if(n < 1) {
+        perror("sendto(RAW)");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&raw_addr, 0, sizeof(struct sockaddr_ll));
+    len = sizeof(struct sockaddr_ll);
+
+    n = recvfrom(rawsock, buff2, ETH_FRAME_LEN, 0, (struct sockaddr*)&raw_addr, &len);
+    if(n < 1) {
+        perror("error");
+        exit(EXIT_FAILURE);
+    }
+    printf("done: %s\n", buff2 + sizeof(struct ethhdr));
     /*fixme ^^*/
+    return 1;
 
 
     unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
@@ -76,7 +115,7 @@ int main(void) {
     }
 
     svc_init(svcs, sizeof(svcs));   /* init the service array */
-    
+
     FD_ZERO(&rset);
     for(EVER) {
         FD_SET(unixfd, &rset);
@@ -187,7 +226,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
+void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         fprintf(stderr, "ERROR: craft_frame(): data_len too big\n");
@@ -196,13 +235,14 @@ void* craft_frame(int rawsock, struct sockaddr_ll* raw_addr, void* buff, unsigne
 
     if(raw_addr != NULL) {
         /*prepare sockaddr_ll*/
+        memset(raw_addr, 0, sizeof(struct sockaddr_ll));
 
         /*RAW communication*/
         raw_addr->sll_family = PF_PACKET;
         raw_addr->sll_protocol = htons(PROTO);
 
         /*todo: index of the network device*/
-        raw_addr->sll_ifindex = 2;
+        raw_addr->sll_ifindex = index;
 
         /*ARP hardware identifier is ethernet*/
         raw_addr->sll_hatype = 0;
@@ -338,4 +378,3 @@ int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
     }
     return 0;
 }
-
