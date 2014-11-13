@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
         goto cleanup;
     }
     /* we just use mkstemp to get a filename, so close the file, dumb right? */
+    close(filefd);
     unlink(fname);
 
     my_addr.sun_family = AF_LOCAL;
@@ -79,16 +80,17 @@ int main(int argc, char *argv[]) {
         he = gethostbyname(srvname);
         if (he == NULL) {
             herror("ERROR: gethostbyname()");
-            goto cleanup;
+            if(h_errno == NO_RECOVERY)
+                goto cleanup;
+            else
+                continue;
         }
         /* take out the first addr from the h_addr_list */
         srv_in_addr = **((struct in_addr **) (he->h_addr_list));
         printf("The server host is %s at %s\n", srvname, inet_ntoa(srv_in_addr));
 
-        /* todo: msg_send */
         /* todo: if this is the 1st timeout, then msg_send rediscovery flag */
-        /* fixme: srv_addr always TIME_SRV_PATH */
-        err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 2, 0);
+        err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 1, 0);
         /*err = (int) sendto(sockfd, "H", 2, 0, (struct sockaddr *) &srv_addr, sizeof(srv_addr));*/
         if (err < 0) {
             perror("ERROR: sendto()");

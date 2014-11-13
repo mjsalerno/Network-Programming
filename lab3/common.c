@@ -44,6 +44,7 @@ ssize_t msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port) {
     if(msg_len < m.len) {
         _ERROR("mesg was truncated, user's msg_len: %ld  <  m.len: %ld", (long int)msg_len, (long int)m.len);
     }
+    _DEBUG("GOT: from %s:%d\n", m.src_ip, m.src_port);
     return m.len;
 }
 
@@ -65,8 +66,10 @@ ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int fl
         _ERROR("%s", "malloc()\n");
         exit(EXIT_FAILURE);
     }
+    memset(m, 0, sizeof(struct odr_msg) + msg_len);
     fill_mesg(m, ip, port, msg, msg_len, flag);
     m->type = 2;
+    _DEBUG("SEND: to %s:%d, reroute = %d\n", m->dst_ip, m->dst_port, m->reroute);
     rtn = sendto(sock, m, (sizeof(struct odr_msg) + msg_len), 0, (struct sockaddr*)&odr_addr, odr_len);
     free(m);
     return rtn;
@@ -81,5 +84,5 @@ void fill_mesg(struct odr_msg *m, char* ip, int port, char* msg, size_t msg_len,
     m->reroute = flag;
     m->len = (int)msg_len;
     strncpy(m->dst_ip, ip, INET_ADDRSTRLEN);
-    memcpy(m + sizeof(struct odr_msg), msg, msg_len);
+    memcpy((char*)m + sizeof(struct odr_msg), msg, msg_len);
 }

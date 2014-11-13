@@ -97,8 +97,8 @@ int main(void) {
                 goto cleanup;
             }
             local_msg = (struct odr_msg*)buf_local_msg;
-            _DEBUG("GOT msg from socket: %s, with dst port: %d, dst IP: %s\n",
-                    local_addr.sun_path, local_msg->dst_port, local_msg->dst_ip);
+            _DEBUG("GOT msg from socket: %s, with dest: %s:%d\n",
+                    local_addr.sun_path, local_msg->dst_ip, local_msg->dst_port);
 
             if(0 == strcmp(local_msg->dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
@@ -305,6 +305,7 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
             if(tofree == *hwahead) { /* if we're removing the head then advance the head */
                 *hwahead = curr;
             }
+            free(tofree->ip_addr);
             free(tofree);
         } else if(0 == strcmp(curr->if_name, "lo")) {
             _DEBUG("Removing interface %s from the interface list.\n", curr->if_name);
@@ -315,6 +316,7 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
             if(tofree == *hwahead) { /* if we're removing the head then advance the head */
                 *hwahead = curr;
             }
+            free(tofree->ip_addr);
             free(tofree);
         } else {
             _DEBUG("Leaving interface %s in the interface list.\n", curr->if_name);
@@ -368,6 +370,8 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
         }
         if(svcs[n].ttl <= now && svcs[n].port != TIME_PORT) {   /* entry stale so delete */
             /* entry was stale, deleting */
+            _DEBUG("DELETE stale service, svcs[%d]: port=%d, path=%s\n", n, svcs[n].port, svcs[n].sun_path);
+            printf("service was %ld seconds old, TTL limit: %d\n", (long int)(now - svcs[n].ttl + SVC_TTL), SVC_TTL);
             svcs[n].port = -1;
             updated_port = MIN(n, updated_port);
             continue;
@@ -375,8 +379,9 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
         /* this entry wasn't stale */
         if(0 == strncmp(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path))) {
             /* this is the service we're looking for */
+            _DEBUG("FOUND service, svcs[%d]: port=%d, path=%s\n", n, svcs[n].port, svcs[n].sun_path);
             already_in_svcs = 1;
-            updated_port = n;
+            updated_port = svcs[n].port;
             svcs[n].ttl = now + SVC_TTL;
         }
     }
@@ -388,9 +393,10 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
         return updated_port;
     }
     svcs[updated_port].port = updated_port;
-    svcs[updated_port].ttl = now;
+    svcs[updated_port].ttl = now + SVC_TTL;
     strncpy(svcs[updated_port].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path));
     svcs[updated_port].sun_path[sizeof(svc_addr->sun_path)-1] = '\0';
+    _DEBUG("ADD new service, svcs[%d]: port=%d, path=%s\n", updated_port, svcs[updated_port].port, svcs[updated_port].sun_path);
     return updated_port;
 }
 

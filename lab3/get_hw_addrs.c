@@ -94,6 +94,7 @@ struct hwa_info *get_hw_addrs(void) {
 		memcpy(&hwa->if_index, &ifrcopy.ifr_ifindex, sizeof(int));
 	}
 	free(buf);
+    close(sockfd);
 	return hwahead;	/* pointer to first structure in linked list */
 }
 
