@@ -84,5 +84,6 @@ void fill_mesg(struct odr_msg *m, char* ip, int port, char* msg, size_t msg_len,
     m->reroute = flag;
     m->len = (int)msg_len;
     strncpy(m->dst_ip, ip, INET_ADDRSTRLEN);
-    memcpy((char*)m + sizeof(struct odr_msg), msg, msg_len);
+    /* copy to the end of m so (m+1) */
+    memcpy(m + 1, msg, msg_len);
 }
