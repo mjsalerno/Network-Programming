@@ -11,12 +11,12 @@ static struct sockaddr_un odr_addr = (struct sockaddr_un) {
 static socklen_t odr_len = sizeof(odr_addr);
 
 /*
-msg_recv function which will do a (blocking) read on the application domain socket and return with :
-int    giving socket descriptor for read
-char*  giving message received
-size_t len of the msg
-char*  giving ‘canonical’ IP address for the source node of message, in presentation format
-int*   giving source ‘port’ number
+msg_recv    function which will do a (blocking) read on the application domain socket and return with :
+int         giving socket descriptor for read
+char*       giving message received
+size_t      len of the msg
+char*       giving ‘canonical’ IP address for the source node of message, in presentation format
+int*        giving source ‘port’ number
 */
 
 ssize_t msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port) {
@@ -48,7 +48,7 @@ ssize_t msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port) {
 }
 
 /*
-msg_send function that will be called by clients/servers to send requests/replies. The parameters of the function consist of :
+msg_send    function that will be called by clients/servers to send requests/replies. The parameters of the function consist of :
 int         giving the socket descriptor for write
 char*       giving the ‘canonical’ IP address for the destination node, in presentation format
 int         giving the destination ‘port’ number
