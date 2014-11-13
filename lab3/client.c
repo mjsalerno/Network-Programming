@@ -9,6 +9,7 @@ int main(int argc, char *argv[]) {
     char hostname[BUFF_SIZE] = {0};
     char buf[BUFF_SIZE] = {0};
     char ip_buf[INET_ADDRSTRLEN] = {0};
+    int port;
     struct hostent *he;
     struct in_addr srv_in_addr;
     char *errc;
@@ -112,7 +113,7 @@ int main(int argc, char *argv[]) {
 
         } else if (FD_ISSET(sockfd, &rset)) {
             /* todo: msg_recv */
-            err = (int) msg_recv(sockfd, buf, sizeof(buf), ip_buf, TIME_PORT);
+            err = (int) msg_recv(sockfd, buf, sizeof(buf), ip_buf, &port);
             /*err = (int) recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *) &srv_addr, &socklen);*/
             if (err < 0) {
                 perror("ERROR: sendto()");

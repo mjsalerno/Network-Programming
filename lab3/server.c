@@ -5,6 +5,7 @@ int main(void) {
     /*int port;*/
     ssize_t err, n;
     time_t ticks;
+    int port;
     struct hostent *vm;
     struct sockaddr_un name;
     /*struct sockaddr_un cli_addr;*/
@@ -49,7 +50,7 @@ int main(void) {
         /* todo: msg_recv */
         /*len = sizeof(cli_addr);*/
         /*todo: fix ip*/
-        n = msg_recv(sock, buff, BUFF_SIZE, ip_buff, TIME_PORT);
+        n = msg_recv(sock, buff, BUFF_SIZE, ip_buff, &port);
         /*n = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);*/ /*old code*/
         if(n < 0) {
             perror("ERROR: recvfrom()");
