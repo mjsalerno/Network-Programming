@@ -2,7 +2,7 @@
 #include "ODR.h"
 #include "debug.h"
 
-void fill_mesg(struct odr_msg *m, char* ip, int port, char* data, size_t data_len, int flag);
+void fill_mesg(struct odr_msg *m, char* ip, int port, char* msg, size_t msg_len, int flag);
 
 static struct sockaddr_un odr_addr = (struct sockaddr_un) {
         .sun_family = AF_LOCAL,
@@ -66,20 +66,20 @@ ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int fl
         exit(EXIT_FAILURE);
     }
     fill_mesg(m, ip, port, msg, msg_len, flag);
-
+    m->type = 2;
     rtn = sendto(sock, m, (sizeof(struct odr_msg) + msg_len), 0, (struct sockaddr*)&odr_addr, odr_len);
-
     free(m);
     return rtn;
 }
 
-void fill_mesg(struct odr_msg *m, char* ip, int port, char* data, size_t data_len, int flag) {
-    _DEBUG("%s", "Filling api_msg.\n");
+/* used by only msg_send() for now */
+void fill_mesg(struct odr_msg *m, char* ip, int port, char* msg, size_t msg_len, int flag) {
+    _DEBUG("%s", "Filling odr_msg.\n");
 
     /* note: dst ip and port for msg_send() */
     m->dst_port = port;
     m->reroute = flag;
-    m->len = (int)data_len;
+    m->len = (int)msg_len;
     strncpy(m->dst_ip, ip, INET_ADDRSTRLEN);
-    memcpy(m + sizeof(struct odr_msg), data, data_len);
+    memcpy(m + sizeof(struct odr_msg), msg, msg_len);
 }

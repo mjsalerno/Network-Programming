@@ -2,19 +2,17 @@
 
 int main(void) {
     int sock;
-    /*int port;*/
     ssize_t err, n;
     time_t ticks;
-    int port;
+    int cliport;
     struct hostent *vm;
     struct sockaddr_un name;
     /*struct sockaddr_un cli_addr;*/
 
     struct in_addr vm_ip;
     char buff[BUFF_SIZE];
-    char ip_buff[INET_ADDRSTRLEN];
+    char cli_ip_buff[INET_ADDRSTRLEN];
     char hostname[BUFF_SIZE];
-    char ip[INET_ADDRSTRLEN];
 
     err = gethostname(hostname, sizeof(hostname));
     if(err < 0) {
@@ -50,16 +48,14 @@ int main(void) {
         /* todo: msg_recv */
         /*len = sizeof(cli_addr);*/
         /*todo: fix ip*/
-        n = msg_recv(sock, buff, BUFF_SIZE, ip_buff, &port);
+        n = msg_recv(sock, buff, BUFF_SIZE, cli_ip_buff, &cliport);
         /*n = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);*/ /*old code*/
         if(n < 0) {
             perror("ERROR: recvfrom()");
         }
         buff[n] = '\0';
         _DEBUG("client! len: %d, mesg: %s\n", (int)n, buff);
-        /* todo: remove 127.0.0.1 */
-        strcpy(ip, "127.0.0.1");
-        inet_aton(ip, &vm_ip);
+        inet_aton(cli_ip_buff, &vm_ip);
         vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
         if (vm == NULL) {
             herror("server.gethostbyaddr()");
@@ -71,7 +67,7 @@ int main(void) {
         n = snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
 
         /* todo: msg_send */
-        err = msg_send(sock, ip_buff, TIME_PORT, buff, n, 0);
+        err = msg_send(sock, cli_ip_buff, cliport, buff, (size_t)n, 0);
         /*err = sendto(sock, buff, (size_t)n, 0, (struct sockaddr*) &cli_addr, len); old code*/
         if(err < 0) {
             perror("ERROR: sendto()");

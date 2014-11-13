@@ -1,6 +1,3 @@
-#include <sys/un.h>
-#include <unistd.h>
-#include <time.h>
 #include "ODR.h"
 #include "debug.h"
 
@@ -16,17 +13,22 @@ int main(void) {
     struct sockaddr_un my_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
-    char buf_local_msg[ODR_MSG_MAX] = {0};   /* buffer to Mesgs from services */
-    struct odr_msg local_msg;                /* to cast buf_local_msg */
+    char *buf_local_msg;                    /* buffer for local messages */
+    struct odr_msg *local_msg;               /* to cast buf_local_msg */
     /*socklen_t len;*/
 
     /* raw socket vars*/
-    //struct sockaddr_ll raw_addr;
+    /* struct sockaddr_ll raw_addr; */
 
     /* select(2) vars */
     fd_set rset;
 
     char* buff = malloc(ETH_FRAME_LEN);
+    buf_local_msg = malloc(ODR_MSG_MAX);
+    if(buf_local_msg == NULL) {
+        _ERROR("%s", "malloc() returned NULL\n");
+        exit(EXIT_FAILURE);
+    }
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
     memset(&my_addr, 0, sizeof(my_addr));
@@ -50,6 +52,11 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
+    if(setuid(1000) < 0) {
+        _ERROR("setuid(%d): %m\n", 1000);
+        exit(EXIT_FAILURE);
+    }
+
 
     unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
     if (unixfd < 0) {
@@ -69,7 +76,7 @@ int main(void) {
         goto cleanup;
     }
 
-    svc_init(svcs, SVC_MAX_NUM);   /* init the service array */
+    svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
 
     FD_ZERO(&rset);
     for(EVER) {
@@ -81,7 +88,7 @@ int main(void) {
             goto cleanup;
         } else if(FD_ISSET(unixfd, &rset)) {
             len = sizeof(local_addr);
-            n = recvfrom(unixfd, buf_local_msg, sizeof(buf_local_msg), 0, (struct sockaddr*)&local_addr, &len);
+            n = recvfrom(unixfd, buf_local_msg, SVC_MAX_NUM, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(unixfd)");
                 goto cleanup;
@@ -89,30 +96,35 @@ int main(void) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
-            _DEBUG("GOT a message from: %s\n", local_addr.sun_path);
-            /* memcpy to align the struct */
-            memcpy(&local_msg, buf_local_msg, sizeof(local_msg));
-            /* note, the data is still in buf_local_msg */
-            if(0 == strcmp(local_msg.dst_ip, host_ip)) {
+            local_msg = (struct odr_msg*)buf_local_msg;
+            _DEBUG("GOT msg from socket: %s, with dst port: %d, dst IP: %s\n",
+                    local_addr.sun_path, local_msg->dst_port, local_msg->dst_ip);
+
+            if(0 == strcmp(local_msg->dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
-                _DEBUG("svc msg has local dest IP: %s\n", local_msg.dst_ip);
-                err = handle_unix_msg(unixfd, svcs, &local_msg, buf_local_msg, (size_t)n, &local_addr);
+                _DEBUG("%s", "msg has local dest IP\n");
+                err = handle_unix_msg(unixfd, svcs, local_msg, (size_t)n, &local_addr);
                 if(err < 0) {
                     goto cleanup;
                 }
             } else {
-                _DEBUG("FIXME: do non-local stuff: %s %s\n", local_msg.dst_ip, host_ip);
+                _DEBUG("FIXME: msg has NON-LOCAL dst IP: %s, host IP: %s\n", local_msg->dst_ip, host_ip);
                 /* fixme: dst ip is not local */
             }
+            /* note: invalidate ptr to buf_local_msg just to be safe*/
+            local_msg = NULL;
         }
     }
 
-
+    free(buff);
+    free(buf_local_msg);
     close(unixfd);
     unlink(ODR_PATH);
     free_hwa_info(hwahead); /* FREE HW list*/
     exit(EXIT_SUCCESS);
 cleanup:
+    free(buff);
+    free(buf_local_msg);
     close(unixfd);
     unlink(ODR_PATH);
     free_hwa_info(hwahead);
@@ -124,42 +136,48 @@ cleanup:
 * Update the service list.
 *   -Pass to service if local
 *   -Pass to rawsock handler if non-local.
-* NOTE: void *buf is a pointer to the start of the buffer you used to recv(2)
-*       this odr_msg{}
+*
+* NOTE: struct odr_msg *m: m is a pointer to the start of the recv(2) buffer.
+*                          - it is mlen bytes long.
+*
 * RETURNS:  0 on successfully sent
 *           -1 on sendto(2) failure, need to cleanup and exit
 */
-int handle_unix_msg(int unixfd, struct svc_entry *svcs, struct odr_msg *m,
-        void *buf, size_t bytes, struct sockaddr_un *from_addr) {
+int handle_unix_msg(int unixfd, struct svc_entry *svcs,
+        struct odr_msg *m, size_t mlen, struct sockaddr_un *from_addr) {
+
     struct sockaddr_un dst_addr = {0};
-    int newport;
+    int msg_src_port;
     socklen_t len;
     ssize_t err;
 
-    newport = svc_update(svcs, from_addr);
+    msg_src_port = svc_update(svcs, from_addr);
 
 
     if(m->dst_port < 0 || m->dst_port > SVC_MAX_NUM) {
-        _SPEC("service trying to send to a bad port: %d\n", m->dst_port);
+        _ERROR("service trying to send to a bad port: %d, ignoring...\n", m->dst_port);
         return 0;
     } else if(svcs[m->dst_port].port == -1) {
         /* the destination service doesn't exist, pretend like we sent it */
+        _NOTE("no service at dst port: %d, ignoring...\n", m->dst_port);
         return 0;
     }
     dst_addr.sun_family = AF_LOCAL;
-    strncpy(dst_addr.sun_path, svcs[m->dst_port].sun_path, sizeof(dst_addr.sun_path)-1);
+    strncpy(dst_addr.sun_path, svcs[m->dst_port].sun_path, sizeof(dst_addr.sun_path));
+    dst_addr.sun_path[sizeof(dst_addr.sun_path)-1] = '\0';
 
-    m->src_port = newport;
+    m->src_port = msg_src_port;
     strcpy(m->src_ip, host_ip);
-    memcpy(buf, m, sizeof(struct odr_msg));  /* memcpy new m over buf */
 
+    _DEBUG("Forwarding msg using sendto() to local socket: %s\n", dst_addr.sun_path);
     len = sizeof(dst_addr);
-    err = sendto(unixfd, buf, bytes, 0, (struct sockaddr*)&dst_addr, len);
+    err = sendto(unixfd, m, mlen, 0, (struct sockaddr*)&dst_addr, len);
     if(err < 0) {
-        perror("ERROR: handle_unix_msg().sendto()");
-        return -1;
+        /* fixme: which sendto() errors should we actually fail on? */
+        _ERROR("%s %m. Ignoring error....\n", "sendto():");
+        return 0;
     }
-
+    _DEBUG("%s", "succesfully forwarded the msg with sendto()\n");
     return 0;
 }
 
@@ -309,90 +327,74 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
 
 /**
 * Init the services array to have index 0 as the time server.
-* All others are -1, with sun_path[0] = '\0'.
+* All others are port = -1, with sun_path[0] = '\0', ttl = 0.
 */
 void svc_init(struct svc_entry *svcs, size_t len) {
     size_t n = 1;
     if(len < 2) {
         _ERROR("%s", "len too small!\n");
     }
-
-    svcs[0].port = 0;
+    svcs[0].port = TIME_PORT;
     strcpy(svcs[0].sun_path, TIME_SRV_PATH);
     time(&svcs[0].ttl);                     /* ttl for server never checked  */
-
     for(; n < SVC_MAX_NUM; n++) {
         svcs[n].port = -1;
         svcs[n].sun_path[0] = '\0';
+        svcs[n].ttl = 0;
     }
 
 }
+
 
 /**
 * Adds the svc to the list, or updates the svc's TTL.
 * Also loop through the svc list deleting stale svcs.
-* RETURNS: port number
+* Also deletes services whose time_to_live (ttl) has expired.
+* RETURNS: the svcs's port number
 *              - could be a new port, if service just added
 *              - or prev port number if service was updated.
 */
 int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
-    int n = 0;
-    /* the min port to add the new entry into, if needed! */
-    int minport = SVC_MAX_NUM;
-    /* let's not recompute the current time over and over*/
-    time_t now = time(NULL);
+    int n = 0, already_in_svcs = 0;
+    /* updated_port is the min port to add the new entry into, if needed! */
+    int updated_port = SVC_MAX_NUM;
+    time_t now = time(NULL);        /* only call time() once */
 
-    if(svc_addr->sun_path[0] == '\0') {
-        _ERROR("%s", "svc_addr->sun_path is empty!\n");
-        exit(EXIT_FAILURE);
-    }
-
-
-    /* svcs[n].port = n; */
-    /* delete the services whose TTL has expired! Must loop through. */
-    while(++n < SVC_MAX_NUM) {
-        if( 0 == strncmp(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path)-1)){
-            /* this svc is already in the list! Update TTL */
-            svcs[n].ttl = now;
-            return svcs[n].port;
-        } else if(svcs[n].port != -1){
-            /* delete an entry if its old*/
-            if((now - svcs[n].ttl) > SVC_TTL) {
-                svcs[n].port = -1;
-            }
+    /* Must loop through all to delete the services whose TTL has expired! */
+    for( ; n < SVC_MAX_NUM; n++) {
+        if(svcs[n].port < 0) {                          /* entry is empty */
+            updated_port = MIN(n, updated_port);
+            continue;
         }
-        /* wasn't occupied or was deleted */
-        if (svcs[n].port == -1 && minport > n)
-            minport = n;
-    }
-    if(minport == SVC_MAX_NUM) {
-        _ERROR("%s", "The svc array is full!\n");
-        exit(EXIT_FAILURE);
-    }
-
-    svcs[minport].port = minport;
-    svcs[minport].ttl = now;
-    strncpy(svcs[minport].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path)-1);
-    return minport;
-}
-
-/* 1 if contains a service at the port number, 0 otherwise */
-int svc_contains_port(struct svc_entry *svcs, int port) {
-    return (svcs[port].port != -1);
-}
-
-/* 1 if contains a service at the port number, 0 otherwise */
-/* fixme: might not even need this? If we do need, then change to a linked list? */
-int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
-    int n = 0;
-    char *new_path = svc_addr->sun_path;
-    for(; n < SVC_MAX_NUM; ++n) {
-        if(0 == strncmp(new_path, svcs[n].sun_path, sizeof(svc_addr->sun_path))) {
-            return 1;
+        if(svcs[n].ttl <= now && svcs[n].port != TIME_PORT) {   /* entry stale so delete */
+            /* entry was stale, deleting */
+            svcs[n].port = -1;
+            updated_port = MIN(n, updated_port);
+            continue;
+        }
+        /* this entry wasn't stale */
+        if(0 == strncmp(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path))) {
+            /* this is the service we're looking for */
+            already_in_svcs = 1;
+            updated_port = n;
+            svcs[n].ttl = now + SVC_TTL;
         }
     }
-    return 0;
+    if(updated_port == SVC_MAX_NUM) {
+        _ERROR("%s", "The svc array was full!\n");
+        exit(EXIT_FAILURE);
+    }
+    if(already_in_svcs) {
+        return updated_port;
+    }
+    svcs[updated_port].port = updated_port;
+    svcs[updated_port].ttl = now;
+    strncpy(svcs[updated_port].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path));
+    svcs[updated_port].sun_path[sizeof(svc_addr->sun_path)-1] = '\0';
+    return updated_port;
 }
+
+
 /**
  * adds a route to the table
  * returns the index it was added to

@@ -15,10 +15,10 @@
 
 #define BUFF_SIZE 1024
 #define EVER ;;
-#define TIME_SRV_PATH "socket_timesrv"
-#define TIME_CLI_PATH "socket_timecli_XXXXXX"
+#define TIME_SRV_PATH "sock_tsrv"
+#define TIME_CLI_PATH "sock_tcli_XXXXXX"
 #define TIME_PORT 0
-#define ODR_PATH "socket_odr"
+#define ODR_PATH "sock_odr"
 #define PROTO 2691
 #define NUM_NODES 10
 

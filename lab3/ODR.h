@@ -5,9 +5,12 @@
 #include <sys/socket.h>
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
+#include <time.h>
 
 #include "common.h"
 #include "get_hw_addrs.h"
+
+#define MIN(a,b) (((a)<=(b))?(a):(b))
 
 #define SVC_MAX_NUM 100
 #define SVC_TTL 15
@@ -47,17 +50,15 @@ void rm_eth0_lo(struct hwa_info	**hwahead);
 /* funcs for svc_entry{} array/list */
 void svc_init(struct svc_entry *svcs, size_t len);
 int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
-int svc_contains_port(struct svc_entry *svcs, int port);
-int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
 
 /* funcs for using the sockets */
-int handle_unix_msg(int unixfd, struct svc_entry *svcs, struct odr_msg *m,
-        void *buf, size_t bytes, struct sockaddr_un *from_addr);
+int handle_unix_msg(int unixfd, struct svc_entry *svcs,
+        struct odr_msg *m, size_t mlen, struct sockaddr_un *from_addr);
 int deliver_app_mesg(int unixfd, struct odr_msg *m, size_t bytes);
 
 /* route table stuff */
 int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN], unsigned char mac_next_hop[ETH_ALEN], int iface_index, int num_hops, int broadcast_id, time_t timestamp);
-int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[16]);
+int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]);
 
 /* funcs for raw pkt stuffs */
 void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
