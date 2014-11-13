@@ -4,11 +4,11 @@ int main(int argc, char *argv[]) {
     int sockfd, filefd, err;
     socklen_t len;
     struct sockaddr_un my_addr, name_addr, srv_addr;
-    socklen_t socklen = 0;
     char fname[] = TIME_CLI_PATH;  /* template for mkstemp */
     char srvname[BUFF_SIZE] = {0};
     char hostname[BUFF_SIZE] = {0};
     char buf[BUFF_SIZE] = {0};
+    char ip_buf[INET_ADDRSTRLEN] = {0};
     struct hostent *he;
     struct in_addr srv_in_addr;
     char *errc;
@@ -87,7 +87,8 @@ int main(int argc, char *argv[]) {
         /* todo: msg_send */
         /* todo: if this is the 1st timeout, then msg_send rediscovery flag */
         /* fixme: srv_addr always TIME_SRV_PATH */
-        err = (int) sendto(sockfd, "H", 2, 0, (struct sockaddr *) &srv_addr, sizeof(srv_addr));
+        err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 2, 0);
+        /*err = (int) sendto(sockfd, "H", 2, 0, (struct sockaddr *) &srv_addr, sizeof(srv_addr));*/
         if (err < 0) {
             perror("ERROR: sendto()");
             goto cleanup;
@@ -111,8 +112,8 @@ int main(int argc, char *argv[]) {
 
         } else if (FD_ISSET(sockfd, &rset)) {
             /* todo: msg_recv */
-            socklen = sizeof(srv_addr);
-            err = (int) recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *) &srv_addr, &socklen);
+            err = (int) msg_recv(sockfd, buf, sizeof(buf), ip_buf, TIME_PORT);
+            /*err = (int) recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *) &srv_addr, &socklen);*/
             if (err < 0) {
                 perror("ERROR: sendto()");
                 goto cleanup;

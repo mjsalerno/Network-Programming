@@ -7,11 +7,11 @@ int main(void) {
     time_t ticks;
     struct hostent *vm;
     struct sockaddr_un name;
-    struct sockaddr_un cli_addr;
-    socklen_t len;
+    /*struct sockaddr_un cli_addr;*/
 
     struct in_addr vm_ip;
     char buff[BUFF_SIZE];
+    char ip_buff[INET_ADDRSTRLEN];
     char hostname[BUFF_SIZE];
     char ip[INET_ADDRSTRLEN];
 
@@ -47,13 +47,15 @@ int main(void) {
     for(EVER) {
         _DEBUG("%s", "waiting for clients...\n");
         /* todo: msg_recv */
-        len = sizeof(cli_addr);
-        n = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);
+        /*len = sizeof(cli_addr);*/
+        /*todo: fix ip*/
+        n = msg_recv(sock, buff, BUFF_SIZE, ip_buff, TIME_PORT);
+        /*n = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);*/ /*old code*/
         if(n < 0) {
             perror("ERROR: recvfrom()");
         }
         buff[n] = '\0';
-        _DEBUG("client! len: %d, from path: %s, mesg: %s\n", len, cli_addr.sun_path, buff);
+        _DEBUG("client! len: %d, mesg: %s\n", (int)n, buff);
         /* todo: remove 127.0.0.1 */
         strcpy(ip, "127.0.0.1");
         inet_aton(ip, &vm_ip);
@@ -68,8 +70,8 @@ int main(void) {
         n = snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
 
         /* todo: msg_send */
-        sleep(5);
-        err = sendto(sock, buff, (size_t)n, 0, (struct sockaddr*) &cli_addr, len);
+        err = msg_send(sock, ip_buff, TIME_PORT, buff, n, 0);
+        /*err = sendto(sock, buff, (size_t)n, 0, (struct sockaddr*) &cli_addr, len); old code*/
         if(err < 0) {
             perror("ERROR: sendto()");
             exit(EXIT_FAILURE);
