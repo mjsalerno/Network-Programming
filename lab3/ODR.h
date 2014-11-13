@@ -45,12 +45,13 @@ void rm_eth0_lo(struct hwa_info	**hwahead);
 
 /* funcs for svc_entry{} array/list */
 void svc_init(struct svc_entry *svcs, size_t len);
-int svc_add(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
+int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
 int svc_contains_port(struct svc_entry *svcs, int port);
 int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
 
 /* funcs for using the sockets */
-int recvd_app_mesg(size_t bytes, struct odr_msg *m, struct sockaddr_un *from_addr);
+int handle_unix_msg(int unixfd, struct svc_entry *svcs, struct odr_msg *m,
+        void *buf, size_t bytes, struct sockaddr_un *from_addr);
 int deliver_app_mesg(int unixfd, struct odr_msg *m, size_t bytes);
 
 /* funcs for raw pkt stuffs */

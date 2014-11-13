@@ -12,11 +12,11 @@ int main(void) {
     ssize_t n;
     struct hwa_info *hwahead;
     int unixfd, rawsock;
-    struct sockaddr_un my_addr, cli_addr;
+    struct sockaddr_un my_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
-    char buf_svc_mesg[ODR_MSG_MAX];         /* buffer to Mesgs from services */
-    struct odr_msg svc_mesg;                /* to cast buf_svc_mesg */
+    char buf_local_msg[ODR_MSG_MAX];         /* buffer to Mesgs from services */
+    struct odr_msg local_msg;                /* to cast buf_local_msg */
     /*socklen_t len;*/
 
     /* raw socket vars*/
@@ -47,7 +47,7 @@ int main(void) {
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
     memset(&my_addr, 0, sizeof(my_addr));
-    memset(&cli_addr, 0, sizeof(cli_addr));
+    memset(&local_addr, 0, sizeof(local_addr));
 
     if ((hwahead = get_hw_addrs()) == NULL) {       /* get MAC addrs of our interfaces */
         fprintf(stderr, "ERROR: get_hw_addrs()\n");
@@ -96,34 +96,29 @@ int main(void) {
             perror("ERROR: select()");
             goto cleanup;
         } else if(FD_ISSET(unixfd, &rset)) {
-            /* todo: add to list */
-            len = sizeof(cli_addr);
-            n = recvfrom(unixfd, buf_svc_mesg, sizeof(buf_svc_mesg), 0, (struct sockaddr*)&cli_addr, &len);
+            len = sizeof(local_addr);
+            n = recvfrom(unixfd, buf_local_msg, sizeof(buf_local_msg), 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(unixfd)");
                 goto cleanup;
             } else if(n < sizeof(struct odr_msg)) {
-                _ERROR("recv'd api_msg was too short!! n: %d\n", (int)n);
+                _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
-            memcpy(&svc_mesg, buf_svc_mesg, sizeof(svc_mesg));/*align the struct*/
-
-            /* recvd_app_mesg(n, &svc_mesg, &cli_addr); */
-
-            /* svc_add() */
-
-
-            if(0 == strcmp(svc_mesg.dst_ip, host_ip)) {
+            /* memcpy to align the struct */
+            memcpy(&local_msg, buf_local_msg, sizeof(local_msg));
+            /* note, the data is still in buf_local_msg */
+            if(0 == strcmp(local_msg.dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
-                _DEBUG("GOT svc msg with local dest IP: %s\n", svc_mesg.dst_ip);
+                _DEBUG("GOT svc msg with local dest IP: %s\n", local_msg.dst_ip);
+                err = handle_unix_msg(unixfd, svcs, &local_msg, buf_local_msg, (size_t)n, &local_addr);
+                if(err < 0) {
+                    goto cleanup;
+                }
             } else {
-                /* fixme: the dest IP is non-local */
+                /* fixme: dst ip is not local */
             }
-
-            /* todo: where i left off, look at port in svc_mesg or something */
-
         }
-
     }
 
 
@@ -138,8 +133,47 @@ cleanup:
     exit(EXIT_FAILURE);
 }
 
-int recvd_app_mesg(size_t bytes, struct odr_msg *m, struct sockaddr_un *from_addr) {
-    return -1;
+/**
+* We have recvfrom()'d off of our PF_UNIX socket, the destination is local.
+* Update the service list.
+*   -Pass to service if local
+*   -Pass to rawsock handler if non-local.
+* NOTE: void *buf is a pointer to the start of the buffer you used to recv(2)
+*       this odr_msg{}
+* RETURNS:  0 on successfully sent
+*           -1 on sendto(2) failure, need to cleanup and exit
+*/
+int handle_unix_msg(int unixfd, struct svc_entry *svcs, struct odr_msg *m,
+        void *buf, size_t bytes, struct sockaddr_un *from_addr) {
+    struct sockaddr_un dst_addr = {0};
+    int newport;
+    socklen_t len;
+    ssize_t err;
+
+    newport = svc_update(svcs, from_addr);
+
+
+    if(m->dst_port < 0 || m->dst_port > SVC_MAX_NUM) {
+        _SPEC("service trying to send to a bad port: %d\n", m->dst_port);
+        return 0;
+    } else if(svcs[m->dst_port].port == -1) {
+        /* the destination service doesn't exist, pretend like we sent it */
+        return 0;
+    }
+    dst_addr.sun_family = AF_LOCAL;
+    strncpy(dst_addr.sun_path, svcs[m->dst_port].sun_path, sizeof(dst_addr.sun_path)-1);
+
+    m->src_port = newport;
+    strcpy(m->src_ip, host_ip);
+
+    len = sizeof(dst_addr);
+    err = sendto(unixfd, buf, bytes, 0, (struct sockaddr*)&dst_addr, len);
+    if(err < 0) {
+        perror("ERROR: handle_unix_msg().sendto()");
+        return -1;
+    }
+
+    return 0;
 }
 
 /* print the info about all interfaces in the hwa_info linked list */
@@ -309,12 +343,12 @@ void svc_init(struct svc_entry *svcs, size_t len) {
 
 /**
 * Adds the svc to the list, or updates the svc's TTL.
-* Also loop through the svc list deleteing stale svcs.
+* Also loop through the svc list deleting stale svcs.
 * RETURNS: port number
 *              - could be a new port, if service just added
 *              - or prev port number if service was updated.
 */
-int svc_add(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
+int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
     int n = 1;
     /* the min port to add the new entry into, if needed! */
     int minport = SVC_MAX_NUM;
