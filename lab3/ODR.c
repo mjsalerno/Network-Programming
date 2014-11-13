@@ -1,6 +1,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <time.h>
+#include <zzip/zzip.h>
 #include "ODR.h"
 #include "debug.h"
 
@@ -16,7 +17,7 @@ int main(void) {
     struct sockaddr_un my_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
-    char buf_local_msg[ODR_MSG_MAX];         /* buffer to Mesgs from services */
+    char buf_local_msg[ODR_MSG_MAX] = {0};   /* buffer to Mesgs from services */
     struct odr_msg local_msg;                /* to cast buf_local_msg */
     /*socklen_t len;*/
 
@@ -69,10 +70,11 @@ int main(void) {
         goto cleanup;
     }
 
-    svc_init(svcs, sizeof(svcs));   /* init the service array */
+    svc_init(svcs, SVC_MAX_NUM);   /* init the service array */
 
     FD_ZERO(&rset);
     for(EVER) {
+        _DEBUG("%s", "waiting for messages....\n");
         FD_SET(unixfd, &rset);
         err = select(unixfd + 1, &rset, NULL, NULL, NULL);
         if(err < 0) {
@@ -88,12 +90,13 @@ int main(void) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
+            _DEBUG("GOT a message from: %s\n", local_addr.sun_path);
             /* memcpy to align the struct */
             memcpy(&local_msg, buf_local_msg, sizeof(local_msg));
             /* note, the data is still in buf_local_msg */
             if(0 == strcmp(local_msg.dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
-                _DEBUG("GOT svc msg with local dest IP: %s\n", local_msg.dst_ip);
+                _DEBUG("svc msg has local dest IP: %s\n", local_msg.dst_ip);
                 err = handle_unix_msg(unixfd, svcs, &local_msg, buf_local_msg, (size_t)n, &local_addr);
                 if(err < 0) {
                     goto cleanup;
@@ -149,6 +152,7 @@ int handle_unix_msg(int unixfd, struct svc_entry *svcs, struct odr_msg *m,
 
     m->src_port = newport;
     strcpy(m->src_ip, host_ip);
+    memcpy(buf, m, sizeof(struct odr_msg));  /* memcpy new m over buf */
 
     len = sizeof(dst_addr);
     err = sendto(unixfd, buf, bytes, 0, (struct sockaddr*)&dst_addr, len);
@@ -320,7 +324,7 @@ void svc_init(struct svc_entry *svcs, size_t len) {
 
     for(; n < SVC_MAX_NUM; n++) {
         svcs[n].port = -1;
-        svcs[n].port = '\0';
+        svcs[n].sun_path[0] = '\0';
     }
 
 }
@@ -333,7 +337,7 @@ void svc_init(struct svc_entry *svcs, size_t len) {
 *              - or prev port number if service was updated.
 */
 int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
-    int n = 1;
+    int n = 0;
     /* the min port to add the new entry into, if needed! */
     int minport = SVC_MAX_NUM;
     /* let's not recompute the current time over and over*/
@@ -345,7 +349,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
     }
 
 
-    svcs[n].port = n;
+    /* svcs[n].port = n; */
     /* delete the services whose TTL has expired! Must loop through. */
     while(++n < SVC_MAX_NUM) {
         if( 0 == strncmp(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path)-1)){
@@ -359,7 +363,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
             }
         }
         /* wasn't occupied or was deleted */
-        if (minport > n)
+        if (svcs[n].port == -1 && minport > n)
             minport = n;
     }
     if(minport == SVC_MAX_NUM) {
@@ -369,7 +373,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 
     svcs[minport].port = minport;
     svcs[minport].ttl = now;
-    strncpy(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path)-1);
+    strncpy(svcs[minport].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path)-1);
     return minport;
 }
 
