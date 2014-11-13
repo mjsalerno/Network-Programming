@@ -2,10 +2,10 @@
 #include <unistd.h>
 #include <time.h>
 #include "ODR.h"
-#include "common.h"
 #include "debug.h"
 
 static char host_ip[INET_ADDRSTRLEN];
+/*static struct tbl_entry route_table[NUM_NODES];*/
 
 int main(void) {
     int err;
@@ -20,30 +20,12 @@ int main(void) {
     /*socklen_t len;*/
 
     /* raw socket vars*/
-    struct sockaddr_ll raw_addr;
-    //mine
-    //unsigned char src_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
-    //unsigned char dst_mac[6] = {0x5c, 0x51, 0x4f, 0x11, 0x25, 0x65};
-    //index = 1
+    //struct sockaddr_ll raw_addr;
 
-    //vm1 eth2 index
-    unsigned char src_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
-    unsigned char dst_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
-    int index = 3;
-
-    //vm1 eth2
-    //unsigned char src_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
-    //unsigned char dst_mac[6] = {0x00,0x0c,0x29,0x49,0x3f,0x6f};
-
-    //vm2 eth1
-    //unsigned char src_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
-    //unsigned char dst_mac[6] = {0x00, 0x0c,0x29, 0xd9, 0x08, 0xf6};
-    //int index = 3;
     /* select(2) vars */
     fd_set rset;
 
     char* buff = malloc(ETH_FRAME_LEN);
-    char* buff2 = malloc(ETH_FRAME_LEN);
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
     memset(&my_addr, 0, sizeof(my_addr));
@@ -406,3 +388,46 @@ int svc_contains_path(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
     }
     return 0;
 }
+/**
+ * adds a route to the table
+ * returns the index it was added to
+ * returns -1 if it was not added
+ */
+int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN], unsigned char mac_next_hop[ETH_ALEN], int iface_index, int num_hops, int broadcast_id, time_t timestamp) {
+    int i, rtn = -1;
+    _DEBUG("looking to add ip: %s\n", ip_dst);
+
+    for (i = 0; i < NUM_NODES; ++i) {
+        if(route_table[i].ip_dst[0] == 0 || strncmp(route_table[i].ip_dst, ip_dst, INET_ADDRSTRLEN) == 0) {
+            _DEBUG("found empty index: %d\n", i);
+            memcpy(route_table[i].mac_next_hop, mac_next_hop, ETH_ALEN);
+            route_table[i].iface_index = iface_index;
+            route_table[i].num_hops = num_hops;
+            route_table[i].timestamp = timestamp;
+            route_table[i].broadcast_id = broadcast_id;
+            strncpy(route_table[i].ip_dst, ip_dst, 16);
+            rtn = i;
+            break;
+        }
+        _DEBUG("index was full : %d\n", i);
+    }
+
+    _DEBUG("unable to add ip: %s\n", ip_dst);
+    return rtn;
+}
+
+/* returns the index of the matching route or -1 if not found*/
+int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]) {
+    int i;
+    _DEBUG("looking for ip: %s\n", ip_dst);
+    for (i = 0; i < NUM_NODES; ++i) {
+        if(strncmp(ip_dst, route_table[i].ip_dst, 16) == 0) {
+            _DEBUG("found match| ip: '%s' index: %d\n", route_table->ip_dst, i);
+            return i;
+        }
+    }
+
+    _DEBUG("%s\n", "did not find a match");
+    return -1;
+}
+

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.4)
 project(lab3)
 
 #set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros")
-set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-g -Wall -Werror")
+set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-g -Wall -Werror -DDEBUG")
 
 set(ODR_SOURCE_FILES
     ODR.c

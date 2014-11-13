@@ -1,6 +1,8 @@
 #include "ODR.h"
 #include "debug.h"
 
+static struct tbl_entry route_table[NUM_NODES];
+
 int notmain(void) {
 
 
@@ -31,9 +33,15 @@ int notmain(void) {
     //int index = 3;
 
     char* buff = malloc(ETH_FRAME_LEN);
-    char* buff2 = malloc(ETH_FRAME_LEN);
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
+    memset(route_table, 0, NUM_NODES);
+
+    add_route(route_table, "192.168.1.1", src_mac, 1, 1, 1, 1);
+    add_route(route_table, "192.168.1.2", src_mac, 1, 1, 1, 1);
+    find_route_index(route_table, "192.168.1.1");
+    find_route_index(route_table, "192.168.1.2");
+    find_route_index(route_table, "192.168.1.3");
 
     if ((hwahead = get_hw_addrs()) == NULL) {       /* get MAC addrs of our interfaces */
         fprintf(stderr, "ERROR: get_hw_addrs()\n");
@@ -71,12 +79,12 @@ int notmain(void) {
 
     memset(&raw_addr, 0, sizeof(struct sockaddr_ll));
     len = sizeof(struct sockaddr_ll);
-    n = recvfrom(rawsock, buff2, ETH_FRAME_LEN, 0, (struct sockaddr*)&raw_addr, &len);
+    n = recvfrom(rawsock, buff, ETH_FRAME_LEN, 0, (struct sockaddr*)&raw_addr, &len);
     if(n < 1) {
         perror("error");
         exit(EXIT_FAILURE);
     }
-    printf("done: %s\n", buff2 + sizeof(struct ethhdr));
+    printf("done: %s\n", buff + sizeof(struct ethhdr));
     /*fixme ^^*/
     return 1;
 }
