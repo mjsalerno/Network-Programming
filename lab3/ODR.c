@@ -1,7 +1,6 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <time.h>
-#include <zzip/zzip.h>
 #include "ODR.h"
 #include "debug.h"
 
