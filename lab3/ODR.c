@@ -4,7 +4,8 @@
 #include "ODR.h"
 #include "debug.h"
 
-static char host_ip[INET_ADDRSTRLEN];
+/* fixme: remove */
+static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 /*static struct tbl_entry route_table[NUM_NODES];*/
 
 int main(void) {
@@ -98,6 +99,7 @@ int main(void) {
                     goto cleanup;
                 }
             } else {
+                _DEBUG("%s", "FIXME: do non-local stuff\n");
                 /* fixme: dst ip is not local */
             }
         }
