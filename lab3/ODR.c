@@ -99,7 +99,7 @@ int main(void) {
                     goto cleanup;
                 }
             } else {
-                _DEBUG("%s", "FIXME: do non-local stuff\n");
+                _DEBUG("FIXME: do non-local stuff: %s %s\n", local_msg.dst_ip, host_ip);
                 /* fixme: dst ip is not local */
             }
         }
