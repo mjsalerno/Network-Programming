@@ -1,0 +1,17 @@
+
+
+
+
+RREQ received:
+    1. Update routing table for reverse route
+        *   if rreq.hops <= route.hops then update route
+            * route.broadcast_id = rreq.broadcast_id
+        *   NOTE if this is a new route      ex) never heard of rreq.src_ip before
+        *   NOTE if rreq.hops < route.hops   ex) more eff. route
+    2. RREP generation:
+        a. If I have route to rreq.dst_ip then send RREP
+
+    3. RREQ flooding:
+        a. If either NOTE from 1, set the rrep_sent flag.
+        b. send RREQ on all interfaces except the source.
+        c. don't send rrep if already sent, unless NOTE from 1
