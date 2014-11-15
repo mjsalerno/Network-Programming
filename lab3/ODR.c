@@ -9,7 +9,7 @@ int main(void) {
     int err;
     ssize_t n;
     struct hwa_info *hwahead;
-    int unixfd, rawsock;
+    int unixsock, rawsock;
     struct sockaddr_un my_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
@@ -60,8 +60,8 @@ int main(void) {
     }*/
 
 
-    unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
-    if (unixfd < 0) {
+    unixsock = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
+    if (unixsock < 0) {
         perror("ERROR: socket()");
         free_hwa_info(hwahead);
         exit(EXIT_FAILURE);
@@ -71,7 +71,7 @@ int main(void) {
     my_addr.sun_family = AF_LOCAL;
     strncpy(my_addr.sun_path, ODR_PATH, sizeof(my_addr.sun_path)-1);
 
-    err = bind(unixfd, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
+    err = bind(unixsock, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
     if(err < 0) {
         perror("ERROR: bind()");
         goto cleanup;
@@ -82,16 +82,16 @@ int main(void) {
     FD_ZERO(&rset);
     for(EVER) {
         _DEBUG("%s", "waiting for messages....\n");
-        FD_SET(unixfd, &rset);
-        err = select(unixfd + 1, &rset, NULL, NULL, NULL);
+        FD_SET(unixsock, &rset);
+        err = select(unixsock + 1, &rset, NULL, NULL, NULL);
         if(err < 0) {
             perror("ERROR: select()");
             goto cleanup;
-        } else if(FD_ISSET(unixfd, &rset)) {
+        } else if(FD_ISSET(unixsock, &rset)) {
             len = sizeof(local_addr);
-            n = recvfrom(unixfd, buf_local_msg, SVC_MAX_NUM, 0, (struct sockaddr*)&local_addr, &len);
+            n = recvfrom(unixsock, buf_local_msg, SVC_MAX_NUM, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
-                perror("ERROR: recvfrom(unixfd)");
+                perror("ERROR: recvfrom(unixsock)");
                 goto cleanup;
             } else if(n < sizeof(struct odr_msg)) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
@@ -104,7 +104,7 @@ int main(void) {
             if(0 == strcmp(local_msg->dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
                 _DEBUG("%s", "msg has local dest IP\n");
-                err = handle_unix_msg(unixfd, svcs, local_msg, (size_t)n, &local_addr);
+                err = handle_unix_msg(unixsock, svcs, local_msg, (size_t)n, &local_addr);
                 if(err < 0) {
                     goto cleanup;
                 }
@@ -114,19 +114,21 @@ int main(void) {
             }
             /* note: invalidate ptr to buf_local_msg just to be safe*/
             local_msg = NULL;
+        } else if(FD_ISSET(rawsock, &rset)) {
+
         }
     }
 
     free(buff);
     free(buf_local_msg);
-    close(unixfd);
+    close(unixsock);
     unlink(ODR_PATH);
     free_hwa_info(hwahead); /* FREE HW list*/
     exit(EXIT_SUCCESS);
 cleanup:
     free(buff);
     free(buf_local_msg);
-    close(unixfd);
+    close(unixsock);
     unlink(ODR_PATH);
     free_hwa_info(hwahead);
     exit(EXIT_FAILURE);
