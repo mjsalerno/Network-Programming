@@ -149,7 +149,8 @@ int main(int argc, char *argv[]) {
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
             len = sizeof(raw_addr);
-            int route_index;
+            int fi;
+            int bi;
             n = recvfrom(rawsock, buf_msg, SVC_MAX_NUM, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
@@ -163,15 +164,29 @@ int main(int argc, char *argv[]) {
             switch(msgp->type) {
 
                 case T_RREQ:
-                    route_index = find_route_index(route_table, msgp->src_ip);
-                    if(route_index >= 0) { /* we have a route for it*/
+                    bi = find_route_index(route_table, msgp->src_ip);
+                    fi = find_route_index(route_table, msgp->dst_ip);
+                    if(fi >= 0 && !msgp->force_redisc) { /* we have a route for it*/
+                        if(msgp->broadcast_id < route_table[fi].broadcast_id
+                                || msgp->num_hops > route_table[fi].num_hops) {
 
+                            if(msgp->do_not_rrep == 0 && (msgp->force_redisc == 0 || (0 == strcmp(msgp->dst_ip, host_ip)))) {
+
+                            }
+                        }
                     } else { /* we do not have a route to it */
+                        /* todo: send out on all ifaces */
+                    }
+
+                    /* no matter what update the back path if hops id better*/
+                    if(msgp->force_redisc || bi < 0 || msgp->num_hops >= route_table[bi].num_hops) { /* the back pth is better or the same */
                         err = add_route(route_table, msgp->src_ip, raw_addr.sll_addr, raw_addr.sll_ifindex, msgp->num_hops, msgp->broadcast_id, staleness);
                         if (err < 0) {
-                            _ERROR("%s\n", "There was an error adding the route");
+                            _ERROR("%s\n", "There was an error adding the back route");
+                            exit(EXIT_FAILURE);
                         }
                     }
+
                     break;
                 case T_RREP:
                     break;
