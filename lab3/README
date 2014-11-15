@@ -4,6 +4,10 @@ README for Assignment 3
 |  Michael Salerno  cse533-8   xxxxxxxxx  |
 ===========================================
 
+When running the client and ODR the user can type ^D to terminate.
+The server doesn't have that.
+
+
 Special Cases:
  If two clients on a VM1 both msg_send to vm5, and vm1 has no route to vm5,
  then both msg_send()'s will generate an RREQ. We feel this is not an problem.

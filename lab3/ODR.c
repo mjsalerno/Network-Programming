@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
     int err;
     ssize_t n;
     struct hwa_info *hwahead;
-    int unixsock, rawsock;
+    int unixsock, rawsock, stdinfd;
     struct sockaddr_un my_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
@@ -89,11 +89,13 @@ int main(int argc, char *argv[]) {
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
 
     FD_ZERO(&rset);
-    fpd1 = MAX(unixsock, rawsock) + 1;
+    stdinfd = fileno(stdin);
+    fpd1 = MAX(MAX(unixsock, rawsock), stdinfd) + 1;
     for(EVER) {
         _DEBUG("%s", "waiting for messages....\n");
         FD_SET(unixsock, &rset);
         FD_SET(rawsock, &rset);
+        FD_SET(stdinfd, &rset);
         err = select(fpd1, &rset, NULL, NULL, NULL);
         if(err < 0) {
             perror("ERROR: select()");
@@ -161,12 +163,24 @@ int main(int argc, char *argv[]) {
             }
 
 
+        } else if(FD_ISSET(stdinfd, &rset)) {
+            char *errc = fgets(buf_msg, ODR_MSG_MAX, stdin);
+            if (errc == NULL) {
+                if(ferror(stdin)) {
+                    fprintf(stderr, "ERROR: fgets() error from stdin\n");
+                    goto cleanup;
+                } else {
+                    printf("Read ^D or EOF, terminating...\n");
+                    break;
+                }
+            }
         }
     }
 
     free(buff);
     free(buf_msg);
     close(unixsock);
+    close(rawsock);
     unlink(ODR_PATH);
     free_hwa_info(hwahead); /* FREE HW list*/
     exit(EXIT_SUCCESS);
@@ -174,6 +188,7 @@ cleanup:
     free(buff);
     free(buf_msg);
     close(unixsock);
+    close(rawsock);
     unlink(ODR_PATH);
     free_hwa_info(hwahead);
     exit(EXIT_FAILURE);

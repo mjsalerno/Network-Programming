@@ -39,6 +39,8 @@ int main(void) {
     err = bind(sock, (struct sockaddr *) &name, sizeof(struct sockaddr_un));
     if(err < 0) {
         perror("binding name to datagram socket");
+        close(sock);
+        unlink(TIME_SRV_PATH);
         exit(EXIT_FAILURE);
     }
     printf("socket --> %s\n", TIME_SRV_PATH);
@@ -51,7 +53,10 @@ int main(void) {
         n = msg_recv(sock, buff, BUFF_SIZE, cli_ip_buff, &cliport);
         /*n = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);*/ /*old code*/
         if(n < 0) {
-            perror("ERROR: recvfrom()");
+            _ERROR("ERROR: msg_recv() returned %ld\n", (long int)n);
+            close(sock);
+            unlink(TIME_SRV_PATH);
+            exit(EXIT_FAILURE);
         }
         buff[n] = '\0';
         _DEBUG("client! len: %d, mesg: %s\n", (int)n, buff);
@@ -59,6 +64,8 @@ int main(void) {
         vm = gethostbyaddr(&vm_ip, sizeof(vm_ip), AF_INET);
         if (vm == NULL) {
             herror("server.gethostbyaddr()");
+            close(sock);
+            unlink(TIME_SRV_PATH);
             exit(EXIT_FAILURE);
         }
         printf("server at node: %s responding to request from: %s\n", hostname, vm->h_name);
@@ -71,6 +78,8 @@ int main(void) {
         /*err = sendto(sock, buff, (size_t)n, 0, (struct sockaddr*) &cli_addr, len); old code*/
         if(err < 0) {
             perror("ERROR: sendto()");
+            close(sock);
+            unlink(TIME_SRV_PATH);
             exit(EXIT_FAILURE);
         }
     }
