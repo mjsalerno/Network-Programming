@@ -66,20 +66,20 @@ int main(int argc, char *argv[]) {
     for(EVER) {
 
         /* prompts the user to choose one of vm1, ..., vm10 as a server node. */
-        printf("Enter server host (vm1, vm2, ..., vm10):\n> ");
+        printf("Enter server host (vm1, vm2, ..., vm10 or ^D to quit):\n> ");
         errc = fgets(srvname, sizeof(srvname), stdin);
         if (errc == NULL) {
-            fprintf(stderr, "ERROR: fgets() returned NULL\n");
-            goto cleanup;
+            if(ferror(stdin)) {
+                fprintf(stderr, "ERROR: fgets() returned NULL\n");
+                goto cleanup;
+            } else {
+                printf("Read ^D or EOF, terminating...\n");
+                break;
+            }
         }
         errc = strchr(srvname, '\n');
         if (errc != NULL) {
             *errc = 0;              /* replace '\n' with NULL term.*/
-        }
-
-        if(*srvname == 'q' || *srvname == 'Q') {
-            printf("Bye\n");
-            goto cleanup;
         }
 
         /* don't check if's a "vmXX", just call gethostbyname() */
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
             perror("ERROR: sendto()");
             goto cleanup;
         }
-        printf("client at node %s: sending request to server at %s\n", hostname, srvname);
+        printf("client at node %s: SENDING request to server at %s\n", hostname, srvname);
 
         FD_ZERO(&rset);
         FD_SET(sockfd, &rset);
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
                 goto cleanup;
             }
             buf[err] = 0;
-            printf("RESPONSE: %s\n", buf);
+            printf("client at node %s: RECEIVED from %s %s", hostname, srvname, buf);
         }
     }
 

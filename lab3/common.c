@@ -77,8 +77,7 @@ ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int fl
 
 /* used by only msg_send() for now */
 void fill_mesg(struct odr_msg *m, char* ip, int port, char* msg, size_t msg_len, int flag) {
-    _DEBUG("%s", "Filling odr_msg.\n");
-
+    /*_DEBUG("%s", "Filling odr_msg.\n");*/
     /* note: dst ip and port for msg_send() */
     m->dst_port = port;
     m->reroute = flag;

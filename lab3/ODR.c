@@ -5,7 +5,7 @@
 static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 /*static struct tbl_entry route_table[NUM_NODES];*/
 
-int main(void) {
+int main(int argc, char *argv[]) {
     int err;
     ssize_t n;
     struct hwa_info *hwahead;
@@ -15,6 +15,7 @@ int main(void) {
     struct svc_entry svcs[SVC_MAX_NUM];
     char *buf_local_msg;                    /* buffer for local messages */
     struct odr_msg *local_msg;               /* to cast buf_local_msg */
+    int staleness;
     /*socklen_t len;*/
 
     /* raw socket vars*/
@@ -22,6 +23,13 @@ int main(void) {
 
     /* select(2) vars */
     fd_set rset;
+    int fpd1;
+
+    if(argc != 2) {
+        fprintf(stderr, "usage: %s staleness\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    staleness = atoi(argv[1]);
 
     char* buff = malloc(ETH_FRAME_LEN);
     buf_local_msg = malloc(ODR_MSG_MAX);
@@ -80,10 +88,12 @@ int main(void) {
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
 
     FD_ZERO(&rset);
+    fpd1 = MAX(unixsock, rawsock) + 1;
     for(EVER) {
         _DEBUG("%s", "waiting for messages....\n");
         FD_SET(unixsock, &rset);
-        err = select(unixsock + 1, &rset, NULL, NULL, NULL);
+        FD_SET(rawsock, &rset);
+        err = select(fpd1, &rset, NULL, NULL, NULL);
         if(err < 0) {
             perror("ERROR: select()");
             goto cleanup;
@@ -162,7 +172,7 @@ int handle_unix_msg(int unixfd, struct svc_entry *svcs,
         return 0;
     } else if(svcs[m->dst_port].port == -1) {
         /* the destination service doesn't exist, pretend like we sent it */
-        _NOTE("no service at dst port: %d, ignoring...\n", m->dst_port);
+        _ERROR("no service at dst port: %d, ignoring...\n", m->dst_port);
         return 0;
     }
     dst_addr.sun_family = AF_LOCAL;
@@ -172,7 +182,7 @@ int handle_unix_msg(int unixfd, struct svc_entry *svcs,
     m->src_port = msg_src_port;
     strcpy(m->src_ip, host_ip);
 
-    _DEBUG("Forwarding msg using sendto() to local socket: %s\n", dst_addr.sun_path);
+
     len = sizeof(dst_addr);
     err = sendto(unixfd, m, mlen, 0, (struct sockaddr*)&dst_addr, len);
     if(err < 0) {
@@ -180,7 +190,7 @@ int handle_unix_msg(int unixfd, struct svc_entry *svcs,
         _ERROR("%s %m. Ignoring error....\n", "sendto():");
         return 0;
     }
-    _DEBUG("%s", "succesfully forwarded the msg with sendto()\n");
+    _DEBUG("Relayed msg: sendto() local sock: %s\n", dst_addr.sun_path);
     return 0;
 }
 
@@ -360,12 +370,12 @@ void svc_init(struct svc_entry *svcs, size_t len) {
 *              - or prev port number if service was updated.
 */
 int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
-    int n = 0, already_in_svcs = 0;
+    int n = 0;
     /* updated_port is the min port to add the new entry into, if needed! */
     int updated_port = SVC_MAX_NUM;
     time_t now = time(NULL);        /* only call time() once */
 
-    /* Must loop through all to delete the services whose TTL has expired! */
+    /* Loop through deleting stale services! If svc_addr is found, then stop */
     for( ; n < SVC_MAX_NUM; n++) {
         if(svcs[n].port < 0) {                          /* entry is empty */
             updated_port = MIN(n, updated_port);
@@ -373,8 +383,8 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
         }
         if(svcs[n].ttl <= now && svcs[n].port != TIME_PORT) {   /* entry stale so delete */
             /* entry was stale, deleting */
-            _DEBUG("DELETE stale service, svcs[%d]: port=%d, path=%s\n", n, svcs[n].port, svcs[n].sun_path);
-            printf("service was %ld seconds old, TTL limit: %d\n", (long int)(now - svcs[n].ttl + SVC_TTL), SVC_TTL);
+            /*_DEBUG("DELETE stale service, svcs[%d]: port=%d, path=%s\n", n, svcs[n].port, svcs[n].sun_path);*/
+            /*_DEBUG("service was %ld secs old, TTL limit: %d secs\n", (long int)(now - svcs[n].ttl + SVC_TTL), SVC_TTL);*/
             svcs[n].port = -1;
             updated_port = MIN(n, updated_port);
             continue;
@@ -382,24 +392,20 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
         /* this entry wasn't stale */
         if(0 == strncmp(svcs[n].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path))) {
             /* this is the service we're looking for */
-            _DEBUG("FOUND service, svcs[%d]: port=%d, path=%s\n", n, svcs[n].port, svcs[n].sun_path);
-            already_in_svcs = 1;
-            updated_port = svcs[n].port;
+            /*_DEBUG("FOUND service, svcs[%d]: port=%d, path=%s\n", n, svcs[n].port, svcs[n].sun_path);*/
             svcs[n].ttl = now + SVC_TTL;
+            return svcs[n].port;
         }
     }
     if(updated_port == SVC_MAX_NUM) {
         _ERROR("%s", "The svc array was full!\n");
         exit(EXIT_FAILURE);
     }
-    if(already_in_svcs) {
-        return updated_port;
-    }
     svcs[updated_port].port = updated_port;
     svcs[updated_port].ttl = now + SVC_TTL;
     strncpy(svcs[updated_port].sun_path, svc_addr->sun_path, sizeof(svc_addr->sun_path));
     svcs[updated_port].sun_path[sizeof(svc_addr->sun_path)-1] = '\0';
-    _DEBUG("ADD new service, svcs[%d]: port=%d, path=%s\n", updated_port, svcs[updated_port].port, svcs[updated_port].sun_path);
+    /*_DEBUG("ADD new service, svcs[%d]: port=%d, path=%s\n", updated_port, svcs[updated_port].port, svcs[updated_port].sun_path);*/
     return updated_port;
 }
 
@@ -435,12 +441,15 @@ int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRL
     return rtn;
 }
 
-/* returns the index of the matching route or -1 if not found*/
+/**
+*  RETURNS: the index of the matching route
+*          -1 if not found
+*/
 int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]) {
     int i;
     _DEBUG("looking for ip: %s\n", ip_dst);
     for (i = 0; i < NUM_NODES; ++i) {
-        if(strncmp(ip_dst, route_table[i].ip_dst, 16) == 0) {
+        if(strncmp(ip_dst, route_table[i].ip_dst, INET_ADDRSTRLEN) == 0) {
             _DEBUG("found match| ip: '%s' index: %d\n", route_table->ip_dst, i);
             return i;
         }

@@ -10,7 +10,8 @@
 #include "common.h"
 #include "get_hw_addrs.h"
 
-#define MIN(a,b) (((a)<=(b))?(a):(b))
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
 
 #define SVC_MAX_NUM 100
 #define SVC_TTL 15
