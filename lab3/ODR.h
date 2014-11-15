@@ -16,9 +16,9 @@
 #define SVC_MAX_NUM 100
 #define SVC_TTL 15
 struct svc_entry {
-    int port;                   /* 0 reserved for timeservers */
+    time_t ttl;             /* time_to_live timestamp */
+    int port;               /* 0 reserved for timeservers */
     char sun_path[108];
-    time_t ttl;                 /* time_to_live timestamp */
 };
 
 

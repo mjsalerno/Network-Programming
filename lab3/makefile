@@ -8,7 +8,7 @@ CC = gcc
 LIBS =
 
 FLAGS = -g -Wall -Werror -Wextra -pedantic -Wno-variadic-macros -DDEBUG
-FLAGS = -g -Wall -Werror -DDEBUG
+FLAGS = -g -Wall -Wextra -Werror -DDEBUG
 
 all: ODR server client
 
