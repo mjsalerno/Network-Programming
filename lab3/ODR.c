@@ -15,6 +15,9 @@ int main(int argc, char *argv[]) {
     struct svc_entry svcs[SVC_MAX_NUM];
     char *buf_msg;                    /* buffer for local messages */
     struct odr_msg *msgp;               /* to cast buf_local_msg */
+    struct odr_msg *out_msg;
+    uint32_t broadcastID = 0;
+
     int staleness;
     /*socklen_t len;*/
 
@@ -34,6 +37,11 @@ int main(int argc, char *argv[]) {
     char* buff = malloc(ETH_FRAME_LEN);
     buf_msg = malloc(ODR_MSG_MAX);
     if(buf_msg == NULL) {
+        _ERROR("%s", "malloc() returned NULL\n");
+        exit(EXIT_FAILURE);
+    }
+    out_msg = malloc(ODR_MSG_MAX);
+    if(out_msg == NULL) {
         _ERROR("%s", "malloc() returned NULL\n");
         exit(EXIT_FAILURE);
     }
@@ -124,6 +132,18 @@ int main(int argc, char *argv[]) {
             } else {
                 _DEBUG("FIXME: msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
                 /* fixme: dst ip is not local */
+                if(msgp->force_redisc) {
+                    /* pretend like we don't have a route, send RREQ */
+                    memset(out_msg, 0, sizeof(struct odr_msg));
+                    craft_rreq(out_msg, host_ip, msgp->dst_ip, 1, broadcastID);
+                    broadcastID++;
+                    /* send on all ifaces */
+                    /* queue the service's msg */
+                    /* done ? */
+
+                } else {
+
+                }
             }
             /* note: invalidate ptr to buf_msg just to be safe*/
             msgp = NULL;
@@ -383,6 +403,23 @@ void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t d
             exit(EXIT_FAILURE);
         }
     }
+}
+
+/* Can pass NULL for srcip or dstip if not wanted. */
+void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID) {
+    m->type = T_RREQ;
+    m->force_redisc = (uint8_t)force_redisc;
+    m->broadcast_id = broadcastID;
+    if(dstip != NULL) {
+        strncpy(m->dst_ip, dstip, INET_ADDRSTRLEN);
+    }
+    m->dst_port = 0;
+    if(srcip != NULL) {
+        strncpy(m->src_ip, srcip, INET_ADDRSTRLEN);
+    }
+    m->src_port = 0;
+    m->len = 0;
+    m->do_not_rrep = 0;
 }
 
 /**
