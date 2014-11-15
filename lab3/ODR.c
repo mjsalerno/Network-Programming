@@ -378,7 +378,7 @@ void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t d
         }
 
         ssize = sendto(rawsock, buff, size, 0, (struct sockaddr const *) &raw_addr, sizeof(raw_addr));
-        if(ssize < sizeof(struct ethhdr)) {
+        if(ssize < (ssize_t)sizeof(struct ethhdr)) {
             _ERROR("%s : %m\n", "sendto()");
             exit(EXIT_FAILURE);
         }
