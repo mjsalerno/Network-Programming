@@ -3,7 +3,7 @@
 
 /* fixme: remove */
 static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
-/*static struct tbl_entry route_table[NUM_NODES];*/
+static struct tbl_entry route_table[NUM_NODES];
 
 int main(int argc, char *argv[]) {
     int err;
@@ -13,13 +13,13 @@ int main(int argc, char *argv[]) {
     struct sockaddr_un my_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
-    char *buf_local_msg;                    /* buffer for local messages */
-    struct odr_msg *local_msg;               /* to cast buf_local_msg */
+    char *buf_msg;                    /* buffer for local messages */
+    struct odr_msg *msgp;               /* to cast buf_local_msg */
     int staleness;
     /*socklen_t len;*/
 
     /* raw socket vars*/
-    /* struct sockaddr_ll raw_addr; */
+    struct sockaddr_ll raw_addr;
 
     /* select(2) vars */
     fd_set rset;
@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
     staleness = atoi(argv[1]);
 
     char* buff = malloc(ETH_FRAME_LEN);
-    buf_local_msg = malloc(ODR_MSG_MAX);
-    if(buf_local_msg == NULL) {
+    buf_msg = malloc(ODR_MSG_MAX);
+    if(buf_msg == NULL) {
         _ERROR("%s", "malloc() returned NULL\n");
         exit(EXIT_FAILURE);
     }
@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
     memset(&my_addr, 0, sizeof(my_addr));
     memset(&local_addr, 0, sizeof(local_addr));
+    memset(&raw_addr, 0, sizeof(raw_addr));
 
     if ((hwahead = get_hw_addrs()) == NULL) {       /* get MAC addrs of our interfaces */
         fprintf(stderr, "ERROR: get_hw_addrs()\n");
@@ -99,7 +100,7 @@ int main(int argc, char *argv[]) {
             goto cleanup;
         } else if(FD_ISSET(unixsock, &rset)) {
             len = sizeof(local_addr);
-            n = recvfrom(unixsock, buf_local_msg, SVC_MAX_NUM, 0, (struct sockaddr*)&local_addr, &len);
+            n = recvfrom(unixsock, buf_msg, SVC_MAX_NUM, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(unixsock)");
                 goto cleanup;
@@ -107,37 +108,71 @@ int main(int argc, char *argv[]) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
-            local_msg = (struct odr_msg*)buf_local_msg;
+            msgp = (struct odr_msg*) buf_msg;
             _DEBUG("GOT msg from socket: %s, with dest: %s:%d\n",
-                    local_addr.sun_path, local_msg->dst_ip, local_msg->dst_port);
+                    local_addr.sun_path, msgp->dst_ip, msgp->dst_port);
 
-            if(0 == strcmp(local_msg->dst_ip, host_ip)) {
+            if(0 == strcmp(msgp->dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
                 _DEBUG("%s", "msg has local dest IP\n");
-                err = handle_unix_msg(unixsock, svcs, local_msg, (size_t)n, &local_addr);
+                err = handle_unix_msg(unixsock, svcs, msgp, (size_t)n, &local_addr);
                 if(err < 0) {
                     goto cleanup;
                 }
             } else {
-                _DEBUG("FIXME: msg has NON-LOCAL dst IP: %s, host IP: %s\n", local_msg->dst_ip, host_ip);
+                _DEBUG("FIXME: msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
                 /* fixme: dst ip is not local */
             }
-            /* note: invalidate ptr to buf_local_msg just to be safe*/
-            local_msg = NULL;
-        } else if(FD_ISSET(rawsock, &rset)) {
+            /* note: invalidate ptr to buf_msg just to be safe*/
+            msgp = NULL;
+        } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
+            len = sizeof(raw_addr);
+            int route_index;
+            n = recvfrom(rawsock, buf_msg, SVC_MAX_NUM, 0, (struct sockaddr*)&local_addr, &len);
+            if(n < 0) {
+                perror("ERROR: recvfrom(rawsock)");
+                goto cleanup;
+            } else if(n < sizeof(struct odr_msg)) {
+                _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
+                goto cleanup;
+            }
+            msgp = (struct odr_msg*) buf_msg;
+
+            switch(msgp->type) {
+
+                case T_RREQ:
+                    route_index = find_route_index(route_table, msgp->src_ip);
+                    if(route_index >= 0) { /* we have a route for it*/
+
+                    } else { /* we do not have a route to it */
+                        err = add_route(route_table, msgp->src_ip, raw_addr.sll_addr, raw_addr.sll_ifindex, msgp->num_hops, msgp->broadcast_id, staleness);
+                        if (err < 0) {
+                            _ERROR("%s\n", "There was an error adding the route");
+                        }
+                    }
+                    break;
+                case T_RREP:
+                    break;
+                case T_DATA:
+                    break;
+                default:
+                    break;
+
+            }
+
 
         }
     }
 
     free(buff);
-    free(buf_local_msg);
+    free(buf_msg);
     close(unixsock);
     unlink(ODR_PATH);
     free_hwa_info(hwahead); /* FREE HW list*/
     exit(EXIT_SUCCESS);
 cleanup:
     free(buff);
-    free(buf_local_msg);
+    free(buf_msg);
     close(unixsock);
     unlink(ODR_PATH);
     free_hwa_info(hwahead);
@@ -418,7 +453,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  * returns the index it was added to
  * returns -1 if it was not added
  */
-int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN], unsigned char mac_next_hop[ETH_ALEN], int iface_index, int num_hops, int broadcast_id, time_t timestamp) {
+int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN], unsigned char mac_next_hop[ETH_ALEN], int iface_index, uint16_t num_hops, uint32_t broadcast_id, int staleness) {
     int i, rtn = -1;
     _DEBUG("looking to add ip: %s\n", ip_dst);
 
@@ -428,7 +463,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRL
             memcpy(route_table[i].mac_next_hop, mac_next_hop, ETH_ALEN);
             route_table[i].iface_index = iface_index;
             route_table[i].num_hops = num_hops;
-            route_table[i].timestamp = timestamp;
+            route_table[i].timestamp = time(NULL) + staleness;
             route_table[i].broadcast_id = broadcast_id;
             strncpy(route_table[i].ip_dst, ip_dst, 16);
             rtn = i;
@@ -442,15 +477,22 @@ int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRL
 }
 
 /**
+* removed routs that are stale
 *  RETURNS: the index of the matching route
-*          -1 if not found
+*          -1 if not found or stale
 */
 int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]) {
     int i;
+    time_t now = time(NULL);
     _DEBUG("looking for ip: %s\n", ip_dst);
     for (i = 0; i < NUM_NODES; ++i) {
         if(strncmp(ip_dst, route_table[i].ip_dst, INET_ADDRSTRLEN) == 0) {
             _DEBUG("found match| ip: '%s' index: %d\n", route_table->ip_dst, i);
+            if(route_table[i].timestamp  < now) {
+                _DEBUG("%s\n", "it was stale, deleteing it and returning -1\n");
+                route_table[i].ip_dst[0] = 0;
+                return -1;
+            }
             return i;
         }
     }
