@@ -1,3 +1,14 @@
+README for Assignment 3
+=====================================
+Scott Harvey     cse533-11  108272691
+Michael Salerno  cse533-8   xxxxxxxxx
+=====================================
+
+
+If two clients on a VM1 both msg_send to vm5, and vm1 has no route to vm5,
+then both msg_send()'s will generate an RREQ. We feel this is not an problem.
+
+
 
 
 
@@ -24,24 +35,26 @@ On RREQ received (Detailed):
     * Set NEW_ROUTE if no prev route to src or route was stale.
     * Set EFF_ROUTE if RREQ.hops < route.hops (more efficient route).
 
-2. RREP generation. Only if(RREQ.rrep_sent == 0 && (RREQ.f_redisc == 0|| i_am_dest)):
-    a. If I have route to RREQ.dst_ip then send RREP
-    b. If I am dest and RREQ.f_redisc, keep RREQ.f_redisc set
+if(RREQ.broadcast_id > route.broadcast_id || EFF_ROUTE):
+    2. RREP generation.
+        Only if(RREQ.rrep_sent == 0 && (RREQ.f_redisc == 0 || i_am_dest)):
+        a. If I have route to RREQ.dst_ip then send RREP
+        b. If I am dest and RREQ.f_redisc, keep RREQ.f_redisc set
 
-3. RREQ flooding. Only if(!we_sent_RREP || (NEW_ROUTE || EFF_ROUTE)):
-    a. If we sent RREP, set the RREQ.rrep_sent flag.
-    b. Send RREQ on all interfaces except the source interface.
+    3. RREQ flooding. Only if(!we_sent_RREP || (NEW_ROUTE || EFF_ROUTE)):
+        a. If we sent RREP, set the RREQ.rrep_sent flag.
+        b. Send RREQ on all interfaces except the source interface.
 
 
 On RREP received (Detailed):
 ============================
-1.  If the RREP was not for you relay it using the path in the table
-    that was added when the corresponding RREQ was recieved.
+1.  If the RREP was not for you, relay it using the path in the table
+    that was added when the corresponding RREQ was received.
 
-2.  add/update the path to the destination. If the route is suboptimul,
-    DO NOT update the table and DO NOT relay the information to the destination
+2.  Add/Update the path to the destination. If the route is suboptimal,
+    DO NOT update the table and DO NOT relay the information to the destination.
 
-?.  make a table?? "maintaining a route and its associated timestamp in
+?.  "maintaining a route and its associated timestamp in
     the table in response to RREPs received is done in the same manner described
     above for RREQs."
 
@@ -52,5 +65,5 @@ On APP_PAYLOAD received (Detailed):
 
 On ANYTHING transmitted (Detailed):
 ===================================
-1.  if (STALENESS == 0 || now - ts >= STALENESS || FLAGS || missing) send RREQ then send
-    else update the ts and send
+1.  if (now >= ts || FLAGS || missing): send RREQ then send
+    else: update the ts and send
