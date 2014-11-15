@@ -37,7 +37,7 @@ struct odr_msg {
     uint16_t num_hops;
     uint16_t len;
     uint8_t do_not_rrep:1;
-    uint8_t reroute:1;
+    uint8_t force_redisc:1;
 };
 
 struct tbl_entry {
