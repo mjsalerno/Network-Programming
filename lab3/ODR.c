@@ -325,7 +325,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-void* craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
+size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         fprintf(stderr, "ERROR: craft_frame(): data_len too big\n");
@@ -363,7 +363,46 @@ void* craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned 
     /* todo: also copy the ODR hdr */
     memcpy(buff + sizeof(struct ethhdr), data, data_len);
 
-    return buff;
+    return sizeof(struct ethhdr) + data_len;
+}
+
+/**
+*
+* |----------------frame----------------|
+* |-ethhdr-|-------------data-----------|
+* |-ethhdr-|---odr_msg---|---payload----|
+*
+* sends data on all ifaces except the one in the except arg
+* this already calls craft_frame
+*
+*/
+void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t data_len, int except) {
+    char buff[ETH_FRAME_LEN];
+    size_t size;
+    ssize_t ssize;
+    unsigned char addr[ETH_ALEN];
+    unsigned char bcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    struct sockaddr_ll raw_addr;
+
+    for(; hwa_head !=NULL; hwa_head = hwa_head->hwa_next) {
+        if(hwa_head->if_index == except) { /* skip the iface if it is except */
+            _DEBUG("skipping iface: %d\n", hwa_head->if_index);
+            continue;
+        }
+        _DEBUG("sending on iface: %d\n", hwa_head->if_index);
+        memcpy(addr, hwa_head->if_haddr, ETH_ALEN);
+        size = craft_frame(hwa_head->if_index, &raw_addr, buff, addr, bcast, data, data_len);
+        if(size < sizeof(struct ethhdr)) {
+            _ERROR("%s\n", "there was an error crafting the packet");
+            exit(EXIT_FAILURE);
+        }
+
+        ssize = sendto(rawsock, buff, size, 0, (struct sockaddr const *) &raw_addr, sizeof(raw_addr));
+        if(ssize < (ssize_t)sizeof(struct ethhdr)) {
+            _ERROR("%s : %m\n", "sendto()");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
 
 /* Can pass NULL for srcip or dstip if not wanted. */

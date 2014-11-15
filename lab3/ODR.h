@@ -67,6 +67,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRL
 int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]);
 
 /* funcs for raw pkt stuffs */
-void* craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
+size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
+void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t data_len, int except);
 
 #endif /* ODR_H */
