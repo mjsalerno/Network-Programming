@@ -47,13 +47,10 @@ int main(void) {
 
     for(EVER) {
         _DEBUG("%s", "waiting for clients...\n");
-        /* todo: msg_recv */
-        /*len = sizeof(cli_addr);*/
         /*todo: fix ip*/
         n = msg_recv(sock, buff, BUFF_SIZE, cli_ip_buff, &cliport);
-        /*n = recvfrom(sock, buff, BUFF_SIZE, 0, (struct sockaddr*)&cli_addr, &len);*/ /*old code*/
         if(n < 0) {
-            _ERROR("ERROR: msg_recv() returned %ld\n", (long int)n);
+            perror("ERROR: msg_recv()");
             close(sock);
             unlink(TIME_SRV_PATH);
             exit(EXIT_FAILURE);
@@ -75,9 +72,8 @@ int main(void) {
 
         /* todo: msg_send */
         err = msg_send(sock, cli_ip_buff, cliport, buff, (size_t)n, 0);
-        /*err = sendto(sock, buff, (size_t)n, 0, (struct sockaddr*) &cli_addr, len); old code*/
         if(err < 0) {
-            perror("ERROR: sendto()");
+            perror("ERROR: msg_send()");
             close(sock);
             unlink(TIME_SRV_PATH);
             exit(EXIT_FAILURE);
@@ -86,6 +82,5 @@ int main(void) {
 
     close(sock);
     unlink(TIME_SRV_PATH);
-
     exit(EXIT_SUCCESS);
 }

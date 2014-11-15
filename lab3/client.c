@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
         err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 1, 0);
         /*err = (int) sendto(sockfd, "H", 2, 0, (struct sockaddr *) &srv_addr, sizeof(srv_addr));*/
         if (err < 0) {
-            perror("ERROR: sendto()");
+            perror("ERROR: msg_send()");
             goto cleanup;
         }
         printf("client at node %s: SENDING request to server at %s\n", hostname, srvname);
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
             err = (int) msg_recv(sockfd, buf, sizeof(buf), ip_buf, &port);
             /*err = (int) recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *) &srv_addr, &socklen);*/
             if (err < 0) {
-                perror("ERROR: sendto()");
+                perror("ERROR: msg_recv()");
                 goto cleanup;
             }
             buf[err] = 0;
