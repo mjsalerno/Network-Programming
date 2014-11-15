@@ -19,15 +19,38 @@ On RREQ received (Detailed):
 ============================
 1. Update Reverse Route in routing table:
     a. Always do: route.broadcast_id = RREQ.broadcast_id ?????
-    b. If RREQ.hops <= route.hops then update route.
+    b. If RREQ.hops <= route.hops || RREQ.f_redisc then update route.
         1. Update the NxtHop to the src MAC in the sockaddr_ll.
     * Set NEW_ROUTE if no prev route to src or route was stale.
     * Set EFF_ROUTE if RREQ.hops < route.hops (more efficient route).
 
-2. RREP generation. Only if(RREQ.rrep_sent == 0):
+2. RREP generation. Only if(RREQ.rrep_sent == 0 && (RREQ.f_redisc == 0|| i_am_dest)):
     a. If I have route to RREQ.dst_ip then send RREP
+    b. If I am dest and RREQ.f_redisc, keep RREQ.f_redisc set
 
 3. RREQ flooding. Only if(!we_sent_RREP || (NEW_ROUTE || EFF_ROUTE)):
     a. If we sent RREP, set the RREQ.rrep_sent flag.
     b. Send RREQ on all interfaces except the source interface.
-    
+
+
+On RREP received (Detailed):
+============================
+1.  If the RREP was not for you relay it using the path in the table
+    that was added when the corresponding RREQ was recieved.
+
+2.  add/update the path to the destination. If the route is suboptimul,
+    DO NOT update the table and DO NOT relay the information to the destination
+
+?.  make a table?? "maintaining a route and its associated timestamp in
+    the table in response to RREPs received is done in the same manner described
+    above for RREQs."
+
+On APP_PAYLOAD received (Detailed):
+===================================
+1.  make sure to add the path to the source to the table.
+    WILL LOSE POINTS
+
+On ANYTHING transmitted (Detailed):
+===================================
+1.  if (STALENESS == 0 || now - ts >= STALENESS || FLAGS || missing) send RREQ then send
+    else update the ts and send
