@@ -16,9 +16,9 @@
 #define SVC_MAX_NUM 100
 #define SVC_TTL 15
 struct svc_entry {
-    int port;                   /* 0 reserved for timeservers */
+    time_t ttl;             /* time_to_live timestamp */
+    int port;               /* 0 reserved for timeservers */
     char sun_path[108];
-    time_t ttl;                 /* time_to_live timestamp */
 };
 
 
@@ -67,6 +67,6 @@ int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRL
 int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]);
 
 /* funcs for raw pkt stuffs */
-void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
+void* craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
 
 #endif /* ODR_H */

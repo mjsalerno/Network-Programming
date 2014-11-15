@@ -28,13 +28,13 @@ ssize_t msg_recv(int sock, char* msg, size_t msg_len, char* ip, int* port) {
     n = recv(sock, buf_msg, ODR_MSG_MAX, 0);
     if(n < 0) {
         return n;
-    } else if(n < sizeof(struct odr_msg)) {
+    } else if(n < (ssize_t)sizeof(struct odr_msg)) {
         _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
         exit(EXIT_FAILURE);
     }
     memcpy(&m, buf_msg, sizeof(m));     /* copy into struct, no SIGBUS */
 
-    if(n != (m.len + sizeof(struct odr_msg))) {
+    if(n != (ssize_t)(m.len + sizeof(struct odr_msg))) {
         _ERROR("recv'd bytes doesn't add up! n: %ld, m.len %d\n", (long int)n, m.len);
     }
     strncpy(ip, m.src_ip, INET_ADDRSTRLEN);                 /* fill user's ip */

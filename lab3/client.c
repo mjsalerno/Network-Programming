@@ -1,6 +1,6 @@
 #include "client.h"
 
-int main(int argc, char *argv[]) {
+int main(void) {
     int sockfd, filefd, err;
     socklen_t len;
     struct sockaddr_un my_addr, name_addr, srv_addr;

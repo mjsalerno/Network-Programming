@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
             if(n < 0) {
                 perror("ERROR: recvfrom(unixsock)");
                 goto cleanup;
-            } else if(n < sizeof(struct odr_msg)) {
+            } else if(n < (ssize_t)sizeof(struct odr_msg)) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
                 goto cleanup;
-            } else if(n < sizeof(struct odr_msg)) {
+            } else if(n < (ssize_t)sizeof(struct odr_msg)) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
             }
 
 
-        } else if(FD_ISSET(stdinfd, &rset)) {
+        } else if(FD_ISSET(stdinfd, &rset)) {                   /* so user can ^D to terminate */
             char *errc = fgets(buf_msg, ODR_MSG_MAX, stdin);
             if (errc == NULL) {
                 if(ferror(stdin)) {
@@ -217,7 +217,7 @@ int handle_unix_msg(int unixfd, struct svc_entry *svcs,
     msg_src_port = svc_update(svcs, from_addr);
 
 
-    if(m->dst_port < 0 || m->dst_port > SVC_MAX_NUM) {
+    if(m->dst_port > SVC_MAX_NUM) {
         _ERROR("service trying to send to a bad port: %d, ignoring...\n", m->dst_port);
         return 0;
     } else if(svcs[m->dst_port].port == -1) {
@@ -229,7 +229,7 @@ int handle_unix_msg(int unixfd, struct svc_entry *svcs,
     strncpy(dst_addr.sun_path, svcs[m->dst_port].sun_path, sizeof(dst_addr.sun_path));
     dst_addr.sun_path[sizeof(dst_addr.sun_path)-1] = '\0';
 
-    m->src_port = msg_src_port;
+    m->src_port = (uint16_t)msg_src_port;
     strcpy(m->src_ip, host_ip);
 
 
@@ -305,7 +305,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-void* craft_frame(int rawsock, int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
+void* craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         fprintf(stderr, "ERROR: craft_frame(): data_len too big\n");
