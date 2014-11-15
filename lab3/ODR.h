@@ -25,7 +25,7 @@ struct svc_entry {
 #define T_RREQ 0
 #define T_RREP 1
 #define T_DATA 2
-#define ODR_MSG_MAX 1522
+#define ODR_MSG_MAX 1515
 /* type: 0 for RREQ, 1 for RREP, and 2 for app payload */
 struct odr_msg {
     uint32_t broadcast_id;
@@ -69,5 +69,8 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 /* funcs for raw pkt stuffs */
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
 void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t data_len, int except);
+
+/* funcs for odr_msg{} */
+void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID);
 
 #endif /* ODR_H */
