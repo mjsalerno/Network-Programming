@@ -403,6 +403,9 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 
 /**
  * adds a route to the table
+ * If a route witht he same dest ip was found,
+ * the entry is replaced without question
+ *
  * returns the index it was added to
  * returns -1 if it was not added
  */

@@ -76,6 +76,12 @@ int main(int argc, char *argv[]) {
         if (errc != NULL) {
             *errc = 0;              /* replace '\n' with NULL term.*/
         }
+
+        if(*srvname == 'q' || *srvname == 'Q') {
+            printf("Bye\n");
+            goto cleanup;
+        }
+
         /* don't check if's a "vmXX", just call gethostbyname() */
         he = gethostbyname(srvname);
         if (he == NULL) {
