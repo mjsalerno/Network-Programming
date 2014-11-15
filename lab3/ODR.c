@@ -52,10 +52,12 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    if(setuid(1000) < 0) {
+    unlink(ODR_PATH); /* unlink before dropping root */
+
+/*    if(setuid(1000) < 0) {
         _ERROR("setuid(%d): %m\n", 1000);
         exit(EXIT_FAILURE);
-    }
+    }*/
 
 
     unixfd = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
@@ -68,7 +70,6 @@ int main(void) {
 
     my_addr.sun_family = AF_LOCAL;
     strncpy(my_addr.sun_path, ODR_PATH, sizeof(my_addr.sun_path)-1);
-    unlink(ODR_PATH);
 
     err = bind(unixfd, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
     if(err < 0) {
