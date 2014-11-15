@@ -43,8 +43,8 @@ add_executable(client
 	${CLIENT_SOURCE_FILES}
 	$<TARGET_OBJECTS:commonlib>)
 
-add_executable(testcli
-   	testcli.c
-   	${ODR_SOURCE_FILES}
-   	$<TARGET_OBJECTS:hwlib>
-   	$<TARGET_OBJECTS:commonlib>)
+#add_executable(testcli
+#   	testcli.c
+#   	${ODR_SOURCE_FILES}
+#   	$<TARGET_OBJECTS:hwlib>
+#   	$<TARGET_OBJECTS:commonlib>)
