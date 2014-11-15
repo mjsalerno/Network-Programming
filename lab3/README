@@ -1,22 +1,41 @@
 README for Assignment 3
-=====================================
-Scott Harvey     cse533-11  108272691
-Michael Salerno  cse533-8   xxxxxxxxx
-=====================================
+===========================================
+|  Scott Harvey     cse533-11  108272691  |
+|  Michael Salerno  cse533-8   xxxxxxxxx  |
+===========================================
 
+Special Cases:
+ If two clients on a VM1 both msg_send to vm5, and vm1 has no route to vm5,
+ then both msg_send()'s will generate an RREQ. We feel this is not an problem.
 
-If two clients on a VM1 both msg_send to vm5, and vm1 has no route to vm5,
-then both msg_send()'s will generate an RREQ. We feel this is not an problem.
+=======================
+Outline of ODR Program:
+=======================
+select(unixfd/rawfd):
+  unixfd:
+    1. Local dst IP: Forward to local dst port.
+    2. Remote dst IP:
+        a. get_route(dst_IP)
+            - no route/stale/f_redisc:    send RREQ over rawfd
+            - had a route:                send DATA over rawfd
 
+  rawfd:
+    * RREQ: see ODR Overview
+    * RREP: see ODR Overview
+    * DATA: see ODR Overview
 
-
-
-
+==============
 Routing Table:
-
+==============
+_______________________________________________________________________
 | DestIP | BroadcastID | NextHop(MAC) | IfIndex | NumHops | Timestamp |
+-----------------------------------------------------------------------
 
 
+
+==========================================
+============== ODR Overview ==============
+==========================================
 
 On RREQ received (Overview):
 ============================
@@ -58,7 +77,7 @@ On RREP received (Detailed):
     the table in response to RREPs received is done in the same manner described
     above for RREQs."
 
-On APP_PAYLOAD received (Detailed):
+On DATA received (Detailed):
 ===================================
 1.  make sure to add the path to the source to the table.
     WILL LOSE POINTS
