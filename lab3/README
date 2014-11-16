@@ -64,10 +64,10 @@ On RREQ received (Detailed):
     * Set EFF_ROUTE if no prev route to src or route was stale.
     * Set EFF_ROUTE if RREQ.hops < route.hops (more efficient route).
 
-if(RREQ.broadcast_id > route.broadcast_id || EFF_ROUTE):
+if(RREQ.broadcast_id > route.broadcast_id || EFF_ROUTE):  <--- same thing as add_route returning > -1
     2. RREP generation.
         Only if(!RREQ.do_not_rrep && (!RREQ.force_redisc || i_am_dest)):
-            a. If I have route to RREQ.dst_ip then send RREP
+            a. If I have route to RREQ.dst_ip then send RREP, also perserv force_redisc
             b. If I am dest and RREQ.force_redisc, keep RREQ.force_redisc set
 
     3. RREQ flooding. Only if(!we_sent_RREP || EFF_ROUTE):

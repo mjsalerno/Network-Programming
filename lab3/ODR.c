@@ -156,7 +156,8 @@ int main(int argc, char *argv[]) {
             /* note: invalidate ptr to buf_msg just to be safe*/
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
-            int eff, its_me, forw_index, we_sent;
+            int eff, its_me, forw_index;
+            uint8_t we_sent;
             its_me = (0 == strcmp(msgp->dst_ip, host_ip));
             len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
@@ -184,12 +185,18 @@ int main(int argc, char *argv[]) {
                         if(!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
                             if(its_me) {
                                 craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, 0);
+                                we_sent = 1;
                             } else if (forw_index > -1) {   /* we have the route */
                                 craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, route_table[forw_index].num_hops);
+                                we_sent = 1;
                             }
+                            if(we_sent)
+                                send_on_iface(rawsock, (char*)out_msg, sizeof(struct odr_msg), raw_addr.sll_ifindex, raw_addr.sll_addr);
+                        }
 
-                            we_sent = 1;
-                            
+                        if(we_sent || eff) {
+                            msgp->num_hops++;
+                            msgp->do_not_rrep = we_sent;
                         }
                     }
 
