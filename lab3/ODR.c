@@ -204,8 +204,25 @@ int main(int argc, char *argv[]) {
                 case T_RREP:
                     break;
                 case T_DATA:
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
+                    forw_index = find_route_index(route_table, msgp->dst_ip);
+                    if(0 == strcmp(msgp->dst_ip, host_ip)) {
+                        _DEBUG("%s\n", "received data for me");
+                        /* todo: scott says fix he needs to fix it or something */
+                        _ERROR("%s\n", "I R BROKEN!!!");
+                        /*handle_unix_msg(unixsock, svcs, msgp, sizeof(struct odr_msg), NULL);*/
+                    } else if(forw_index > -1) {
+                        _DEBUG("%s\n", "received data that is not mine, and i have the route\n");
+                        send_on_iface(rawsock, (char*)msgp, sizeof(struct odr_msg) + msgp->len, route_table[forw_index]
+                                .iface_index, route_table[forw_index].mac_next_hop);
+                    } else {
+                        _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
+                        craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
+                        queue_store(&queue, msgp);
+                    }
                     break;
                 default:
+                    _ERROR("Do not know what to do with this type of msg: %d", msgp->type);
                     break;
 
             }
