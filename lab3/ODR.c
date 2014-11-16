@@ -202,6 +202,42 @@ int main(int argc, char *argv[]) {
 
                     break;
                 case T_RREP:
+                    /* forwarding RREP */
+                    if(!its_me) {
+                        /* then i should still have the path made from the request (unless staleness is really low)*/
+                        forw_index = find_route_index(route_table, msgp->dst_ip);
+                        if(forw_index < 0) {
+                            _ERROR("%s\n", "there was an error, no route found to forward RREP maybe staleness too low");
+                            /*exit(EXIT_FAILURE);*/
+                            craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+                            broadcast(rawsock, hwahead, (char*)out_msg, sizeof(struct odr_msg) + out_msg->len, raw_addr.sll_ifindex);
+                            queue_store(&queue, out_msg);
+                            break;
+                        }
+
+                        /*todo see if the eff gets updated like i think it will*/
+                        eff = 0;
+                        /* check to see if the their path is better than mine */
+                        /* if force_redesc then always send theirs            */
+                        if(add_route(route_table, msgp, &raw_addr, staleness, &eff) || eff || msgp->force_redisc) {
+                            _DEBUG("%s\n", "forwarding their route");
+                            send_on_iface(rawsock, (char*)msgp, sizeof(struct odr_msg) + msgp->len, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
+                        } else { /*i have better route*/
+                            /*todo i think this else is junk, I should never get here*/
+                            _DEBUG("I have a better route, their hops: %d, my hops: %d\n", msgp->num_hops, route_table[forw_index].num_hops);
+                            craft_rrep(out_msg, host_ip, msgp->dst_ip, 0, route_table[forw_index].num_hops);
+                            send_on_iface(rawsock, (char*)out_msg, sizeof(struct odr_msg) + out_msg->len, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
+                        }
+                    /* the rrep is for me :D */
+                    } else {
+                        eff = 0;
+                        err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
+                        if(err < 0 || eff < 1) {
+                            _ERROR("bad eff or err when adding to the rout table, err: %d  eff: %d\n", err, eff);
+                        }
+                        /* todo add this when it is fixed
+                        queue_send(&queue, rawsock, route_table);*/
+                    }
                     break;
                 case T_DATA:
                     err = add_route(route_table, msgp, &raw_addr, staleness, &eff);

@@ -82,7 +82,7 @@ On RREP received (Detailed):
     that was added when the corresponding RREQ was received.
 
 2.  Add/Update the path to the destination. If the route is suboptimal,
-    DO NOT update the table and DO NOT relay the information to the destination.
+    DO NOT update the table and DO NOT relay the information to the destination. (what about when force_redsc??)
 
 ?.  "maintaining a route and its associated timestamp in
     the table in response to RREPs received is done in the same manner described
