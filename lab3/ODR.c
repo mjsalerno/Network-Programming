@@ -3,7 +3,7 @@
 
 /* fixme: remove */
 static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
-/*static struct tbl_entry route_table[NUM_NODES];*/
+static struct tbl_entry route_table[NUM_NODES];
 
 int main(int argc, char *argv[]) {
     int err;
