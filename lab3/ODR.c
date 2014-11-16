@@ -629,35 +629,38 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  * returns the index it was added to
  * returns -1 if it was not added
  */
-int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN],
-        unsigned char mac_next_hop[ETH_ALEN], int iface_index, uint16_t num_hops,
-        uint32_t broadcast_id, int staleness, int* flags) {
-
+int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr, int staleness, int* flags) {
     int i, rtn = -1;
-    _DEBUG("looking to add ip: %s\n", ip_dst);
+    _DEBUG("looking to add ip: %s\n", msgp->src_ip);
 
     for (i = 0; i < NUM_NODES; ++i) {
-        if(route_table[i].ip_dst[0] == 0 || strncmp(route_table[i].ip_dst, ip_dst, INET_ADDRSTRLEN) == 0) {
+        if(route_table[i].ip_dst[0] == 0 || strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN) == 0) {
             _DEBUG("adding at index: %d\n", i);
-            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < num_hops) {
-                _DEBUG("%s\n", "Found a less efficient rout but updating bcast id");
-                route_table[i].broadcast_id = broadcast_id;
+            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops) {
+                _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
+                route_table[i].broadcast_id = msgp->broadcast_id;
                 *flags = 0;
                 return -1;
             }
-            memcpy(route_table[i].mac_next_hop, mac_next_hop, ETH_ALEN);
-            route_table[i].iface_index = iface_index;
-            route_table[i].num_hops = num_hops;
+            if(route_table[i].num_hops > msgp->num_hops) {
+                *flags = 1;
+            }
+            if( route_table[i].ip_dst[0] == 0 ) {
+                *flags = 1;
+                /* todo: add q_send here */
+            }
+            memcpy(route_table[i].mac_next_hop, raw_addr->sll_addr, ETH_ALEN);
+            route_table[i].iface_index = raw_addr->sll_ifindex;
+            route_table[i].num_hops = msgp->num_hops;
             route_table[i].timestamp = time(NULL) + staleness;
-            route_table[i].broadcast_id = broadcast_id;
-            strncpy(route_table[i].ip_dst, ip_dst, 16);
-            *flags = EFF_ROUTE;
+            route_table[i].broadcast_id = msgp->broadcast_id;
+            strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
             return i;
         }
         _DEBUG("index was full : %d\n", i);
     }
 
-    _DEBUG("unable to add ip: %s\n", ip_dst);
+    _DEBUG("unable to add ip: %s\n", msgp->src_ip);
     return rtn;
 }
 

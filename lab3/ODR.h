@@ -85,9 +85,7 @@ int deliver_app_mesg(int unixfd, struct odr_msg *m, size_t bytes);
 /* route table stuff */
 #define NEW_ROUTE 0x1
 #define EFF_ROUTE 0x2
-int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN],
-        unsigned char mac_next_hop[ETH_ALEN], int iface_index, uint16_t num_hops,
-        uint32_t broadcast_id, int staleness, int* flags);
+int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr, int staleness, int* flags);
 int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]);
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
 
