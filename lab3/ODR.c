@@ -35,9 +35,6 @@ int main(int argc, char *argv[]) {
     }
     staleness = atoi(argv[1]);
 
-    staleness++;
-    staleness--;
-
     char* buff = malloc(ETH_FRAME_LEN);
     buf_msg = malloc(ODR_MSG_MAX);
     if(buf_msg == NULL) {
@@ -141,18 +138,18 @@ int main(int argc, char *argv[]) {
                         -1 != (route_i = find_route_index(route_table, msgp->dst_ip))) {
                     /* send DATA */
 
-                    send_on_iface(rawsock, hwahead, (char *)msgp, msgp->len,
+                    send_on_iface(rawsock, (char *)msgp, msgp->len,
                             route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
-
+                    /* done ? */
                 } else {
                     /* send RREQ */
                     /* either we don't have a route or force_redisc was set
                      so we pretend like we don't have a route */
-                    store_msg(&queue, msgp);
+                    queue_store(&queue, msgp);
                     memset(out_msg, 0, sizeof(struct odr_msg));
                     craft_rreq(out_msg, host_ip, msgp->dst_ip, 1, broadcastID);
                     broadcastID++;
-                    send_on_ifaces(rawsock, hwahead, (char *)msgp, msgp->len, -1);
+                    broadcast(rawsock, hwahead, (char *) msgp, msgp->len, -1);
                     /* done ? */
                 }
             }
@@ -399,32 +396,15 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
 * this already calls craft_frame
 *
 */
-void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t data_len, int except) {
-    char buff[ETH_FRAME_LEN];
-    size_t size;
-    ssize_t ssize;
-    unsigned char addr[ETH_ALEN];
+void broadcast(int rawsock, struct hwa_info *hwa_head, char *data, size_t data_len, int except) {
     unsigned char bcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    struct sockaddr_ll raw_addr;
 
     for(; hwa_head !=NULL; hwa_head = hwa_head->hwa_next) {
         if(hwa_head->if_index == except) { /* skip the iface if it is except */
             _DEBUG("skipping iface: %d\n", hwa_head->if_index);
             continue;
         }
-        _DEBUG("sending on iface: %d\n", hwa_head->if_index);
-        memcpy(addr, hwa_head->if_haddr, ETH_ALEN);
-        size = craft_frame(hwa_head->if_index, &raw_addr, buff, addr, bcast, data, data_len);
-        if(size < sizeof(struct ethhdr)) {
-            _ERROR("%s\n", "there was an error crafting the packet");
-            exit(EXIT_FAILURE);
-        }
-
-        ssize = sendto(rawsock, buff, size, 0, (struct sockaddr const *) &raw_addr, sizeof(raw_addr));
-        if(ssize < (ssize_t)sizeof(struct ethhdr)) {
-            _ERROR("%s : %m\n", "sendto()");
-            exit(EXIT_FAILURE);
-        }
+        send_on_iface(rawsock, data, data_len, hwa_head->if_index, bcast);
     }
 }
 
@@ -436,18 +416,18 @@ void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t d
 *
 * Sends data on only the dst_if interface to dst_mac
 * This already calls craft_frame
-* todo: change send_on_ifaces() to use this func
+* todo: change broadcast() to use this func
 */
-void send_on_iface(int rawsock, struct hwa_info* hwa_head, char* data,
-        size_t data_len, int dst_if, unsigned char dst_mac[ETH_ALEN]) {
+void send_on_iface(int rawsock, char* data, size_t data_len,
+        int dst_if, unsigned char dst_mac[ETH_ALEN]) {
     char buff[ETH_FRAME_LEN];
     size_t size;
     ssize_t ssize;
     unsigned char mac[ETH_ALEN];
     struct sockaddr_ll raw_addr;
 
-    _DEBUG("sending on iface: %d\n", hwa_head->if_index);
-    memcpy(mac, hwa_head->if_haddr, ETH_ALEN);
+    _DEBUG("sending on iface: %d\n", dst_if);
+    memcpy(mac, dst_mac, ETH_ALEN);
     size = craft_frame(dst_if, &raw_addr, buff, mac, dst_mac, data, data_len);
     if (size < sizeof(struct ethhdr)) {
         _ERROR("%s\n", "there was an error crafting the packet");
@@ -544,32 +524,53 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
 
 
 /**
-*   malloc()'s space for |-- odr_msg --|--  data  --|  and then put it at the
+*   Store the message into the queue, to be sent later (upon getting a route).
+*
+*   malloc()'s space for |-- odr_msg --|--  data  --|  and then puts it at the
 *   end of the queue.
 */
-void store_msg(struct msg_queue *queue, struct odr_msg *m) {
-    struct msg_node *new_msg;
+void queue_store(struct msg_queue *queue, struct odr_msg *m) {
+    struct msg_node *new_node, *curr, *prev;
     size_t real_len;
     if(queue == NULL || m == NULL) {
         _ERROR("%s", "You're msg queue stuff NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
     real_len = sizeof(struct odr_msg) + m->len;
-    new_msg = malloc(real_len);
-    if(new_msg == NULL) {
+    new_node = malloc(sizeof(struct msg_node)); /**/
+    if(new_node == NULL) {
         _ERROR("%s", "malloc() returned NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
-    memcpy(new_msg, m, real_len);
+    memcpy(new_node, m, real_len);
 
     if(queue->head == NULL) {        /* case if list is empty */
-        queue->head = new_msg;
-        queue->tail = new_msg;
+        queue->head = new_node;
+        queue->tail = new_node;
         return;
     }
-                                        /* list not empty */
-    queue->tail->next = new_msg;
-    queue->tail = new_msg;
+    curr = queue->head;
+    prev = NULL;
+    for( ; curr != NULL; prev = curr, curr = curr->next) {
+        if(strncmp(m->dst_ip, curr->msg->dst_ip, INET_ADDRSTRLEN) < 0){
+            new_node->next = curr;
+            if(prev == NULL) {
+                queue->head = new_node; /* case if before head */
+            } else {
+                prev->next = new_node;  /* case if after head*/
+            }
+            return;
+        }
+    }
+    /* case if last element */
+    prev->next = new_node;
+}
+
+/**
+*   Check if any messages in the queue now have a route in the table.
+*/
+void queue_send(struct msg_queue *queue, int rawfd, struct tbl_entry *route_tbl) {
+
 }
 
 /**
