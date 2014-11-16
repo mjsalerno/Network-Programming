@@ -159,6 +159,8 @@ int main(int argc, char *argv[]) {
             /* note: invalidate ptr to buf_msg just to be safe*/
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
+            int eff, its_me, forw_index, we_sent;
+            its_me = (0 == strcmp(msgp->dst_ip, host_ip));
             len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
@@ -173,7 +175,26 @@ int main(int argc, char *argv[]) {
             switch(msgp->type) {
 
                 case T_RREQ:
+                    eff = 0;
+                    we_sent = 0;
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
+                    forw_index = find_route_index(route_table, msgp->dst_ip);
 
+                    if(err < 0) {
+                        _DEBUG("%s\n", "the route was not added");
+                    } else {
+
+                        if(!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
+                            if(its_me) {
+                                craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, 0);
+                            } else if (forw_index > -1) {   /* we have the route */
+                                craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, route_table[forw_index].num_hops);
+                            }
+
+                            we_sent = 1;
+                            
+                        }
+                    }
 
                     break;
                 case T_RREP:
