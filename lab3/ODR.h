@@ -63,8 +63,13 @@ int handle_unix_msg(int unixfd, struct svc_entry *svcs,
 int deliver_app_mesg(int unixfd, struct odr_msg *m, size_t bytes);
 
 /* route table stuff */
-int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN], unsigned char mac_next_hop[ETH_ALEN], int iface_index, uint16_t num_hops, uint32_t broadcast_id, int staleness);
+#define NEW_ROUTE 0x1
+#define EFF_ROUTE 0x2
+int add_route(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN],
+        unsigned char mac_next_hop[ETH_ALEN], int iface_index, uint16_t num_hops,
+        uint32_t broadcast_id, int staleness, int* flags);
 int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]);
+int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
 
 /* funcs for raw pkt stuffs */
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
@@ -72,5 +77,6 @@ void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t d
 
 /* funcs for odr_msg{} */
 void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID);
+void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, int num_hops);
 
 #endif /* ODR_H */
