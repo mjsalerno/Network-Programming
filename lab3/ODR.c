@@ -3,7 +3,7 @@
 
 /* fixme: remove */
 static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
-static struct tbl_entry route_table[NUM_NODES];
+/*static struct tbl_entry route_table[NUM_NODES];*/
 
 int main(int argc, char *argv[]) {
     int err;
@@ -33,6 +33,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     staleness = atoi(argv[1]);
+
+    staleness++;
+    staleness--;
 
     char* buff = malloc(ETH_FRAME_LEN);
     buf_msg = malloc(ODR_MSG_MAX);
@@ -149,7 +152,6 @@ int main(int argc, char *argv[]) {
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
             len = sizeof(raw_addr);
-            int fi, bi;
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
@@ -163,35 +165,7 @@ int main(int argc, char *argv[]) {
             switch(msgp->type) {
 
                 case T_RREQ:
-                    bi = find_route_index(route_table, msgp->src_ip);
-                    fi = find_route_index(route_table, msgp->dst_ip);
-                    int its_me = (0 == strcmp(msgp->dst_ip, host_ip));
 
-                    if((fi >= 0 && !msgp->force_redisc) || its_me) { /* we have a route for it*/
-                        if(msgp->broadcast_id < route_table[fi].broadcast_id
-                                || msgp->num_hops < route_table[fi].num_hops) { /* we did not answer it or it has better hops*/
-
-                            if(msgp->do_not_rrep == 0 && (msgp->force_redisc == 0 || its_me)) {
-                                /* send rrep since we have the answer and do_not_rrep is not set */
-                                craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc,
-                                    its_me ? 0 : route_table[fi].num_hops);
-
-                                //send_on_ifaces(rawsock, hwahead, (char*), <#(size_t)data_len#>, <#(int)except#>)
-
-                            }
-                        }
-                    } else { /* we do not have a route to it */
-                        /* todo: send out on all ifaces */
-                    }
-
-                    /* no matter what update the back path if hops id better*/
-                    if(msgp->force_redisc || bi < 0 || msgp->num_hops >= route_table[bi].num_hops) { /* the back pth is better or the same */
-                        /*err = add_route(route_table, msgp->src_ip, raw_addr.sll_addr, raw_addr.sll_ifindex, msgp->num_hops, msgp->broadcast_id, staleness);*/
-                        if (err < 0) {
-                            _ERROR("%s\n", "There was an error adding the back route");
-                            exit(EXIT_FAILURE);
-                        }
-                    }
 
                     break;
                 case T_RREP:
