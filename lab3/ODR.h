@@ -55,9 +55,10 @@ struct msg_node {
     struct odr_msg *msg;
 };
 
+/* A queue of un-sent messages */
 struct msg_queue {
     struct msg_node *head;
-    struct msg_node *tail;
+    /*struct msg_node *tail;*/
 };
 
 struct tbl_entry {

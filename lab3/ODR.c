@@ -507,29 +507,34 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
 *
 *   malloc()'s space for |-- odr_msg --|--  data  --|  and then puts it at the
 *   end of the queue.
+*   NOTE: malloc()'s 2 times
 */
 void queue_store(struct msg_queue *queue, struct odr_msg *m) {
     struct msg_node *new_node, *curr, *prev;
     size_t real_len;
     if(queue == NULL || m == NULL) {
-        _ERROR("%s", "You're msg queue stuff NULL! Failing!\n");
+        _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
-    real_len = sizeof(struct odr_msg) + m->len;
-    new_node = malloc(sizeof(struct msg_node)); /**/
+    new_node = malloc(sizeof(struct msg_node)); /* alloc the enclosing msg_node */
     if(new_node == NULL) {
         _ERROR("%s", "malloc() returned NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
-    memcpy(new_node, m, real_len);
-
-    if(queue->head == NULL) {        /* case if list is empty */
-        queue->head = new_node;
-        queue->tail = new_node;
-        return;
+    real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
+    new_node->msg = malloc(real_len);
+    if(new_node->msg == NULL) {
+        _ERROR("%s", "malloc() returned NULL! Failing!\n");
+        exit(EXIT_FAILURE);
     }
+    memcpy(new_node->msg, m, real_len);
+
     curr = queue->head;
     prev = NULL;
+    if(curr == NULL) {        /* case if list is empty */
+        queue->head = new_node;
+        return;
+    }
     for( ; curr != NULL; prev = curr, curr = curr->next) {
         if(strncmp(m->dst_ip, curr->msg->dst_ip, INET_ADDRSTRLEN) < 0){
             new_node->next = curr;
@@ -547,9 +552,51 @@ void queue_store(struct msg_queue *queue, struct odr_msg *m) {
 
 /**
 *   Check if any messages in the queue now have a route in the table.
+*
 */
-void queue_send(struct msg_queue *queue, int rawfd, struct tbl_entry *route_tbl) {
-
+void queue_send(struct msg_queue *queue, int rawsock, struct tbl_entry *route_tbl) {
+    struct msg_node *curr, *prev, *tofree;
+    char prev_ip[INET_ADDRSTRLEN] = "\0";
+    int route_i = -1;
+    if(queue == NULL || route_tbl == NULL) {
+        _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
+        exit(EXIT_FAILURE);
+    }
+    /**
+    *   Since the msgs are ordered based on dst_ip we only look up in the
+    *   routing table every time the dst_ip is different than in the previous
+    *   msg.
+    */
+    curr = queue->head;
+    prev = NULL;
+    while(curr != NULL) {
+        if(strncmp(curr->msg->dst_ip, prev_ip, INET_ADDRSTRLEN) != 0) {
+            /* ip different so lookup route again */
+            route_i = find_route_index(route_tbl, curr->msg->dst_ip);
+            strncpy(prev_ip, curr->msg->dst_ip, INET_ADDRSTRLEN);
+        }
+        /* if way have a route, then ip same so just send */
+        if(route_i >= 0) {
+            send_on_iface(rawsock, (char*)curr->msg,
+                    (sizeof(struct odr_msg) + curr->msg->len),
+                    route_tbl[route_i].iface_index, route_tbl[route_i].mac_next_hop);
+            /* now free the msg_node, since it was sent */
+            tofree = curr;
+            if(prev == NULL){               /* case if curr is head */
+                queue->head = curr->next;
+                curr = queue->head;
+            } else {                        /* case if curr is not head */
+                curr = curr->next;
+                prev->next = curr;
+            }
+            free(tofree->msg);
+            free(tofree);
+        } else {
+            /* we didn't have a route so just skip this message */
+            prev = curr;
+            curr = curr->next;
+        }
+    }
 }
 
 /**

@@ -13,7 +13,8 @@ Special Cases:
   then both msg_send()'s will generate equivalent RREQs. We reason that this
   is not a problem.
 
-2. If a msg_send() has set force_redisc we do not immediately drop the route
+2. *** FIX to immediately drop the route: ***
+    If a msg_send() has set force_redisc we do not immediately drop the route
   from our routing table. Instead we send a RREQ with the force_redisc flag
   set. The corresponding RREP that eventually comes back will also have the
   force_redisc flag set, causing us to forcefully update our route.
@@ -67,7 +68,7 @@ On RREQ received (Detailed):
 if(RREQ.broadcast_id > route.broadcast_id || EFF_ROUTE):
     2. RREP generation.
         Only if(!RREQ.do_not_rrep && (!RREQ.force_redisc || i_am_dest)):
-            a. If I have route to RREQ.dst_ip then send RREP
+            a. If I have route to RREQ.dst_ip:  then send RREP
             b. If I am dest and RREQ.force_redisc, keep RREQ.force_redisc set
 
     3. RREQ flooding. Only if(!we_sent_RREP || EFF_ROUTE):
