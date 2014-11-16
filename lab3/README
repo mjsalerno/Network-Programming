@@ -61,16 +61,16 @@ On RREQ received (Detailed):
     a. Always do: route.broadcast_id = RREQ.broadcast_id ?????
     b. If RREQ.hops <= route.hops || RREQ.force_redisc then update route.
         1. Update the NxtHop to the src MAC in the sockaddr_ll.
-    * Set NEW_ROUTE if no prev route to src or route was stale.
+    * Set EFF_ROUTE if no prev route to src or route was stale.
     * Set EFF_ROUTE if RREQ.hops < route.hops (more efficient route).
 
 if(RREQ.broadcast_id > route.broadcast_id || EFF_ROUTE):
     2. RREP generation.
-        Only if(RREQ.rrep_sent == 0 && (RREQ.force_redisc == 0 || i_am_dest)):
-        a. If I have route to RREQ.dst_ip then send RREP
-        b. If I am dest and RREQ.force_redisc, keep RREQ.force_redisc set
+        Only if(!RREQ.do_not_rrep && (!RREQ.force_redisc || i_am_dest)):
+            a. If I have route to RREQ.dst_ip then send RREP
+            b. If I am dest and RREQ.force_redisc, keep RREQ.force_redisc set
 
-    3. RREQ flooding. Only if(!we_sent_RREP || (NEW_ROUTE || EFF_ROUTE)):
+    3. RREQ flooding. Only if(!we_sent_RREP || EFF_ROUTE):
         a. If we sent RREP, set the RREQ.rrep_sent flag.
         b. Send RREQ on all interfaces except the source interface.
 

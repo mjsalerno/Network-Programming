@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
     struct odr_msg *msgp;               /* to cast buf_local_msg */
     struct odr_msg *out_msg;
     uint32_t broadcastID = 0;
+    struct msg_queue queue;
 
     int staleness;
     /*socklen_t len;*/
@@ -130,19 +131,26 @@ int main(int argc, char *argv[]) {
                     goto cleanup;
                 }
             } else {
-                _DEBUG("FIXME: msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
-                /* fixme: dst ip is not local */
-                if(msgp->force_redisc) {
-                    /* pretend like we don't have a route, send RREQ */
+                int route_i;
+                _DEBUG("msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
+                /* force_rediscid off  AND     we do have a route to the dest IP */
+                if(!msgp->force_redisc &&
+                        -1 != (route_i = find_route_index(route_table, msgp->dst_ip))) {
+                    /* send DATA */
+
+                    send_on_iface(rawsock, hwahead, (char *)msgp, msgp->len,
+                            route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
+
+                } else {
+                    /* send RREQ */
+                    /* either we don't have a route or force_redisc was set
+                     so we pretend like we don't have a route */
+                    store_msg(&queue, msgp);
                     memset(out_msg, 0, sizeof(struct odr_msg));
                     craft_rreq(out_msg, host_ip, msgp->dst_ip, 1, broadcastID);
                     broadcastID++;
-                    /* send on all ifaces */
-                    /* queue the service's msg */
+                    send_on_ifaces(rawsock, hwahead, (char *)msgp, msgp->len, -1);
                     /* done ? */
-
-                } else {
-
                 }
             }
             /* note: invalidate ptr to buf_msg just to be safe*/
@@ -244,7 +252,7 @@ cleanup:
 int handle_unix_msg(int unixfd, struct svc_entry *svcs,
         struct odr_msg *m, size_t mlen, struct sockaddr_un *from_addr) {
 
-    struct sockaddr_un dst_addr = {0};
+    struct sockaddr_un dst_addr;
     int msg_src_port;
     socklen_t len;
     ssize_t err;
@@ -355,7 +363,7 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
         raw_addr->sll_family = PF_PACKET;
         raw_addr->sll_protocol = htons(PROTO);
 
-        /*todo: index of the network device*/
+        /*index of the network device*/
         raw_addr->sll_ifindex = index;
 
         /*ARP hardware identifier is ethernet*/
@@ -375,7 +383,6 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
     /* copy in the data */
-    /* todo: also copy the ODR hdr */
     memcpy(buff + sizeof(struct ethhdr), data, data_len);
 
     return sizeof(struct ethhdr) + data_len;
@@ -419,6 +426,41 @@ void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t d
         }
     }
 }
+
+/**
+*
+* |----------------frame----------------|
+* |-ethhdr-|-------------data-----------|
+* |-ethhdr-|---odr_msg---|---payload----|
+*
+* Sends data on only the dst_if interface to dst_mac
+* This already calls craft_frame
+* todo: change send_on_ifaces() to use this func
+*/
+void send_on_iface(int rawsock, struct hwa_info* hwa_head, char* data,
+        size_t data_len, int dst_if, unsigned char dst_mac[ETH_ALEN]) {
+    char buff[ETH_FRAME_LEN];
+    size_t size;
+    ssize_t ssize;
+    unsigned char mac[ETH_ALEN];
+    struct sockaddr_ll raw_addr;
+
+    _DEBUG("sending on iface: %d\n", hwa_head->if_index);
+    memcpy(mac, hwa_head->if_haddr, ETH_ALEN);
+    size = craft_frame(dst_if, &raw_addr, buff, mac, dst_mac, data, data_len);
+    if (size < sizeof(struct ethhdr)) {
+        _ERROR("%s\n", "there was an error crafting the packet");
+        exit(EXIT_FAILURE);
+    }
+
+    ssize = sendto(rawsock, buff, size, 0, (struct sockaddr const *)&raw_addr,
+            sizeof(raw_addr));
+    if (ssize < (ssize_t) sizeof(struct ethhdr)) {
+        _ERROR("%s : %m\n", "sendto()");
+        exit(EXIT_FAILURE);
+    }
+}
+
 
 /* Can pass NULL for srcip or dstip if not wanted. */
 void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID) {
@@ -480,6 +522,35 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
     }
 }
 
+
+/**
+*   malloc()'s space for |-- odr_msg --|--  data  --|  and then put it at the
+*   end of the queue.
+*/
+void store_msg(struct msg_queue *queue, struct odr_msg *m) {
+    struct msg_node *new_msg;
+    size_t real_len;
+    if(queue == NULL || m == NULL) {
+        _ERROR("%s", "You're msg queue stuff NULL! Failing!\n");
+        exit(EXIT_FAILURE);
+    }
+    real_len = sizeof(struct odr_msg) + m->len;
+    new_msg = malloc(real_len);
+    if(new_msg == NULL) {
+        _ERROR("%s", "malloc() returned NULL! Failing!\n");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(new_msg, m, real_len);
+
+    if(queue->head == NULL) {        /* case if list is empty */
+        queue->head = new_msg;
+        queue->tail = new_msg;
+        return;
+    }
+                                        /* list not empty */
+    queue->tail->next = new_msg;
+    queue->tail = new_msg;
+}
 
 /**
 * Init the services array to have index 0 as the time server.
