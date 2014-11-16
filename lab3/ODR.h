@@ -40,6 +40,26 @@ struct odr_msg {
     uint8_t force_redisc:1;
 };
 
+/**
+*  The pending queue of T_DATA messages waiting for routes.
+*  NOTE: MISLEADING because the odr_msg is followed by data.
+*`
+*  |---------- msg_node --------------|
+*  |-- next --|------- odr_msg -------|---- odr_msg.len bytes of data ----|
+*      ||
+*      V
+*      |----msg_node----|
+*/
+struct msg_node {
+    struct msg_node *next;
+    struct odr_msg *msg;
+};
+
+struct msg_queue {
+    struct msg_node *head;
+    struct msg_node *tail;
+};
+
 struct tbl_entry {
     unsigned char mac_next_hop[ETH_ALEN];
     char ip_dst[INET_ADDRSTRLEN];
@@ -74,9 +94,14 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
 /* funcs for raw pkt stuffs */
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
 void send_on_ifaces(int rawsock, struct hwa_info* hwa_head, char* data, size_t data_len, int except);
+void send_on_iface(int rawsock, struct hwa_info* hwa_head, char* data,
+        size_t data_len, int dst_if, unsigned char dst_mac[ETH_ALEN]);
 
 /* funcs for odr_msg{} */
 void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID);
 void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, int num_hops);
+
+/* funcs for msg_queue{} */
+void store_msg(struct msg_queue *queue, struct odr_msg *m);
 
 #endif /* ODR_H */

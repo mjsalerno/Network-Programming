@@ -1,6 +1,6 @@
 # Author Mike Salerno
 # Author Scott Harvey
-
+CC = clang
 CC = gcc
 
 # Location of Steven's lib on minix
