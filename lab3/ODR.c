@@ -409,7 +409,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
-        fprintf(stderr, "ERROR: craft_frame(): data_len too big\n");
+        _ERROR("%s\n", "ERROR: craft_frame(): data_len too big");
         exit(EXIT_FAILURE);
     }
 
@@ -759,19 +759,20 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  * returns -1 if it was not added
  */
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr, int staleness, int* flags) {
-    int i, rtn = -1;
+    int i;
     _DEBUG("looking to add ip: %s\n", msgp->src_ip);
 
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN) == 0) {
             _DEBUG("adding at index: %d\n", i);
-            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops) {
+            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
                 _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
                 route_table[i].broadcast_id = msgp->broadcast_id;
                 *flags = 0;
                 return -1;
             }
-            if(route_table[i].num_hops > msgp->num_hops) {
+            /*todo should this also be set if force_redesc?*/
+            if(route_table[i].num_hops > msgp->num_hops /*|| msgp.force_redesc*/) {
                 *flags = 1;
             }
             if( route_table[i].ip_dst[0] == 0 ) {
@@ -789,8 +790,9 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
         _DEBUG("index was full : %d\n", i);
     }
 
-    _DEBUG("unable to add ip: %s\n", msgp->src_ip);
-    return rtn;
+    _ERROR("unable to add ip: %s\n", msgp->src_ip);
+    exit(EXIT_FAILURE);
+    return -1;
 }
 
 /**
