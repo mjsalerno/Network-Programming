@@ -593,9 +593,12 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
 *   malloc()'s space for |-- odr_msg --|--  data  --|  and then puts it at the
 *   end of the queue.
 *   NOTE: malloc()'s 2 times
+*   RETURNS:    0   if the dst IP was not already in the queue
+*               -1  if the dst IP was already in the queue.
 */
-void queue_store(struct msg_queue *queue, struct odr_msg *m) {
+int queue_store(struct msg_queue *queue, struct odr_msg *m) {
     struct msg_node *new_node, *curr, *prev;
+    int cmp;
     size_t real_len;
     if(queue == NULL || m == NULL) {
         _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
@@ -614,21 +617,23 @@ void queue_store(struct msg_queue *queue, struct odr_msg *m) {
     prev = NULL;
     if(curr == NULL) {        /* case if list is empty */
         queue->head = new_node;
-        return;
+        return 0;
     }
     for( ; curr != NULL; prev = curr, curr = curr->next) {
-        if(strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN) < 0){
+        cmp = strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
+        if(cmp <= 0){
             new_node->next = curr;
             if(prev == NULL) {
                 queue->head = new_node; /* case if before head */
             } else {
                 prev->next = new_node;  /* case if after head*/
             }
-            return;
+            return (cmp == 0);
         }
     }
     /* case if last element */
     prev->next = new_node;
+    return 0;
 }
 
 /**

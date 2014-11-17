@@ -86,21 +86,30 @@ int deliver_app_mesg(int unixfd, struct odr_msg *m, size_t bytes);
 /* route table stuff */
 #define NEW_ROUTE 0x1
 #define EFF_ROUTE 0x2
-int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr, int staleness, int* flags);
-int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]);
+int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
+        struct sockaddr_ll* raw_addr, int staleness, int* flags);
+int find_route_index(struct tbl_entry route_table[NUM_NODES],
+        char ip_dst[INET_ADDRSTRLEN]);
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
 
 /* funcs for raw pkt stuffs */
-size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
-void broadcast(int rawsock, struct hwa_info *hwa_head, char *data, size_t data_len, int except);
+size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff,
+        unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN],
+        char* data, size_t data_len);
+void broadcast(int rawsock, struct hwa_info *hwa_head, char *data,
+        size_t data_len, int except);
 void send_on_iface(int rawsock, char* data, size_t data_len,
         int dst_if, unsigned char dst_mac[ETH_ALEN]);
 
 /* funcs for odr_msg{} */
-void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID);
-void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, int num_hops);
+void craft_rreq(struct odr_msg *m, char *srcip, char *dstip,
+        int force_redisc, uint32_t broadcastID);
+void craft_rrep(struct odr_msg *m, char *srcip, char *dstip,
+        int force_redisc, int num_hops);
 
 /* funcs for msg_queue{} */
-void queue_store(struct msg_queue *queue, struct odr_msg *m);
+int queue_store(struct msg_queue *queue, struct odr_msg *m);
+void queue_send(struct msg_queue *queue, int rawsock,
+        struct tbl_entry *route_tbl);
 
 #endif /* ODR_H */
