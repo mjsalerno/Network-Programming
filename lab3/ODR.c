@@ -96,6 +96,7 @@ int main(int argc, char *argv[]) {
     }
 
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
+    queue.head = NULL;             /* init the queue */
 
     FD_ZERO(&rset);
     stdinfd = fileno(stdin);
@@ -609,6 +610,7 @@ void queue_store(struct msg_queue *queue, struct odr_msg *m) {
         exit(EXIT_FAILURE);
     }
     memcpy(new_node->msg, m, real_len);
+    new_node->next = NULL;
 
     curr = queue->head;
     prev = NULL;
@@ -617,6 +619,9 @@ void queue_store(struct msg_queue *queue, struct odr_msg *m) {
         return;
     }
     for( ; curr != NULL; prev = curr, curr = curr->next) {
+        if(curr->msg == NULL){
+            _ERROR("%s", "NULL message, will SIGSEGV.....");
+        }
         if(strncmp(m->dst_ip, curr->msg->dst_ip, INET_ADDRSTRLEN) < 0){
             new_node->next = curr;
             if(prev == NULL) {
@@ -663,7 +668,7 @@ void queue_send(struct msg_queue *queue, int rawsock, struct tbl_entry *route_tb
                     route_tbl[route_i].iface_index, route_tbl[route_i].mac_next_hop);
             /* now free the msg_node, since it was sent */
             tofree = curr;
-            if(prev == NULL){               /* case if curr is head */
+            if(prev == NULL) {              /* case if curr is head */
                 queue->head = curr->next;
                 curr = queue->head;
             } else {                        /* case if curr is not head */
