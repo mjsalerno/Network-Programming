@@ -9,7 +9,8 @@ The server doesn't have that.
 
 
 Special Cases:
-1. If two clients on a vm1 both msg_send() to vm5, and vm1 has no route to vm5,
+1. ***  PARTIAL FIX in commit eecc442bf839576fc6f3f5ca85936b5eb5dd8178  ***
+    If two clients on a vm1 both msg_send() to vm5, and vm1 has no route to vm5,
   then both msg_send()'s will generate equivalent RREQs. We reason that this
   is not a problem.
 
