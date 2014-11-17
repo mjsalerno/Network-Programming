@@ -167,6 +167,13 @@ int main(int argc, char *argv[]) {
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
             int eff, its_me, forw_index;
             uint8_t we_sent;
+
+            if(raw_addr.sll_protocol != PROTO) {
+                _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
+                continue;
+            }
+
+            msgp = (struct odr_msg*) buf_msg;
             its_me = (0 == strcmp(msgp->dst_ip, host_ip));
             len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
@@ -177,7 +184,6 @@ int main(int argc, char *argv[]) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
-            msgp = (struct odr_msg*) buf_msg;
 
             switch(msgp->type) {
 
@@ -267,7 +273,7 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 default:
-                    _ERROR("Do not know what to do with this type of msg: %d", msgp->type);
+                    _ERROR("Do not know what to do with this type of msg: %d\n", msgp->type);
                     break;
 
             }
@@ -513,6 +519,21 @@ void send_on_iface(int rawsock, char* data, size_t data_len,
     }
 }
 
+void hton_odr_msg(struct odr_msg* msgp) {
+    msgp->broadcast_id = htonl(msgp->broadcast_id);
+    msgp->dst_port = htons(msgp->dst_port);
+    msgp->len = htons(msgp->len);
+    msgp->src_port = htons(msgp->src_port);
+    msgp->num_hops = ntohs(msgp->num_hops);
+}
+
+void ntoh_odr_msg(struct odr_msg* msgp) {
+    msgp->broadcast_id = ntohl(msgp->broadcast_id);
+    msgp->dst_port     = ntohs(msgp->dst_port);
+    msgp->len          = ntohs(msgp->len);
+    msgp->src_port     = ntohs(msgp->src_port);
+    msgp->num_hops     = ntohs(msgp->num_hops);
+}
 
 /* Can pass NULL for srcip or dstip if not wanted. */
 void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID) {

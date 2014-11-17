@@ -97,6 +97,8 @@ void send_on_iface(int rawsock, char* data, size_t data_len,
         int dst_if, unsigned char dst_mac[ETH_ALEN]);
 
 /* funcs for odr_msg{} */
+void hton_odr_msg(struct odr_msg* msgp);
+void ntoh_odr_msg(struct odr_msg* msgp);
 void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID);
 void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, int num_hops);
 
