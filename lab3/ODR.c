@@ -459,9 +459,9 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
     /* copy in the data and ethhdr */
-    memcpy(buff, et, sizeof(struct ethhdr));
     memcpy(buff + sizeof(struct ethhdr), data, data_len);
 
+    _DEBUG("crafted frame with proto: %d", et->h_proto);
     return sizeof(struct ethhdr) + data_len;
 }
 
