@@ -92,9 +92,8 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
 
 /* funcs for raw pkt stuffs */
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
-void broadcast(int rawsock, struct hwa_info *hwa_head, char *data, size_t data_len, int except);
-void send_on_iface(int rawsock, char* data, size_t data_len,
-        int dst_if, unsigned char dst_mac[ETH_ALEN]);
+void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int except);
+void send_on_iface(int rawsock, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]);
 
 /* funcs for odr_msg{} */
 void hton_odr_msg(struct odr_msg* msgp);
