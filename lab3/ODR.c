@@ -592,9 +592,10 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
             }
             tofree = curr;
             curr = curr->hwa_next;
-            prev->hwa_next = curr;
             if(tofree == *hwahead) { /* if we're removing the head then advance the head */
                 *hwahead = curr;
+            } else {
+                prev->hwa_next = curr;
             }
             free(tofree->ip_addr);
             free(tofree);
