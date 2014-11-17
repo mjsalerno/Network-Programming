@@ -172,10 +172,6 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            msgp = (struct odr_msg*) buf_msg;
-            ntoh_odr_msg(msgp);
-            its_me = (0 == strcmp(msgp->dst_ip, host_ip));
-            len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
@@ -184,6 +180,11 @@ int main(int argc, char *argv[]) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
+
+            msgp = (struct odr_msg*) buf_msg;
+            ntoh_odr_msg(msgp);
+            its_me = (0 == strcmp(msgp->dst_ip, host_ip));
+            len = sizeof(raw_addr);
 
             switch(msgp->type) {
 
