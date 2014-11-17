@@ -52,7 +52,7 @@ struct odr_msg {
 */
 struct msg_node {
     struct msg_node *next;
-    struct odr_msg *msg;
+    struct odr_msg msg;
 };
 
 /* A queue of un-sent messages */

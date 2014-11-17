@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     ssize_t n;
     struct hwa_info *hwahead;
     int unixsock, rawsock, stdinfd;
-    struct sockaddr_un my_addr, local_addr;
+    struct sockaddr_un unix_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
     char *buf_msg;                    /* buffer for local messages */
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     }
 
     memset(buff, 0, sizeof(ETH_FRAME_LEN));
-    memset(&my_addr, 0, sizeof(my_addr));
+    memset(&unix_addr, 0, sizeof(unix_addr));
     memset(&local_addr, 0, sizeof(local_addr));
     memset(&raw_addr, 0, sizeof(raw_addr));
 
@@ -67,6 +67,10 @@ int main(int argc, char *argv[]) {
     rawsock = socket(AF_PACKET, SOCK_RAW, htons(PROTO));
     if(rawsock < 0) {
         perror("ERROR: socket(RAW)");
+        free(buf_msg);
+        free(out_msg);
+        free(buff);
+        free_hwa_info(hwahead);
         exit(EXIT_FAILURE);
     }
 
@@ -81,15 +85,19 @@ int main(int argc, char *argv[]) {
     unixsock = socket(AF_LOCAL, SOCK_DGRAM, 0);   /* create local socket */
     if (unixsock < 0) {
         perror("ERROR: socket()");
+        close(rawsock);
+        free(buf_msg);
+        free(out_msg);
+        free(buff);
         free_hwa_info(hwahead);
         exit(EXIT_FAILURE);
     }
 
 
-    my_addr.sun_family = AF_LOCAL;
-    strncpy(my_addr.sun_path, ODR_PATH, sizeof(my_addr.sun_path)-1);
+    unix_addr.sun_family = AF_LOCAL;
+    strncpy(unix_addr.sun_path, ODR_PATH, sizeof(unix_addr.sun_path)-1);
 
-    err = bind(unixsock, (struct sockaddr*) &my_addr, (socklen_t)sizeof(my_addr));
+    err = bind(unixsock, (struct sockaddr*) &unix_addr, (socklen_t)sizeof(unix_addr));
     if(err < 0) {
         perror("ERROR: bind()");
         goto cleanup;
@@ -281,6 +289,7 @@ int main(int argc, char *argv[]) {
 
     free(buff);
     free(buf_msg);
+    free(out_msg);
     close(unixsock);
     close(rawsock);
     unlink(ODR_PATH);
@@ -289,6 +298,7 @@ int main(int argc, char *argv[]) {
 cleanup:
     free(buff);
     free(buf_msg);
+    free(out_msg);
     close(unixsock);
     close(rawsock);
     unlink(ODR_PATH);
@@ -546,27 +556,19 @@ void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, i
 */
 void rm_eth0_lo(struct hwa_info	**hwahead) {
     struct hwa_info *curr, *tofree, *prev;
+    int cmp_eth0;
     curr = prev = *hwahead;
 
     while(curr != NULL) {
-        if(0 == strcmp(curr->if_name, "eth0")) {
+        if((0 == (cmp_eth0 = strcmp(curr->if_name, "eth0")))
+                || (0 == strcmp(curr->if_name, "lo"))) {
             _DEBUG("Removing interface %s from the interface list.\n", curr->if_name);
 
-            if(curr->ip_alias != IP_ALIAS && curr->ip_addr != NULL) {
+            if(cmp_eth0 == 0
+                    && curr->ip_alias != IP_ALIAS && curr->ip_addr != NULL) {
                 strcpy(host_ip, inet_ntoa(((struct sockaddr_in*)curr->ip_addr)->sin_addr));
                 _DEBUG("Found the canonical ip of eth0: %s\n", host_ip);
             }
-            tofree = curr;
-            curr = curr->hwa_next;
-            prev->hwa_next = curr;
-            if(tofree == *hwahead) { /* if we're removing the head then advance the head */
-                *hwahead = curr;
-            }
-            free(tofree->ip_addr);
-            free(tofree);
-        } else if(0 == strcmp(curr->if_name, "lo")) {
-            _DEBUG("Removing interface %s from the interface list.\n", curr->if_name);
-
             tofree = curr;
             curr = curr->hwa_next;
             prev->hwa_next = curr;
@@ -598,18 +600,13 @@ void queue_store(struct msg_queue *queue, struct odr_msg *m) {
         _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
-    new_node = malloc(sizeof(struct msg_node)); /* alloc the enclosing msg_node */
+    new_node = malloc(sizeof(struct msg_node) + m->len); /* alloc the enclosing msg_node */
     if(new_node == NULL) {
         _ERROR("%s", "malloc() returned NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
     real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
-    new_node->msg = malloc(real_len);
-    if(new_node->msg == NULL) {
-        _ERROR("%s", "malloc() returned NULL! Failing!\n");
-        exit(EXIT_FAILURE);
-    }
-    memcpy(new_node->msg, m, real_len);
+    memcpy(&new_node->msg, m, real_len);
     new_node->next = NULL;
 
     curr = queue->head;
@@ -619,10 +616,7 @@ void queue_store(struct msg_queue *queue, struct odr_msg *m) {
         return;
     }
     for( ; curr != NULL; prev = curr, curr = curr->next) {
-        if(curr->msg == NULL){
-            _ERROR("%s", "NULL message, will SIGSEGV.....");
-        }
-        if(strncmp(m->dst_ip, curr->msg->dst_ip, INET_ADDRSTRLEN) < 0){
+        if(strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN) < 0){
             new_node->next = curr;
             if(prev == NULL) {
                 queue->head = new_node; /* case if before head */
@@ -656,15 +650,15 @@ void queue_send(struct msg_queue *queue, int rawsock, struct tbl_entry *route_tb
     curr = queue->head;
     prev = NULL;
     while(curr != NULL) {
-        if(strncmp(curr->msg->dst_ip, prev_ip, INET_ADDRSTRLEN) != 0) {
+        if(strncmp(curr->msg.dst_ip, prev_ip, INET_ADDRSTRLEN) != 0) {
             /* ip different so lookup route again */
-            route_i = find_route_index(route_tbl, curr->msg->dst_ip);
-            strncpy(prev_ip, curr->msg->dst_ip, INET_ADDRSTRLEN);
+            route_i = find_route_index(route_tbl, curr->msg.dst_ip);
+            strncpy(prev_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
         }
         /* if way have a route, then ip same so just send */
         if(route_i >= 0) {
-            send_on_iface(rawsock, (char*)curr->msg,
-                    (sizeof(struct odr_msg) + curr->msg->len),
+            send_on_iface(rawsock, (char*)&curr->msg,
+                    (sizeof(struct odr_msg) + curr->msg.len),
                     route_tbl[route_i].iface_index, route_tbl[route_i].mac_next_hop);
             /* now free the msg_node, since it was sent */
             tofree = curr;
@@ -675,7 +669,6 @@ void queue_send(struct msg_queue *queue, int rawsock, struct tbl_entry *route_tb
                 curr = curr->next;
                 prev->next = curr;
             }
-            free(tofree->msg);
             free(tofree);
         } else {
             /* we didn't have a route so just skip this message */
