@@ -29,7 +29,7 @@ struct svc_entry {
 /* type: 0 for RREQ, 1 for RREP, and 2 for app payload */
 struct odr_msg {
     uint32_t broadcast_id;
-    char type;
+    uint8_t type;
     char src_ip[INET_ADDRSTRLEN];
     char dst_ip[INET_ADDRSTRLEN];
     uint16_t src_port;
