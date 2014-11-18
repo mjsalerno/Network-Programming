@@ -176,14 +176,6 @@ int main(int argc, char *argv[]) {
             uint8_t we_sent;
 
             _DEBUG("%s\n", "The raw socket has something in it ..");
-
-            if(raw_addr.sll_protocol != PROTO) {
-                _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
-                _ERROR("htons: %d\n", htons(raw_addr.sll_protocol));
-                _ERROR("ntohs: %d\n", ntohs(raw_addr.sll_protocol));
-                continue;
-            }
-
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
@@ -192,6 +184,14 @@ int main(int argc, char *argv[]) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
+
+            if(raw_addr.sll_protocol != PROTO) {
+                _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
+                _ERROR("htons: %d\n", htons(raw_addr.sll_protocol));
+                _ERROR("ntohs: %d\n", ntohs(raw_addr.sll_protocol));
+                continue;
+            }
+
 
             msgp = (struct odr_msg*) buf_msg;
             ntoh_odr_msg(msgp);
