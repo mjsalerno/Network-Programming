@@ -3,6 +3,7 @@
 
 /* fixme: remove */
 static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
+static char host_name[BUFF_SIZE];
 static struct tbl_entry route_table[NUM_NODES];
 
 int main(int argc, char *argv[]) {
@@ -103,6 +104,13 @@ int main(int argc, char *argv[]) {
         goto cleanup;
     }
 
+    err = gethostname(host_name, sizeof(host_name));  /* get my hostname */
+    if(err < 0) {
+        perror("ERROR: gethostname()");
+        goto cleanup;
+    }
+    _NOTE("ODR at node %s: ready for messages....\n", host_name);
+
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
     queue.head = NULL;             /* init the queue */
 
@@ -157,7 +165,7 @@ int main(int argc, char *argv[]) {
                     memset(out_msg, 0, sizeof(struct odr_msg));
                     craft_rreq(out_msg, host_ip, msgp->dst_ip, 1, broadcastID);
                     broadcastID++;
-                    broadcast(rawsock, hwahead, msgp, -1);
+                    broadcast(rawsock, hwahead, out_msg, -1);
                     /* done ? */
                 }
             }
@@ -496,7 +504,6 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
 *
 * Sends data on only the dst_if interface to dst_mac
 * This already calls craft_frame
-* todo: change broadcast() to use this func
 */
 void send_on_iface(int rawsock, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]) {
     char buff[ETH_FRAME_LEN];
@@ -512,7 +519,11 @@ void send_on_iface(int rawsock, struct odr_msg* msgp, int dst_if, unsigned char 
         _ERROR("%s\n", "there was an error crafting the packet");
         exit(EXIT_FAILURE);
     }
-
+    printf("ODR at node %s: sending\tframe hdr src %s dest ", host_name, host_name);
+    printf("%02X:%02X:%02X:%02X:%02X:%02X\n", dst_mac[0], dst_mac[1],
+            dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
+    /* todo: convert src_ip to sin_addr, do gethostbyaddr() */
+    printf("\t\t\tODR msg\ttype %d\tsrc %s\tdest %s\n", msgp->type, msgp->src_ip, msgp->dst_ip);
     ssize = sendto(rawsock, buff, size, 0, (struct sockaddr const *)&raw_addr,
             sizeof(raw_addr));
     if (ssize < (ssize_t) sizeof(struct ethhdr)) {
