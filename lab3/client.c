@@ -3,7 +3,7 @@
 int main(void) {
     int sockfd, filefd, err;
     socklen_t len;
-    struct sockaddr_un my_addr, name_addr, srv_addr;
+    struct sockaddr_un my_addr, name_addr;
     char fname[] = TIME_CLI_PATH;  /* template for mkstemp */
     char srvname[BUFF_SIZE] = {0};
     char hostname[BUFF_SIZE] = {0};
@@ -19,11 +19,6 @@ int main(void) {
 
     memset(&my_addr, 0, sizeof(my_addr));
     memset(&name_addr, 0, sizeof(name_addr));
-    memset(&srv_addr, 0, sizeof(srv_addr));
-    /* todo: remove*/
-    srv_addr.sun_family = AF_LOCAL;
-    /* fixme: remove TIME_SRV_PATH */
-    strncpy(srv_addr.sun_path, TIME_SRV_PATH, sizeof(my_addr.sun_path)-1);
 
     err = gethostname(hostname, sizeof(hostname));  /* get my hostname */
     if(err < 0) {
@@ -119,9 +114,7 @@ int main(void) {
             continue;
 
         } else if (FD_ISSET(sockfd, &rset)) {
-            /* todo: msg_recv */
             err = (int) msg_recv(sockfd, buf, sizeof(buf), ip_buf, &port);
-            /*err = (int) recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *) &srv_addr, &socklen);*/
             if (err < 0) {
                 perror("ERROR: msg_recv()");
                 goto cleanup;

@@ -70,7 +70,6 @@ int main(void) {
         ticks = time(NULL);
         n = snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
 
-        /* todo: msg_send */
         err = msg_send(sock, cli_ip_buff, cliport, buff, (size_t)n, 0);
         if(err < 0) {
             perror("ERROR: msg_send()");
