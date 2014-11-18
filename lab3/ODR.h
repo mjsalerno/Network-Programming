@@ -100,6 +100,8 @@ void send_on_iface(int rawsock, struct odr_msg* msgp, int dst_if, unsigned char 
 /* funcs for odr_msg{} */
 void hton_odr_msg(struct odr_msg* msgp);
 void ntoh_odr_msg(struct odr_msg* msgp);
+void ntoh_sockll(struct sockaddr_ll* addr);
+void hton_sockll(struct sockaddr_ll* addr);
 void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, uint32_t broadcastID);
 void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, int num_hops);
 
