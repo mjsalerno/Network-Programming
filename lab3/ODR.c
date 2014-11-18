@@ -173,6 +173,7 @@ int main(int argc, char *argv[]) {
             uint8_t we_sent;
 
             _DEBUG("%s\n", "The raw socket has something in it ..");
+            len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&raw_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
@@ -212,11 +213,11 @@ int main(int argc, char *argv[]) {
                             _DEBUG("%s\n", "going to send an RREP");
                             if(its_me) {
                                 _DEBUG("%s\n", "crafted a rrep for me");
-                                craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, 0);
+                                craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
                                 we_sent = 1;
                             } else if (forw_index > -1) {   /* we have the route */
                                 _DEBUG("%s\n", "crafted a rrep since i know where it is");
-                                craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, route_table[forw_index].num_hops);
+                                craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
                             } else {
                                 _ERROR("%s\n", "not sure");
