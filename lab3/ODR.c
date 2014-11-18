@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
         perror("ERROR: gethostname()");
         goto cleanup;
     }
-    _NOTE("ODR at node %s: ready for messages....\n", host_name);
+    _NOTE("ODR at node %s (%s): ready for messages....\n", host_name, host_ip);
 
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
     queue.head = NULL;             /* init the queue */
@@ -143,10 +143,7 @@ int main(int argc, char *argv[]) {
             if(0 == strcmp(msgp->dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
                 _DEBUG("%s", "msg has local dest IP\n");
-                err = handle_unix_msg(unixsock, svcs, msgp, (size_t)n, &local_addr);
-                if(err < 0) {
-                    goto cleanup;
-                }
+                handle_unix_msg(unixsock, svcs, msgp, &local_addr);
             } else {
                 int route_i;
                 _DEBUG("msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
@@ -289,9 +286,7 @@ int main(int argc, char *argv[]) {
                     _DEBUG("forw_index: %d\n", forw_index);
                     if(0 == strcmp(msgp->dst_ip, host_ip)) {
                         _DEBUG("%s\n", "received data for me");
-                        /* todo: scott says fix he needs to fix it or something */
-                        _ERROR("%s\n", "I R BROKEN!!!");
-                        /*handle_unix_msg(unixsock, svcs, msgp, sizeof(struct odr_msg), NULL);*/
+                        deliver_app_mesg(unixsock, svcs, msgp);
                     } else if(forw_index > -1) {
                         _DEBUG("%s\n", "received data that is not mine, and i have the route\n");
                         send_on_iface(rawsock, hwahead, msgp, route_table[forw_index]
@@ -343,53 +338,61 @@ cleanup:
 }
 
 /**
-* We have recvfrom()'d off of our PF_UNIX socket, the destination is local.
-* Update the service list.
-*   -Pass to service if local
-*   -Pass to rawsock handler if non-local.
+* We have recvfrom()'d off of our PF_UNIX socket AND the destination is local.
+* Updates the service list, giving a new port number to the from_addr if
+* nessecary.
 *
-* NOTE: struct odr_msg *m: m is a pointer to the start of the recv(2) buffer.
-*                          - it is mlen bytes long.
-*
-* RETURNS:  0 on successfully sent
-*           -1 on sendto(2) failure, need to cleanup and exit
+* NOTES: Should be called only for traffic from the local unix socket.
+* struct odr_msg *m: m is a pointer to the start of the recv(2) buffer.
 */
-int handle_unix_msg(int unixfd, struct svc_entry *svcs,
-        struct odr_msg *m, size_t mlen, struct sockaddr_un *from_addr) {
+void handle_unix_msg(int unixfd, struct svc_entry *svcs,
+        struct odr_msg *m, struct sockaddr_un *from_addr) {
 
-    struct sockaddr_un dst_addr;
     int msg_src_port;
+
+    msg_src_port = svc_update(svcs, from_addr); /* track the local services */
+    m->src_port = (uint16_t) msg_src_port;
+    strcpy(m->src_ip, host_ip);
+
+    deliver_app_mesg(unixfd, svcs, m);
+}
+
+
+/**
+* Demultiplexes from the dest port in m{} to the correct  service to send to.
+* Called when a T_DATA message is recv()'d with a local dest IP.
+*
+*/
+void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m) {
+    struct sockaddr_un dst_addr;
     socklen_t len;
     ssize_t err;
-
-    msg_src_port = svc_update(svcs, from_addr);
-
+    if(svcs == NULL || m == NULL) {
+        _ERROR("%s", "svcs or m is NULL, terminating.\n");
+        exit(EXIT_FAILURE);
+    }
 
     if(m->dst_port > SVC_MAX_NUM) {
         _ERROR("service trying to send to a bad port: %d, ignoring...\n", m->dst_port);
-        return 0;
+        return;
     } else if(svcs[m->dst_port].port == -1) {
         /* the destination service doesn't exist, pretend like we sent it */
         _ERROR("no service at dst port: %d, ignoring...\n", m->dst_port);
-        return 0;
+        return;
     }
     dst_addr.sun_family = AF_LOCAL;
     strncpy(dst_addr.sun_path, svcs[m->dst_port].sun_path, sizeof(dst_addr.sun_path));
     dst_addr.sun_path[sizeof(dst_addr.sun_path)-1] = '\0';
 
-    m->src_port = (uint16_t)msg_src_port;
-    strcpy(m->src_ip, host_ip);
-
-
     len = sizeof(dst_addr);
-    err = sendto(unixfd, m, mlen, 0, (struct sockaddr*)&dst_addr, len);
+    err = sendto(unixfd, m, (sizeof(struct odr_msg) + m->len), 0, (struct sockaddr*)&dst_addr, len);
     if(err < 0) {
         /* fixme: which sendto() errors should we actually fail on? */
         _ERROR("%s %m. Ignoring error....\n", "sendto():");
-        return 0;
+        return;
     }
     _DEBUG("Relayed msg: sendto() local sock: %s\n", dst_addr.sun_path);
-    return 0;
+    return;
 }
 
 /* print the info about all interfaces in the hwa_info linked list */
@@ -548,7 +551,7 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
         _ERROR("One of these are bad: %s or %s\n", msgp->src_ip, msgp->src_ip);
         exit(EXIT_FAILURE);
     }
-    printf("ODR at node %s: sending\tframe hdr src %s dest ", host_name, host_name);
+    printf("ODR at node %s: sending  frame hdr src %s dest ", host_name, host_name);
     printf("%02X:%02X:%02X:%02X:%02X:%02X\n", dst_mac[0], dst_mac[1],
             dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
     if(NULL == (he = gethostbyaddr(&src_addr, 4, AF_INET))) {
@@ -565,7 +568,7 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
     hton_odr_msg(msgp);
     size = craft_frame(dst_if, &raw_addr, buff, (unsigned char*)
             hwa_head->if_haddr, dst_mac, (char*)msgp,
-            sizeof(struct odr_msg)+msgp->len);
+            sizeof(struct odr_msg) + msgp->len);
     if (size < sizeof(struct ethhdr)) {
         _ERROR("%s\n", "there was an error crafting the packet");
         exit(EXIT_FAILURE);

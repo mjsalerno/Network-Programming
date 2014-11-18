@@ -45,11 +45,11 @@ struct odr_msg {
 *  The pending queue of T_DATA messages waiting for routes.
 *  NOTE: MISLEADING because the odr_msg is followed by data.
 *`
-*  |---------- msg_node --------------|
+*  |------ sizeof msg_node -----------|
 *  |-- next --|------- odr_msg -------|---- odr_msg.len bytes of data ----|
 *      ||
 *      V
-*      |----msg_node----|
+*      |---------- msg_node --------------|
 */
 struct msg_node {
     struct msg_node *next;
@@ -80,9 +80,9 @@ void svc_init(struct svc_entry *svcs, size_t len);
 int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
 
 /* funcs for using the sockets */
-int handle_unix_msg(int unixfd, struct svc_entry *svcs,
-        struct odr_msg *m, size_t mlen, struct sockaddr_un *from_addr);
-int deliver_app_mesg(int unixfd, struct odr_msg *m, size_t bytes);
+void handle_unix_msg(int unixfd, struct svc_entry *svcs,
+        struct odr_msg *m, struct sockaddr_un *from_addr);
+void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m);
 
 /* route table stuff */
 #define NEW_ROUTE 0x1
