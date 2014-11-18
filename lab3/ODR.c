@@ -176,13 +176,7 @@ int main(int argc, char *argv[]) {
             uint8_t we_sent;
 
             _DEBUG("%s\n", "The raw socket has something in it ..");
-
-            if(raw_addr.sll_protocol != PROTO) {
-                _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
-                continue;
-            }
-
-            n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
+            n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&raw_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
                 goto cleanup;
@@ -191,14 +185,22 @@ int main(int argc, char *argv[]) {
                 goto cleanup;
             }
 
+            if(htons(raw_addr.sll_protocol) != PROTO) {
+                _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
+                continue;
+            }
+
             msgp = (struct odr_msg*) buf_msg;
             ntoh_odr_msg(msgp);
             its_me = (0 == strcmp(msgp->dst_ip, host_ip));
+            _DEBUG("its_me: %d\n", its_me);
             len = sizeof(raw_addr);
 
+            _DEBUG("msg type: %d\n", msgp->type);
             switch(msgp->type) {
 
                 case T_RREQ:
+                    _DEBUG("%s\n", "fell into case T_RREQ");
                     eff = 0;
                     we_sent = 0;
                     err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
@@ -208,30 +210,43 @@ int main(int argc, char *argv[]) {
                         _DEBUG("%s\n", "the route was not added");
                     } else {
 
+                        _DEBUG("%s\n", "added the route");
                         if(!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
+                            _DEBUG("%s\n", "going to send an RREP");
                             if(its_me) {
+                                _DEBUG("%s\n", "crafted a rrep for me");
                                 craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, 0);
                                 we_sent = 1;
                             } else if (forw_index > -1) {   /* we have the route */
+                                _DEBUG("%s\n", "crafted a rrep since i know where it is");
                                 craft_rrep(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
+                            } else {
+                                _ERROR("%s\n", "not sure");
                             }
-                            if(we_sent)
+                            if(we_sent) {
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
+                                _DEBUG("%s\n", "we sent it");
+                            }
                         }
 
                         if(we_sent || eff) {
                             msgp->num_hops++;
                             msgp->do_not_rrep = we_sent;
+                            _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
+                            broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
                         }
                     }
 
                     break;
                 case T_RREP:
+                    _DEBUG("%s\n", "fell into case T_RREP");
                     /* forwarding RREP */
                     if(!its_me) {
+                        _DEBUG("%s\n", "it is not for me");
                         /* then i should still have the path made from the request (unless staleness is really low)*/
                         forw_index = find_route_index(route_table, msgp->dst_ip);
+                        _DEBUG("forw_index: %d\n", forw_index);
                         if(forw_index < 0) {
                             _ERROR("%s\n", "there was an error, no route found to forward RREP maybe staleness too low");
                             /*exit(EXIT_FAILURE);*/
@@ -256,6 +271,7 @@ int main(int argc, char *argv[]) {
                         }
                     /* the rrep is for me :D */
                     } else {
+                        _DEBUG("%s\n", "it is for me :D");
                         eff = 0;
                         err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
                         if(err < 0 || eff < 1) {
@@ -266,8 +282,11 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 case T_DATA:
+                    _DEBUG("%s\n", "fell into case T_DATA");
                     err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
+                    _DEBUG("added route result: %d\n", err);
                     forw_index = find_route_index(route_table, msgp->dst_ip);
+                    _DEBUG("forw_index: %d\n", forw_index);
                     if(0 == strcmp(msgp->dst_ip, host_ip)) {
                         _DEBUG("%s\n", "received data for me");
                         /* todo: scott says fix he needs to fix it or something */
@@ -471,7 +490,7 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     /* copy in the data and ethhdr */
     memcpy(buff + sizeof(struct ethhdr), data, data_len);
 
-    _DEBUG("crafted frame with proto: %d", et->h_proto);
+    _DEBUG("crafted frame with proto: %d\n", et->h_proto);
     return sizeof(struct ethhdr) + data_len;
 }
 
