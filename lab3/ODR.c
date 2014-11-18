@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
             uint8_t we_sent;
 
             _DEBUG("%s\n", "The raw socket has something in it ..");
-            n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
+            n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&raw_addr, &len);
             if(n < 0) {
                 perror("ERROR: recvfrom(rawsock)");
                 goto cleanup;
