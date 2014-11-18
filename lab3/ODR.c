@@ -179,6 +179,8 @@ int main(int argc, char *argv[]) {
 
             if(raw_addr.sll_protocol != PROTO) {
                 _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
+                _ERROR("htons: %d\n", htons(raw_addr.sll_protocol));
+                _ERROR("ntohs: %d\n", ntohs(raw_addr.sll_protocol));
                 continue;
             }
 
@@ -471,7 +473,7 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     /* copy in the data and ethhdr */
     memcpy(buff + sizeof(struct ethhdr), data, data_len);
 
-    _DEBUG("crafted frame with proto: %d", et->h_proto);
+    _DEBUG("crafted frame with proto: %d\n", et->h_proto);
     return sizeof(struct ethhdr) + data_len;
 }
 
