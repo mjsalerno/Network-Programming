@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            msgp = (struct odr_msg*) buf_msg;
+            msgp = (struct odr_msg*) (buf_msg +sizeof(struct ethhdr));
             ntoh_odr_msg(msgp);
             its_me = (0 == strcmp(msgp->dst_ip, host_ip));
             _DEBUG("its_me: %d\n", its_me);
