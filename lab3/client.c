@@ -97,7 +97,6 @@ int main(void) {
 
         /* todo: if this is the 1st timeout, then msg_send rediscovery flag */
         err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 1, 0);
-        /*err = (int) sendto(sockfd, "H", 2, 0, (struct sockaddr *) &srv_addr, sizeof(srv_addr));*/
         if (err < 0) {
             perror("ERROR: msg_send()");
             goto cleanup;

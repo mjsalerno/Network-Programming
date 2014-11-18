@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
                         -1 != (route_i = find_route_index(route_table, msgp->dst_ip))) {
                     /* send DATA */
 
-                    send_on_iface(rawsock, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
+                    send_on_iface(rawsock, hwahead, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
                     /* done ? */
                 } else {
                     /* send RREQ */
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
                                 we_sent = 1;
                             }
                             if(we_sent)
-                                send_on_iface(rawsock, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
+                                send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
                         }
 
                         if(we_sent || eff) {
@@ -247,12 +247,12 @@ int main(int argc, char *argv[]) {
                         /* if force_redesc then always send theirs            */
                         if(add_route(route_table, msgp, &raw_addr, staleness, &eff) || eff || msgp->force_redisc) {
                             _DEBUG("%s\n", "forwarding their route");
-                            send_on_iface(rawsock, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
+                            send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                         } else { /*i have better route*/
                             /*todo i think this else is junk, I should never get here*/
                             _DEBUG("I have a better route, their hops: %d, my hops: %d\n", msgp->num_hops, route_table[forw_index].num_hops);
                             craft_rrep(out_msg, host_ip, msgp->dst_ip, 0, route_table[forw_index].num_hops);
-                            send_on_iface(rawsock, out_msg, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
+                            send_on_iface(rawsock, hwahead, out_msg, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                         }
                     /* the rrep is for me :D */
                     } else {
@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
                         /*handle_unix_msg(unixsock, svcs, msgp, sizeof(struct odr_msg), NULL);*/
                     } else if(forw_index > -1) {
                         _DEBUG("%s\n", "received data that is not mine, and i have the route\n");
-                        send_on_iface(rawsock, msgp, route_table[forw_index]
+                        send_on_iface(rawsock, hwahead, msgp, route_table[forw_index]
                                 .iface_index, route_table[forw_index].mac_next_hop);
                     } else {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
@@ -488,12 +488,12 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
 void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int except) {
     unsigned char bcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-    for(; hwa_head !=NULL; hwa_head = hwa_head->hwa_next) {
+    for(; hwa_head != NULL; hwa_head = hwa_head->hwa_next) {
         if(hwa_head->if_index == except) { /* skip the iface if it is except */
             _DEBUG("skipping iface: %d\n", hwa_head->if_index);
             continue;
         }
-        send_on_iface(rawsock, msgp, hwa_head->if_index, bcast);
+        send_on_iface(rawsock, hwa_head, msgp, hwa_head->if_index, bcast);
     }
 }
 
@@ -506,26 +506,52 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
 * Sends data on only the dst_if interface to dst_mac
 * This already calls craft_frame
 */
-void send_on_iface(int rawsock, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]) {
+void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]) {
     char buff[ETH_FRAME_LEN];
     size_t size;
     ssize_t ssize;
-    unsigned char mac[ETH_ALEN];
     struct sockaddr_ll raw_addr;
+    struct in_addr src_addr, dst_addr;
+    struct hostent *he;
 
+    for(; hwa_head != NULL; hwa_head = hwa_head->hwa_next) {
+        if(hwa_head->if_index == dst_if) {
+            break;
+        }
+    }
+    if(hwa_head == NULL) {
+        _ERROR("Destination index: %d not found\n", dst_if);
+        exit(EXIT_FAILURE);
+    }
     _DEBUG("sending on iface: %d\n", dst_if);
-    memcpy(mac, dst_mac, ETH_ALEN);
-    hton_odr_msg(msgp);
-    size = craft_frame(dst_if, &raw_addr, buff, mac, dst_mac, (char*)msgp, sizeof(struct odr_msg)+msgp->len);
-    if (size < sizeof(struct ethhdr)) {
-        _ERROR("%s\n", "there was an error crafting the packet");
+    /* all this crap is for a printout !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+    if((0 == inet_aton(msgp->src_ip, &src_addr)) || (0 == inet_aton(msgp->dst_ip, &dst_addr))) {
+        _ERROR("One of these are bad: %s or %s\n", msgp->src_ip, msgp->src_ip);
         exit(EXIT_FAILURE);
     }
     printf("ODR at node %s: sending\tframe hdr src %s dest ", host_name, host_name);
     printf("%02X:%02X:%02X:%02X:%02X:%02X\n", dst_mac[0], dst_mac[1],
             dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
-    /* todo: convert src_ip to sin_addr, do gethostbyaddr() */
-    printf("\t\t\tODR msg\ttype %d\tsrc %s\tdest %s\n", msgp->type, msgp->src_ip, msgp->dst_ip);
+    if(NULL == (he = gethostbyaddr(&src_addr, 4, AF_INET))) {
+        herror("Serv ipaddr lookup error");
+        exit(EXIT_FAILURE);
+    }
+    printf("\tODR msg  type %d  src %s", msgp->type, he->h_name);
+    if(NULL == (he = gethostbyaddr(&dst_addr, 4, AF_INET))) {
+        herror("Serv ipaddr lookup error");
+        exit(EXIT_FAILURE);
+    }
+    printf("  dest %s\n", he->h_name);
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+    hton_odr_msg(msgp);
+    size = craft_frame(dst_if, &raw_addr, buff, (unsigned char*)
+            hwa_head->if_haddr, dst_mac, (char*)msgp,
+            sizeof(struct odr_msg)+msgp->len);
+    if (size < sizeof(struct ethhdr)) {
+        _ERROR("%s\n", "there was an error crafting the packet");
+        exit(EXIT_FAILURE);
+    }
+
     ssize = sendto(rawsock, buff, size, 0, (struct sockaddr const *)&raw_addr,
             sizeof(raw_addr));
     if (ssize < (ssize_t) sizeof(struct ethhdr)) {
@@ -692,7 +718,7 @@ int queue_store(struct msg_queue *queue, struct odr_msg *m) {
 *   Check if any messages in the queue now have a route in the table.
 *
 */
-void queue_send(struct msg_queue *queue, int rawsock, struct tbl_entry *route_tbl) {
+void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head, struct tbl_entry *route_tbl) {
     struct msg_node *curr, *prev, *tofree;
     char prev_ip[INET_ADDRSTRLEN] = "\0";
     int route_i = -1;
@@ -715,7 +741,7 @@ void queue_send(struct msg_queue *queue, int rawsock, struct tbl_entry *route_tb
         }
         /* if way have a route, then ip same so just send */
         if(route_i >= 0) {
-            send_on_iface(rawsock, &curr->msg, route_tbl[route_i].iface_index,
+            send_on_iface(rawsock, hwa_head, &curr->msg, route_tbl[route_i].iface_index,
                     route_tbl[route_i].mac_next_hop);
             /* now free the msg_node, since it was sent */
             tofree = curr;

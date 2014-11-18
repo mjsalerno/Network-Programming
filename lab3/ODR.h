@@ -6,6 +6,7 @@
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <time.h>
+#include <stdint.h>
 
 #include "common.h"
 #include "get_hw_addrs.h"
@@ -95,7 +96,7 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
 /* funcs for raw pkt stuffs */
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len);
 void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int except);
-void send_on_iface(int rawsock, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]);
+void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]);
 
 /* funcs for odr_msg{} */
 void hton_odr_msg(struct odr_msg* msgp);
@@ -108,6 +109,6 @@ void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, i
 /* funcs for msg_queue{} */
 int queue_store(struct msg_queue *queue, struct odr_msg *m);
 void queue_send(struct msg_queue *queue, int rawsock,
-        struct tbl_entry *route_tbl);
+        struct hwa_info *hwa_head, struct tbl_entry *route_tbl);
 
 #endif /* ODR_H */
