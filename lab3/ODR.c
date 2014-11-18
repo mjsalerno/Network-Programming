@@ -167,6 +167,8 @@ int main(int argc, char *argv[]) {
             int eff, its_me, forw_index;
             uint8_t we_sent;
 
+            _DEBUG("%s\n", "The raw socket has something in it ..");
+
             if(raw_addr.sll_protocol != PROTO) {
                 _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
                 continue;
@@ -477,7 +479,6 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
 */
 void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int except) {
     unsigned char bcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    hton_odr_msg(msgp);
 
     for(; hwa_head !=NULL; hwa_head = hwa_head->hwa_next) {
         if(hwa_head->if_index == except) { /* skip the iface if it is except */
@@ -507,6 +508,7 @@ void send_on_iface(int rawsock, struct odr_msg* msgp, int dst_if, unsigned char 
 
     _DEBUG("sending on iface: %d\n", dst_if);
     memcpy(mac, dst_mac, ETH_ALEN);
+    hton_odr_msg(msgp);
     size = craft_frame(dst_if, &raw_addr, buff, mac, dst_mac, (char*)msgp, sizeof(struct odr_msg)+msgp->len);
     if (size < sizeof(struct ethhdr)) {
         _ERROR("%s\n", "there was an error crafting the packet");
@@ -535,6 +537,22 @@ void ntoh_odr_msg(struct odr_msg* msgp) {
     msgp->len          = ntohs(msgp->len);
     msgp->src_port     = ntohs(msgp->src_port);
     msgp->num_hops     = ntohs(msgp->num_hops);
+}
+
+void hton_sockll(struct sockaddr_ll* addr) {
+    addr->sll_family = htons(addr->sll_family);
+    addr->sll_hatype = htons(addr->sll_hatype);
+    addr->sll_ifindex = htonl((uint32_t)addr->sll_ifindex);
+    addr->sll_protocol = htons(addr->sll_protocol);
+
+}
+
+void ntoh_sockll(struct sockaddr_ll* addr) {
+    addr->sll_family = ntohs(addr->sll_family);
+    addr->sll_hatype = ntohs(addr->sll_hatype);
+    addr->sll_ifindex = ntohl((uint32_t)addr->sll_ifindex);
+    addr->sll_protocol = ntohs(addr->sll_protocol);
+
 }
 
 /* Can pass NULL for srcip or dstip if not wanted. */
