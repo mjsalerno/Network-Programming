@@ -160,8 +160,7 @@ int main(int argc, char *argv[]) {
                      so we pretend like we don't have a route */
                     queue_store(&queue, msgp);
                     memset(out_msg, 0, ODR_MSG_MAX);
-                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID);
-                    broadcastID++;
+                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                     broadcast(rawsock, hwahead, out_msg, -1);
                     /* done ? */
                 }
@@ -210,6 +209,8 @@ int main(int argc, char *argv[]) {
                     } else {
 
                         _DEBUG("%s\n", "added the route");
+                        /* We may only RREP if the next case holds. */
+                        /* we *may* RREP     AND (force_redisc is not set  OR  we're the dest IP) */
                         if(!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
                             _DEBUG("%s\n", "going to send an RREP");
                             if(its_me) {
@@ -930,4 +931,3 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 
     return -1;
 }
-
