@@ -50,6 +50,7 @@ int main(int argc, char *argv[]) {
     memset(&unix_addr, 0, sizeof(unix_addr));
     memset(&local_addr, 0, sizeof(local_addr));
     memset(&raw_addr, 0, sizeof(raw_addr));
+    memset(out_msg, 0, ODR_MSG_MAX);
 
     if ((hwahead = get_hw_addrs()) == NULL) {       /* get MAC addrs of our interfaces */
         fprintf(stderr, "ERROR: get_hw_addrs()\n");
