@@ -695,7 +695,7 @@ int queue_store(struct msg_queue *queue, struct odr_msg *m) {
     real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
     memcpy(&new_node->msg, m, real_len);
     new_node->next = NULL;
-    _DEBUG("Storing msg in queue: msg Type %d", m->type);
+    _DEBUG("Storing msg in queue: msg Type %d\n", m->type);
     curr = queue->head;
     prev = NULL;
     if(curr == NULL) {        /* case if list is empty */
@@ -721,13 +721,12 @@ int queue_store(struct msg_queue *queue, struct odr_msg *m) {
 
 /**
 *   Check if any messages in the queue now have a route in the table.
-*   fixme: only pass the route that was just added, not the whole routing table.
+*   NOTE: new_route is the route that was just added, not the whole routing table.
 */
-void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head, struct tbl_entry *route_tbl) {
+void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head, struct tbl_entry *new_route) {
     struct msg_node *curr, *prev, *tofree;
-    char prev_ip[INET_ADDRSTRLEN] = "\0";
-    int route_i = -1;
-    if(queue == NULL || route_tbl == NULL) {
+    int cmp_ip;
+    if(queue == NULL || new_route == NULL) {
         _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
@@ -740,15 +739,13 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
     curr = queue->head;
     prev = NULL;
     while(curr != NULL) {
-        if(strncmp(curr->msg.dst_ip, prev_ip, INET_ADDRSTRLEN) != 0) {
-            /* ip different so lookup route again */
-            route_i = find_route_index(route_tbl, curr->msg.dst_ip);
-            strncpy(prev_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
-        }
-        /* if way have a route, then ip same so just send */
-        if(route_i >= 0) {
-            send_on_iface(rawsock, hwa_head, &curr->msg, route_tbl[route_i].iface_index,
-                    route_tbl[route_i].mac_next_hop);
+        cmp_ip = strncmp(new_route->ip_dst, curr->msg.dst_ip, INET_ADDRSTRLEN);
+        if(cmp_ip < 0) {
+            /* no more msgs to send */
+            return;
+        } else if(cmp_ip == 0) {
+            /* msg has the same ip as the new route. */
+            send_on_iface(rawsock, hwa_head, &curr->msg, new_route->iface_index, new_route->mac_next_hop);
             /* now free the msg_node, since it was sent */
             tofree = curr;
             if(prev == NULL) {              /* case if curr is head */
@@ -760,9 +757,8 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
             }
             free(tofree);
         } else {
-            /* we didn't have a route so just skip this message */
-            prev = curr;
-            curr = curr->next;
+            /* no more msgs to send*/
+            return;
         }
     }
 }
@@ -888,7 +884,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
             #endif
             if(is_new_route == 1) {
                 /* todo: change from route_table to route_table[i] */
-                queue_send(queue, rawsock, hwa_head, route_table);
+                queue_send(queue, rawsock, hwa_head, &route_table[i]);
             }
             return i;
         }

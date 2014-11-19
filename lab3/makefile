@@ -30,6 +30,6 @@ ODR: ODR.o get_hw_addrs.o
 	$(CC) $(FLAGS) $< get_hw_addrs.o -o $@
 
 clean:
-	rm -f  *.o ODR client server *core* sock_* socket_*
+	rm -f  *.o ODR client server *core* sock_* 
 
 .PHONY: all clean

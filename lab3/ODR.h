@@ -109,6 +109,6 @@ void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, i
 /* funcs for msg_queue{} */
 int queue_store(struct msg_queue *queue, struct odr_msg *m);
 void queue_send(struct msg_queue *queue, int rawsock,
-        struct hwa_info *hwa_head, struct tbl_entry *route_tbl);
+        struct hwa_info *hwa_head, struct tbl_entry *new_route);
 
 #endif /* ODR_H */
