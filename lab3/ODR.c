@@ -201,9 +201,7 @@ int main(int argc, char *argv[]) {
                     _DEBUG("%s\n", "fell into case T_RREQ");
                     eff = 0;
                     we_sent = 0;
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
-                            rawsock, hwahead, &queue);
-                    forw_index = find_route_index(route_table, msgp->dst_ip);
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead, &queue);
 
                     if(err < 0) {
                         _DEBUG("%s\n", "the route was not added");
@@ -218,7 +216,7 @@ int main(int argc, char *argv[]) {
                                 _DEBUG("%s\n", "crafted a rrep for me");
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
                                 we_sent = 1;
-                            } else if (forw_index > -1) {   /* we have the route */
+                            } else if ((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {   /* we have the route */
                                 _DEBUG("%s\n", "crafted a rrep since i know where it is");
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
@@ -757,8 +755,9 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
             }
             free(tofree);
         } else {
-            /* no more msgs to send*/
-            return;
+            /* new route IP is after this entry, so keep looking */
+            prev = curr;
+            curr = curr->next;
         }
     }
 }
