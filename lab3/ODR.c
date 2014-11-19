@@ -439,7 +439,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], char* data, size_t data_len) {
+size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], struct odr_msg* msgp, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         _ERROR("%s\n", "ERROR: craft_frame(): data_len too big");
@@ -474,7 +474,8 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
     /* copy in the data and ethhdr */
-    memcpy(buff + sizeof(struct ethhdr), data, data_len);
+    hton_odr_msg(msgp);
+    memcpy(buff + sizeof(struct ethhdr), msgp, data_len);
 
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
     return sizeof(struct ethhdr) + data_len;
@@ -548,9 +549,8 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
     }
     printf("  dest %s\n", he->h_name);
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-    hton_odr_msg(msgp);
     size = craft_frame(dst_if, &raw_addr, buff, (unsigned char*)
-            hwa_head->if_haddr, dst_mac, (char*)msgp,
+            hwa_head->if_haddr, dst_mac, msgp,
             sizeof(struct odr_msg) + msgp->len);
     if (size < sizeof(struct ethhdr)) {
         _ERROR("%s\n", "there was an error crafting the packet");
