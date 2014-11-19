@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
                 goto cleanup;
             }
             msgp = (struct odr_msg*) buf_msg;
-            _DEBUG("GOT msg from socket: %s, with dest: %s:%d\n",
+            _NOTE("Unix socket has from socket: %s, with dest: %s:%d\n",
                     local_addr.sun_path, msgp->dst_ip, msgp->dst_port);
             /* Get/Assign this service a port number */
             msgp->src_port = (uint16_t) svc_update(svcs, &local_addr);
@@ -160,8 +160,7 @@ int main(int argc, char *argv[]) {
                      so we pretend like we don't have a route */
                     queue_store(&queue, msgp);
                     memset(out_msg, 0, ODR_MSG_MAX);
-                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID);
-                    broadcastID++;
+                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                     broadcast(rawsock, hwahead, out_msg, -1);
                     /* done ? */
                 }
@@ -172,7 +171,7 @@ int main(int argc, char *argv[]) {
             int eff, its_me, forw_index;
             uint8_t we_sent;
 
-            _DEBUG("%s\n", "The raw socket has something in it ..");
+            _NOTE("%s\n", "The raw socket has something in it ..");
             len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&raw_addr, &len);
             if(n < 0) {
@@ -211,8 +210,10 @@ int main(int argc, char *argv[]) {
                     } else {
 
                         _DEBUG("%s\n", "added the route");
+                        /* We may only RREP if the next case holds. */
+                        /* we *may* RREP     AND (force_redisc is not set  OR  we're the dest IP) */
                         if(!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
-                            _DEBUG("%s\n", "going to send an RREP");
+                            _DEBUG("%s\n", "If I have an answer I'll RREP...");
                             if(its_me) {
                                 _DEBUG("%s\n", "crafted a rrep for me");
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
@@ -371,7 +372,7 @@ void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m) {
     err = sendto(unixfd, m, (sizeof(struct odr_msg) + m->len), 0, (struct sockaddr*)&dst_addr, len);
     if(err < 0) {
         /* fixme: which sendto() errors should we actually fail on? */
-        _ERROR("%s %m. Ignoring error....\n", "sendto():");
+        _ERROR("%s %m. Client/Server terminated?\n", "sendto():");
         return;
     }
     _DEBUG("Relayed msg: sendto() local sock: %s\n", dst_addr.sun_path);
@@ -694,7 +695,7 @@ int queue_store(struct msg_queue *queue, struct odr_msg *m) {
     real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
     memcpy(&new_node->msg, m, real_len);
     new_node->next = NULL;
-
+    _DEBUG("Storing msg in queue: msg Type %d", m->type);
     curr = queue->head;
     prev = NULL;
     if(curr == NULL) {        /* case if list is empty */
@@ -735,6 +736,7 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
     *   routing table every time the dst_ip is different than in the previous
     *   msg.
     */
+    _DEBUG("%s", "Searching queue for msgs to send\n");
     curr = queue->head;
     prev = NULL;
     while(curr != NULL) {
@@ -968,4 +970,3 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 
     return -1;
 }
-
