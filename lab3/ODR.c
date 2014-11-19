@@ -285,12 +285,12 @@ int main(int argc, char *argv[]) {
                     err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
                             rawsock, hwahead, &queue);
                     _DEBUG("added route result: %d\n", err);
-                    forw_index = find_route_index(route_table, msgp->dst_ip);
-                    _DEBUG("forw_index: %d\n", forw_index);
-                    if(0 == strcmp(msgp->dst_ip, host_ip)) {
+
+                    if(its_me) {
                         _DEBUG("%s\n", "received data for me");
                         deliver_app_mesg(unixsock, svcs, msgp);
-                    } else if(forw_index > -1) {
+                    } else if((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {
+                        _DEBUG("forw_index: %d\n", forw_index);
                         _DEBUG("%s\n", "received data that is not mine, and i have the route\n");
                         send_on_iface(rawsock, hwahead, msgp, route_table[forw_index]
                                 .iface_index, route_table[forw_index].mac_next_hop);
@@ -847,12 +847,21 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
         struct sockaddr_ll* raw_addr, int staleness, int* eff_flag,
         int rawsock, struct hwa_info* hwa_head, struct msg_queue* queue) {
-    int i, is_new_route = 0;
+    int i, is_new_route = 0, exists = 0;
+    if(strcmp(msgp->src_ip, host_ip) == 0) {
+        _ERROR("%s\n", "trying to add your own ip to the routting table ...");
+        exit(EXIT_FAILURE);
+    }
     _DEBUG("looking to add ip: %s\n", msgp->src_ip);
 
     for (i = 0; i < NUM_NODES; ++i) {
-        if(route_table[i].ip_dst[0] == 0 || strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN) == 0) {
+        if(route_table[i].ip_dst[0] == 0 || (exists = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
             _DEBUG("adding at index: %d\n", i);
+            if(exists) {
+                _DEBUG("%s\n", "updating the route");
+            } else {
+                _DEBUG("%s\n", "adding the route");
+            }
             if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops &&
                     !msgp->force_redisc && (msgp->type == T_RREP || msgp->type == T_RREQ)) {
                 _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
@@ -920,6 +929,10 @@ void print_tbl_entry(struct tbl_entry* entry) {
 int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_ADDRSTRLEN]) {
     int i;
     int deleted;
+    if(strcmp(host_ip, ip_dst) == 0) {
+        _ERROR("%s\n", "Trying to find your own ip in the routing table ....");
+        exit(EXIT_FAILURE);
+    }
     time_t now = time(NULL);
     _DEBUG("looking for ip: %s\n", ip_dst);
     for (i = 0; i < NUM_NODES; ++i) {
