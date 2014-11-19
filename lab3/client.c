@@ -1,18 +1,41 @@
 #include "client.h"
 
+static char fname[] = TIME_CLI_PATH;  /* template for mkstemp */
+static int sockfd;
+
+void handle_sigint(int sign) {
+    /**
+    * From signal(7):
+    *
+    * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
+    * to guarantee that the following functions can be safely called inside a signal handler:
+    * _Exit()
+    * ...
+    * close()
+    * ...
+    * unlink()
+    * ...
+    *
+    */
+    sign++; /* for -Wall -Wextra -Werror */
+    close(sockfd);
+    unlink(fname);
+    _Exit(EXIT_FAILURE);
+}
+
 int main(void) {
-    int sockfd, filefd, err;
+    int filefd, err;
     socklen_t len;
     struct sockaddr_un my_addr, name_addr;
-    char fname[] = TIME_CLI_PATH;  /* template for mkstemp */
-    char srvname[BUFF_SIZE] = {0};
-    char hostname[BUFF_SIZE] = {0};
-    char buf[BUFF_SIZE] = {0};
-    char ip_buf[INET_ADDRSTRLEN] = {0};
+    char srvname[BUFF_SIZE], prev_srvname[BUFF_SIZE];
+    char hostname[BUFF_SIZE];
+    char buf[BUFF_SIZE];
+    char ip_buf[INET_ADDRSTRLEN];
     int port;
     struct hostent *he;
     struct in_addr srv_in_addr;
     char *errc;
+    struct sigaction sigact;
 
     fd_set rset;            /* select(2) vars for a timeout */
     struct timeval tv;      /* select(2) vars for a timeout */
@@ -40,6 +63,16 @@ int main(void) {
     /* we just use mkstemp to get a filename, so close the file, dumb right? */
     close(filefd);
     unlink(fname);
+
+    /* set up the signal handler for SIGINT ^C */
+    sigact.sa_handler = &handle_sigint;
+    sigemptyset(&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    err = sigaction(SIGINT, &sigact, NULL);
+    if(err < 0) {
+        _ERROR("%s: %m\n", "sigaction");
+        exit(EXIT_FAILURE);
+    }
 
     my_addr.sun_family = AF_LOCAL;
     strncpy(my_addr.sun_path, fname, sizeof(my_addr.sun_path)-1);
@@ -75,6 +108,13 @@ int main(void) {
         errc = strchr(srvname, '\n');
         if (errc != NULL) {
             *errc = 0;              /* replace '\n' with NULL term.*/
+        }
+        if(strlen(srvname) == 0) {
+            /* if the user only pressed enter, then use the last hostname */
+            strncpy(srvname, prev_srvname, sizeof(srvname));
+        } else {
+            /* user entered new hostname, */
+            strncpy(prev_srvname, srvname, sizeof(prev_srvname));
         }
 
         /* don't check if's a "vmXX", just call gethostbyname() */

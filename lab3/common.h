@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <signal.h>
 
 #define BUFF_SIZE 1024
 #define EVER ;;
