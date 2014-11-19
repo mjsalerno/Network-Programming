@@ -91,6 +91,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
 int find_route_index(struct tbl_entry route_table[NUM_NODES],
         char ip_dst[INET_ADDRSTRLEN]);
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
+void print_tbl_entry(struct tbl_entry* entry);
 
 /* funcs for raw pkt stuffs */
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], struct odr_msg* msgp, size_t data_len);
