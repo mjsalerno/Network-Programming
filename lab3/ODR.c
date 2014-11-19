@@ -19,9 +19,7 @@ int main(int argc, char *argv[]) {
     struct odr_msg *out_msg;
     uint32_t broadcastID = 0;
     struct msg_queue queue;
-
     int staleness;
-    /*socklen_t len;*/
 
     /* raw socket vars*/
     struct sockaddr_ll raw_addr;
@@ -57,7 +55,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "ERROR: get_hw_addrs()\n");
         exit(EXIT_FAILURE);
     }
-    print_hw_addrs(hwahead);
     rm_eth0_lo(&hwahead);
     print_hw_addrs(hwahead);
     if(hwahead == NULL) {
@@ -109,7 +106,7 @@ int main(int argc, char *argv[]) {
         perror("ERROR: gethostname()");
         goto cleanup;
     }
-    _NOTE("ODR at node %s (%s): ready for messages....\n", host_name, host_ip);
+    _NOTE("ODR at node %s (\"CanonicalIP\" %s): ready....\n", host_name, host_ip);
 
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
     queue.head = NULL;             /* init the queue */
@@ -201,7 +198,8 @@ int main(int argc, char *argv[]) {
                     _DEBUG("%s\n", "fell into case T_RREQ");
                     eff = 0;
                     we_sent = 0;
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
+                            rawsock, hwahead, &queue);
                     forw_index = find_route_index(route_table, msgp->dst_ip);
 
                     if(err < 0) {
@@ -246,7 +244,7 @@ int main(int argc, char *argv[]) {
                         forw_index = find_route_index(route_table, msgp->dst_ip);
                         _DEBUG("forw_index: %d\n", forw_index);
                         if(forw_index < 0) {
-                            _ERROR("%s\n", "there was an error, no route found to forward RREP maybe staleness too low");
+                            _NOTE("%s\n", "there was an error, no route found to forward RREP maybe staleness too low");
                             /*exit(EXIT_FAILURE);*/
                             craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                             broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
@@ -258,7 +256,8 @@ int main(int argc, char *argv[]) {
                         eff = 0;
                         /* check to see if the their path is better than mine */
                         /* if force_redesc then always send theirs            */
-                        if(add_route(route_table, msgp, &raw_addr, staleness, &eff) || eff || msgp->force_redisc) {
+                        if(add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead, &queue)
+                                || eff || msgp->force_redisc) {
                             _DEBUG("%s\n", "forwarding their route");
                             send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                         } else { /*i have better route*/
@@ -271,17 +270,17 @@ int main(int argc, char *argv[]) {
                     } else {
                         _DEBUG("%s\n", "it is for me :D");
                         eff = 0;
-                        err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
+                        err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
+                                rawsock, hwahead, &queue);
                         if(err < 0 || eff < 1) {
                             _ERROR("bad eff or err when adding to the rout table, err: %d  eff: %d\n", err, eff);
                         }
-                        /* todo add this when it is fixed
-                        queue_send(&queue, rawsock, route_table);*/
                     }
                     break;
                 case T_DATA:
                     _DEBUG("%s\n", "fell into case T_DATA");
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff);
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
+                            rawsock, hwahead, &queue);
                     _DEBUG("added route result: %d\n", err);
                     forw_index = find_route_index(route_table, msgp->dst_ip);
                     _DEBUG("forw_index: %d\n", forw_index);
@@ -739,7 +738,7 @@ int queue_store(struct msg_queue *queue, struct odr_msg *m) {
 
 /**
 *   Check if any messages in the queue now have a route in the table.
-*
+*   fixme: only pass the route that was just added, not the whole routing table.
 */
 void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head, struct tbl_entry *route_tbl) {
     struct msg_node *curr, *prev, *tofree;
@@ -855,15 +854,18 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 
 
 /**
- * adds a route to the table
- * If a route with the same dest ip was found,
- * the entry is replaced without question
+ * Add/Updates a route in the table. Updating is done based on hops.
  *
- * returns the index it was added to
- * returns -1 if it was not added
+ * RETURNS: the index the route was added/updated at
+ *          -1 if it was not added
+ *
+ * NOTE: After the call, flags will have 1 if this route was new or more
+ *      efficient than the previous route.
  */
-int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr, int staleness, int* flags) {
-    int i;
+int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
+        struct sockaddr_ll* raw_addr, int staleness, int* eff_flag,
+        int rawsock, struct hwa_info* hwa_head, struct msg_queue* queue) {
+    int i, is_new_route = 0;
     _DEBUG("looking to add ip: %s\n", msgp->src_ip);
 
     for (i = 0; i < NUM_NODES; ++i) {
@@ -872,16 +874,16 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
                 _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
                 route_table[i].broadcast_id = msgp->broadcast_id;
-                *flags = 0;
+                *eff_flag = 0;
                 return -1;
             }
             /*todo should this also be set if force_redesc?*/
             if(route_table[i].num_hops > msgp->num_hops /*|| msgp.force_redesc*/) {
-                *flags = 1;
+                *eff_flag = 1;
             }
-            if( route_table[i].ip_dst[0] == 0 ) {
-                *flags = 1;
-                /* todo: add q_send here */
+            if(route_table[i].ip_dst[0] == 0) { /* this route is new */
+                *eff_flag = 1;
+                is_new_route = 1;
             }
             memcpy(route_table[i].mac_next_hop, raw_addr->sll_addr, ETH_ALEN);
             route_table[i].iface_index = raw_addr->sll_ifindex;
@@ -889,6 +891,10 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             route_table[i].timestamp = time(NULL) + staleness;
             route_table[i].broadcast_id = msgp->broadcast_id;
             strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
+            if(is_new_route == 1) {
+                /* todo: change from route_table to route_table[i] */
+                queue_send(queue, rawsock, hwa_head, route_table);
+            }
             return i;
         }
         _DEBUG("index was full : %d\n", i);
