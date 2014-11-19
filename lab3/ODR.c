@@ -151,7 +151,6 @@ int main(int argc, char *argv[]) {
                 if(!msgp->force_redisc &&
                         -1 != (route_i = find_route_index(route_table, msgp->dst_ip))) {
                     /* send DATA */
-
                     send_on_iface(rawsock, hwahead, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
                     /* done ? */
                 } else {
@@ -159,8 +158,8 @@ int main(int argc, char *argv[]) {
                     /* either we don't have a route or force_redisc was set
                      so we pretend like we don't have a route */
                     queue_store(&queue, msgp);
-                    memset(out_msg, 0, sizeof(struct odr_msg));
-                    craft_rreq(out_msg, host_ip, msgp->dst_ip, 1, broadcastID);
+                    memset(out_msg, 0, ODR_MSG_MAX);
+                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID);
                     broadcastID++;
                     broadcast(rawsock, hwahead, out_msg, -1);
                     /* done ? */
@@ -486,8 +485,7 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
 * |-ethhdr-|-------------data-----------|
 * |-ethhdr-|---odr_msg---|---payload----|
 *
-* sends data on all ifaces except the one in the except arg
-* this already calls craft_frame
+* Sends data on all ifaces except the one in the except arg.
 *
 */
 void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int except) {
@@ -509,7 +507,7 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
 * |-ethhdr-|---odr_msg---|---payload----|
 *
 * Sends data on only the dst_if interface to dst_mac
-* This already calls craft_frame
+* This calls craft_frame and hton_odr_msg()
 */
 void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]) {
     char buff[ETH_FRAME_LEN];
