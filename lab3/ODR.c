@@ -158,10 +158,12 @@ int main(int argc, char *argv[]) {
                     /* send RREQ */
                     /* either we don't have a route or force_redisc was set
                      so we pretend like we don't have a route */
-                    queue_store(&queue, msgp);
-                    memset(out_msg, 0, ODR_MSG_MAX);
-                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
-                    broadcast(rawsock, hwahead, out_msg, -1);
+                    err = queue_store(&queue, msgp);
+                    if(!err) {
+                        memset(out_msg, 0, ODR_MSG_MAX);
+                        craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+                        broadcast(rawsock, hwahead, out_msg, -1);
+                    }
                     /* done ? */
                 }
             }
@@ -248,9 +250,11 @@ int main(int argc, char *argv[]) {
                         if(forw_index < 0) {
                             _NOTE("%s\n", "there was an error, no route found to forward RREP maybe staleness too low");
                             /*exit(EXIT_FAILURE);*/
-                            craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
-                            broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
-                            queue_store(&queue, out_msg);
+                            err = queue_store(&queue, out_msg);
+                            if(!err) {
+                                craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+                                broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
+                            }
                             break;
                         }
 
@@ -295,8 +299,11 @@ int main(int argc, char *argv[]) {
                                 .iface_index, route_table[forw_index].mac_next_hop);
                     } else {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
-                        craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
-                        queue_store(&queue, msgp);
+                        err = queue_store(&queue, msgp);
+                        if(!err) {
+                            craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
+                            broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
+                        }
                     }
                     break;
                 default:
@@ -675,7 +682,7 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
 *   end of the queue.
 *   NOTE: malloc()'s 2 times
 *   RETURNS:    0   if the dst IP was not already in the queue
-*               -1  if the dst IP was already in the queue.
+*               1  if the dst IP was already in the queue.
 */
 int queue_store(struct msg_queue *queue, struct odr_msg *m) {
     struct msg_node *new_node, *curr, *prev;
@@ -889,7 +896,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             route_table[i].num_hops = msgp->num_hops;
             route_table[i].timestamp = time(NULL) + staleness;
             strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
-            if(msgp->type == T_RREQ || msgp->type == T_RREP) {  /*only update id if there not data (and not junk)*/
+            if(msgp->type == T_RREQ) {  /*only update id if RREQ*/
                 route_table[i].broadcast_id = msgp->broadcast_id;
             }
             #ifdef DEBUG
@@ -912,11 +919,11 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
 
 void print_tbl_entry(struct tbl_entry* entry) {
     printf("-------------------------------\n");
-    printf("|mac_next_hop: %02x:%02x:%02x:%02x:%02x:%02x\n",
+    printf("|mac_next_hop: %02hhx:%02x:%02hhx:%02hhx:%02hhx:%02hhx\n",
             entry->mac_next_hop[0], entry->mac_next_hop[1],
             entry->mac_next_hop[2], entry->mac_next_hop[3],
             entry->mac_next_hop[4], entry->mac_next_hop[5]);
-    printf("|mac_iface   : %02x:%02x:%02x:%02x:%02x:%02x\n",
+    printf("|mac_iface   : %02hhx:%02x:%02hhx:%02hhx:%02hhx:%02hhx\n",
             entry->mac_iface[0], entry->mac_iface[1],
             entry->mac_iface[2], entry->mac_iface[3],
             entry->mac_iface[4], entry->mac_iface[5]);
