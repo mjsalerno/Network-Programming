@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
                             }
                         }
 
-                        if(we_sent || eff) {
+                        if(!we_sent || eff) {
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
@@ -878,7 +878,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
     int i, is_new_route = 0, exists = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
-        _ERROR("%s\n", "trying to add your own ip to the routting table ...");
+        _ERROR("%s\n", "trying to add your own ip to the routing table ...");
         exit(EXIT_FAILURE);
     }
     _DEBUG("looking to add ip: %s\n", msgp->src_ip);
@@ -976,7 +976,7 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
     _DEBUG("looking for ip: %s\n", ip_dst);
     for (i = 0; i < NUM_NODES; ++i) {
         if(strncmp(ip_dst, route_table[i].ip_dst, INET_ADDRSTRLEN) == 0) {
-            _DEBUG("found match| ip: '%s' index: %d\n", route_table->ip_dst, i);
+            _DEBUG("found match| ip: '%s' index: %d\n", route_table[i].ip_dst, i);
             if(route_table[i].timestamp  < now) {
                 _INFO("%s\n", "it was stale, deleteing it and returning -1\n");
                 deleted = delete_route_index(route_table, i);
