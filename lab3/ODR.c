@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
                 goto cleanup;
             }
             msgp = (struct odr_msg*) buf_msg;
-            _DEBUG("GOT msg from socket: %s, with dest: %s:%d\n",
+            _NOTE("Unix socket has from socket: %s, with dest: %s:%d\n",
                     local_addr.sun_path, msgp->dst_ip, msgp->dst_port);
             /* Get/Assign this service a port number */
             msgp->src_port = (uint16_t) svc_update(svcs, &local_addr);
@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
             int eff, its_me, forw_index;
             uint8_t we_sent;
 
-            _DEBUG("%s\n", "The raw socket has something in it ..");
+            _NOTE("%s\n", "The raw socket has something in it ..");
             len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&raw_addr, &len);
             if(n < 0) {
@@ -372,7 +372,7 @@ void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m) {
     err = sendto(unixfd, m, (sizeof(struct odr_msg) + m->len), 0, (struct sockaddr*)&dst_addr, len);
     if(err < 0) {
         /* fixme: which sendto() errors should we actually fail on? */
-        _ERROR("%s %m. Ignoring error....\n", "sendto():");
+        _ERROR("%s %m. Client/Server terminated?\n", "sendto():");
         return;
     }
     _DEBUG("Relayed msg: sendto() local sock: %s\n", dst_addr.sun_path);
@@ -695,7 +695,7 @@ int queue_store(struct msg_queue *queue, struct odr_msg *m) {
     real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
     memcpy(&new_node->msg, m, real_len);
     new_node->next = NULL;
-
+    _DEBUG("Storing msg in queue: msg Type %d", m->type);
     curr = queue->head;
     prev = NULL;
     if(curr == NULL) {        /* case if list is empty */
@@ -736,6 +736,7 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
     *   routing table every time the dst_ip is different than in the previous
     *   msg.
     */
+    _DEBUG("%s", "Searching queue for msgs to send\n");
     curr = queue->head;
     prev = NULL;
     while(curr != NULL) {
