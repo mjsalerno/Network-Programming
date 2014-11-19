@@ -370,7 +370,7 @@ void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m) {
     err = sendto(unixfd, m, (sizeof(struct odr_msg) + m->len), 0, (struct sockaddr*)&dst_addr, len);
     if(err < 0) {
         /* fixme: which sendto() errors should we actually fail on? */
-        _ERROR("%s %m. Client/Server terminated?\n", "sendto():");
+        _SPEC("%s %m. Client/Server terminated?\n", "sendto():");
         return;
     }
     _DEBUG("Relayed msg: sendto() local sock: %s\n", dst_addr.sun_path);
