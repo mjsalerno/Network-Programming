@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
                         /* We may only RREP if the next case holds. */
                         /* we *may* RREP     AND (force_redisc is not set  OR  we're the dest IP) */
                         if(!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
-                            _DEBUG("%s\n", "going to send an RREP");
+                            _DEBUG("%s\n", "If I have an answer I'll RREP...");
                             if(its_me) {
                                 _DEBUG("%s\n", "crafted a rrep for me");
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
