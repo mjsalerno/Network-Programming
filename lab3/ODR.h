@@ -68,6 +68,7 @@ struct tbl_entry {
     int iface_index;
     uint16_t num_hops;
     uint32_t broadcast_id;
+    char mac_iface[6];
     time_t timestamp;
 };
 
