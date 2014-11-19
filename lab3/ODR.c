@@ -896,7 +896,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             route_table[i].num_hops = msgp->num_hops;
             route_table[i].timestamp = time(NULL) + staleness;
             strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
-            if(msgp->type == T_RREQ || msgp->type == T_RREP) {  /*only update id if there not data (and not junk)*/
+            if(msgp->type == T_RREQ) {  /*only update id if RREQ*/
                 route_table[i].broadcast_id = msgp->broadcast_id;
             }
             #ifdef DEBUG
