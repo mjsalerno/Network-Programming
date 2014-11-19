@@ -80,8 +80,6 @@ void svc_init(struct svc_entry *svcs, size_t len);
 int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr);
 
 /* funcs for using the sockets */
-void handle_unix_msg(int unixfd, struct svc_entry *svcs,
-        struct odr_msg *m, struct sockaddr_un *from_addr);
 void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m);
 
 /* route table stuff */

@@ -136,11 +136,14 @@ int main(int argc, char *argv[]) {
             msgp = (struct odr_msg*) buf_msg;
             _DEBUG("GOT msg from socket: %s, with dest: %s:%d\n",
                     local_addr.sun_path, msgp->dst_ip, msgp->dst_port);
+            /* Get/Assign this service a port number */
+            msgp->src_port = (uint16_t) svc_update(svcs, &local_addr);
+            strcpy(msgp->src_ip, host_ip);
 
             if(0 == strcmp(msgp->dst_ip, host_ip)) {
                 /* the destination IP of this svc's mesg is local */
                 _DEBUG("%s", "msg has local dest IP\n");
-                handle_unix_msg(unixsock, svcs, msgp, &local_addr);
+                deliver_app_mesg(unixsock, svcs, msgp);
             } else {
                 int route_i;
                 _DEBUG("msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
@@ -335,26 +338,6 @@ cleanup:
     unlink(ODR_PATH);
     free_hwa_info(hwahead);
     exit(EXIT_FAILURE);
-}
-
-/**
-* We have recvfrom()'d off of our PF_UNIX socket AND the destination is local.
-* Updates the service list, giving a new port number to the from_addr if
-* nessecary.
-*
-* NOTES: Should be called only for traffic from the local unix socket.
-* struct odr_msg *m: m is a pointer to the start of the recv(2) buffer.
-*/
-void handle_unix_msg(int unixfd, struct svc_entry *svcs,
-        struct odr_msg *m, struct sockaddr_un *from_addr) {
-
-    int msg_src_port;
-
-    msg_src_port = svc_update(svcs, from_addr); /* track the local services */
-    m->src_port = (uint16_t) msg_src_port;
-    strcpy(m->src_ip, host_ip);
-
-    deliver_app_mesg(unixfd, svcs, m);
 }
 
 
@@ -552,7 +535,7 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
         exit(EXIT_FAILURE);
     }
     printf("ODR at node %s: sending  frame hdr src %s dest ", host_name, host_name);
-    printf("%02X:%02X:%02X:%02X:%02X:%02X\n", dst_mac[0], dst_mac[1],
+    printf("%02x:%02x:%02x:%02x:%02x:%02x\n", dst_mac[0], dst_mac[1],
             dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
     if(NULL == (he = gethostbyaddr(&src_addr, 4, AF_INET))) {
         herror("Serv ipaddr lookup error");
