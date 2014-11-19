@@ -912,11 +912,11 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
 
 void print_tbl_entry(struct tbl_entry* entry) {
     printf("-------------------------------\n");
-    printf("|mac_next_hop: %02x:%02x:%02x:%02x:%02x:%02x\n",
+    printf("|mac_next_hop: %02hhx:%02x:%02hhx:%02hhx:%02hhx:%02hhx\n",
             entry->mac_next_hop[0], entry->mac_next_hop[1],
             entry->mac_next_hop[2], entry->mac_next_hop[3],
             entry->mac_next_hop[4], entry->mac_next_hop[5]);
-    printf("|mac_iface   : %02x:%02x:%02x:%02x:%02x:%02x\n",
+    printf("|mac_iface   : %02hhx:%02x:%02hhx:%02hhx:%02hhx:%02hhx\n",
             entry->mac_iface[0], entry->mac_iface[1],
             entry->mac_iface[2], entry->mac_iface[3],
             entry->mac_iface[4], entry->mac_iface[5]);
