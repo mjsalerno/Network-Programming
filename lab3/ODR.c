@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
                             } else {
-                                _ERROR("%s\n", "not sure");
+                                _DEBUG("%s\n", "Could send if route known, but I don't know it");
                             }
                             if(we_sent) {
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
@@ -276,7 +276,7 @@ int main(int argc, char *argv[]) {
                         err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
                                 rawsock, hwahead, &queue);
                         if(err < 0 || eff < 1) {
-                            _ERROR("bad eff or err when adding to the rout table, err: %d  eff: %d\n", err, eff);
+                            _ERROR("got a RREP for me but it was not added to the table, err: %d  eff: %d\n", err, eff);
                         }
                     }
                     break;
@@ -906,7 +906,7 @@ void print_tbl_entry(struct tbl_entry* entry) {
             entry->mac_next_hop[4], entry->mac_next_hop[5]);
     printf("|iface_index : %d\n", entry->iface_index);
     printf("|num_hops    : %d\n", entry->num_hops);
-    printf("|timestapm   : %lu\n", (long)entry->timestamp);
+    printf("|timestamp   : %lu\n", (long)entry->timestamp);
     printf("|broadcast_id: %d\n", entry->broadcast_id);
     printf("|ip_dst      : %s\n", entry->ip_dst);
     printf("-------------------------------\n");
