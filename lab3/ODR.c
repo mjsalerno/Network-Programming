@@ -189,6 +189,7 @@ int main(int argc, char *argv[]) {
 
             msgp = (struct odr_msg*) (buf_msg +sizeof(struct ethhdr));
             ntoh_odr_msg(msgp);
+            msgp->num_hops++;
             its_me = (0 == strcmp(msgp->dst_ip, host_ip));
             _DEBUG("its_me: %d\n", its_me);
             len = sizeof(raw_addr);
@@ -222,7 +223,7 @@ int main(int argc, char *argv[]) {
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
                             } else {
-                                _ERROR("%s\n", "not sure");
+                                _DEBUG("%s\n", "Could send if route known, but I don't know it");
                             }
                             if(we_sent) {
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
@@ -231,7 +232,6 @@ int main(int argc, char *argv[]) {
                         }
 
                         if(we_sent || eff) {
-                            msgp->num_hops++;
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
@@ -277,7 +277,7 @@ int main(int argc, char *argv[]) {
                         err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
                                 rawsock, hwahead, &queue);
                         if(err < 0 || eff < 1) {
-                            _ERROR("bad eff or err when adding to the rout table, err: %d  eff: %d\n", err, eff);
+                            _ERROR("got a RREP for me but it was not added to the table, err: %d  eff: %d\n", err, eff);
                         }
                     }
                     break;
@@ -854,7 +854,8 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN) == 0) {
             _DEBUG("adding at index: %d\n", i);
-            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
+            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops &&
+                    !msgp->force_redisc && (msgp->type == T_RREP || msgp->type == T_RREQ)) {
                 _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
                 route_table[i].broadcast_id = msgp->broadcast_id;
                 *eff_flag = 0;
@@ -868,12 +869,22 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
                 *eff_flag = 1;
                 is_new_route = 1;
             }
+            #ifdef DEBUG
+            printf("Old Route\n");
+            print_tbl_entry(&(route_table[i]));
+            #endif
             memcpy(route_table[i].mac_next_hop, raw_addr->sll_addr, ETH_ALEN);
             route_table[i].iface_index = raw_addr->sll_ifindex;
             route_table[i].num_hops = msgp->num_hops;
             route_table[i].timestamp = time(NULL) + staleness;
-            route_table[i].broadcast_id = msgp->broadcast_id;
             strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
+            if(msgp->type == T_RREQ || msgp->type == T_RREP) {  /*only update id if there not data (and not junk)*/
+                route_table[i].broadcast_id = msgp->broadcast_id;
+            }
+            #ifdef DEBUG
+            printf("New Route\n");
+            print_tbl_entry(&(route_table[i]));
+            #endif
             if(is_new_route == 1) {
                 /* todo: change from route_table to route_table[i] */
                 queue_send(queue, rawsock, hwa_head, route_table);
@@ -886,6 +897,20 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
     _ERROR("unable to add ip: %s\n", msgp->src_ip);
     exit(EXIT_FAILURE);
     return -1;
+}
+
+void print_tbl_entry(struct tbl_entry* entry) {
+    printf("-------------------------------\n");
+    printf("|mac_next_hop: %02x:%02x:%02x:%02x:%02x:%02x\n",
+            entry->mac_next_hop[0], entry->mac_next_hop[1],
+            entry->mac_next_hop[2], entry->mac_next_hop[3],
+            entry->mac_next_hop[4], entry->mac_next_hop[5]);
+    printf("|iface_index : %d\n", entry->iface_index);
+    printf("|num_hops    : %d\n", entry->num_hops);
+    printf("|timestamp   : %lu\n", (long)entry->timestamp);
+    printf("|broadcast_id: %d\n", entry->broadcast_id);
+    printf("|ip_dst      : %s\n", entry->ip_dst);
+    printf("-------------------------------\n");
 }
 
 /**
@@ -902,7 +927,7 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
         if(strncmp(ip_dst, route_table[i].ip_dst, INET_ADDRSTRLEN) == 0) {
             _DEBUG("found match| ip: '%s' index: %d\n", route_table->ip_dst, i);
             if(route_table[i].timestamp  < now) {
-                _DEBUG("%s\n", "it was stale, deleteing it and returning -1\n");
+                _INFO("%s\n", "it was stale, deleteing it and returning -1\n");
                 deleted = delete_route_index(route_table, i);
                 if(deleted < 0) {
                     _ERROR("There was an error deleteing index: %d, rtn val: %d\n", i, deleted);
