@@ -5,12 +5,28 @@
 static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 static char host_name[BUFF_SIZE];
 static struct tbl_entry route_table[NUM_NODES];
+static int unixsock, rawsock;
+
+void handle_sigint(int sign) {
+    /**
+    * From signal(7):
+    *
+    * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
+    * to guarantee that the following functions can be safely called inside a signal handler:
+    * ... _Exit() ... close() ... unlink() ...
+    */
+    sign++; /* for -Wall -Wextra -Werror */
+    close(unixsock);
+    close(rawsock);
+    unlink(ODR_PATH);
+    _Exit(EXIT_FAILURE);
+}
 
 int main(int argc, char *argv[]) {
     int err;
     ssize_t n;
     struct hwa_info *hwahead;
-    int unixsock, rawsock, stdinfd;
+    int stdinfd;
     struct sockaddr_un unix_addr, local_addr;
     socklen_t len;
     struct svc_entry svcs[SVC_MAX_NUM];
@@ -20,13 +36,13 @@ int main(int argc, char *argv[]) {
     uint32_t broadcastID = 0;
     struct msg_queue queue;
     int staleness;
-
     /* raw socket vars*/
     struct sockaddr_ll raw_addr;
-
     /* select(2) vars */
     fd_set rset;
     int fpd1;
+    /* sigaction(2) var */
+    struct sigaction sigact;
 
     if(argc != 2) {
         fprintf(stderr, "usage: %s staleness\n", argv[0]);
@@ -92,6 +108,15 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    /* set up the signal handler for SIGINT ^C */
+    sigact.sa_handler = &handle_sigint;
+    sigemptyset(&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    err = sigaction(SIGINT, &sigact, NULL);
+    if(err < 0) {
+        _ERROR("%s: %m\n", "sigaction");
+        exit(EXIT_FAILURE);
+    }
 
     unix_addr.sun_family = AF_LOCAL;
     strncpy(unix_addr.sun_path, ODR_PATH, sizeof(unix_addr.sun_path)-1);

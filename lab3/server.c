@@ -1,18 +1,34 @@
 #include "server.h"
 
+static int sock;
+
+void handle_sigint(int sign) {
+    /**
+    * From signal(7):
+    *
+    * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
+    * to guarantee that the following functions can be safely called inside a signal handler:
+    * ... _Exit() ... close() ... unlink() ...
+    */
+    sign++; /* for -Wall -Wextra -Werror */
+    close(sock);
+    unlink(TIME_SRV_PATH);
+    _Exit(EXIT_FAILURE);
+}
+
 int main(void) {
-    int sock;
     ssize_t err, n;
     time_t ticks;
     int cliport;
     struct hostent *vm;
     struct sockaddr_un name;
-    /*struct sockaddr_un cli_addr;*/
 
     struct in_addr vm_ip;
     char buff[BUFF_SIZE];
     char cli_ip_buff[INET_ADDRSTRLEN];
     char hostname[BUFF_SIZE];
+
+    struct sigaction sigact;
 
     err = gethostname(hostname, sizeof(hostname));
     if(err < 0) {
@@ -34,6 +50,16 @@ int main(void) {
     strcpy(name.sun_path, TIME_SRV_PATH);
 
     unlink(TIME_SRV_PATH);
+
+    /* set up the signal handler for SIGINT ^C */
+    sigact.sa_handler = &handle_sigint;
+    sigemptyset(&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    err = sigaction(SIGINT, &sigact, NULL);
+    if(err < 0) {
+        _ERROR("%s: %m\n", "sigaction");
+        exit(EXIT_FAILURE);
+    }
 
     /* Bind the UNIX domain address to the created socket */
     err = bind(sock, (struct sockaddr *) &name, sizeof(struct sockaddr_un));

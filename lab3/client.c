@@ -9,13 +9,7 @@ void handle_sigint(int sign) {
     *
     * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
     * to guarantee that the following functions can be safely called inside a signal handler:
-    * _Exit()
-    * ...
-    * close()
-    * ...
-    * unlink()
-    * ...
-    *
+    * ... _Exit() ... close() ... unlink() ...
     */
     sign++; /* for -Wall -Wextra -Werror */
     close(sockfd);
@@ -27,7 +21,7 @@ int main(void) {
     int filefd, err;
     socklen_t len;
     struct sockaddr_un my_addr, name_addr;
-    char srvname[BUFF_SIZE], prev_srvname[BUFF_SIZE];
+    char srvname[BUFF_SIZE] = {0}, prev_srvname[BUFF_SIZE] = {0};
     char hostname[BUFF_SIZE];
     char buf[BUFF_SIZE];
     char ip_buf[INET_ADDRSTRLEN];
@@ -89,7 +83,7 @@ int main(void) {
         perror("ERROR: getsockname()");
         goto cleanup;
     }
-    printf("socket bound to name: %s, len: %d\n", name_addr.sun_path, len);
+    printf("socket --> %s\n", name_addr.sun_path);
 
     for(EVER) {
 
