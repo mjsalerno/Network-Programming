@@ -11,6 +11,17 @@ struct hwa_info *Get_hw_addrs() {
     return hwa;
 }
 
+struct hwa_info* find_hwa(int index, struct hwa_info* head) {
+    struct hwa_info* ptr;
+    for(ptr = head; ptr != NULL; ptr = ptr->hwa_next) {
+        if(ptr->if_index == index) {
+            return ptr;
+        }
+    }
+
+    return NULL;
+}
+
 /* Uses ioctl(2) to get MAC and H/W info about all interfaces */
 struct hwa_info *get_hw_addrs(void) {
 	struct hwa_info	*hwa, *hwahead, **hwapnext;
@@ -54,12 +65,12 @@ struct hwa_info *get_hw_addrs(void) {
 	hwahead = NULL;
 	hwapnext = &hwahead;
 	lastname[0] = 0;
-    
+
 	ifr = ifc.ifc_req;
 	nInterfaces = ifc.ifc_len / (int)sizeof(struct ifreq);
 	for(i = 0; i < nInterfaces; i++)  {
 		item = &ifr[i];
- 		alias = 0; 
+ 		alias = 0;
 		hwa = (struct hwa_info *) calloc(1, sizeof(struct hwa_info));
         if(hwa == NULL) {
             fprintf(stderr, "ERROR calloc returned NULL");

@@ -841,10 +841,10 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  * NOTE: After the call, flags will have 1 if this route was new or more
  *      efficient than the previous route.
  */
-int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
-        struct sockaddr_ll* raw_addr, int staleness, int* eff_flag,
-        int rawsock, struct hwa_info* hwa_head, struct msg_queue* queue) {
+int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
+        int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head, struct msg_queue* queue) {
     int i, is_new_route = 0, exists = 0;
+    struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routting table ...");
         exit(EXIT_FAILURE);
@@ -879,6 +879,12 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
             print_tbl_entry(&(route_table[i]));
             #endif
             memcpy(route_table[i].mac_next_hop, raw_addr->sll_addr, ETH_ALEN);
+            hwa_ptr = find_hwa(raw_addr->sll_ifindex, hwa_head);
+            if(hwa_ptr == NULL) {
+                _ERROR("could not find hwa with index: %d\n", raw_addr->sll_ifindex);
+                exit(EXIT_FAILURE);
+            }
+            memcpy(route_table[i].mac_iface, hwa_ptr->if_haddr, ETH_ALEN);
             route_table[i].iface_index = raw_addr->sll_ifindex;
             route_table[i].num_hops = msgp->num_hops;
             route_table[i].timestamp = time(NULL) + staleness;
@@ -910,6 +916,10 @@ void print_tbl_entry(struct tbl_entry* entry) {
             entry->mac_next_hop[0], entry->mac_next_hop[1],
             entry->mac_next_hop[2], entry->mac_next_hop[3],
             entry->mac_next_hop[4], entry->mac_next_hop[5]);
+    printf("|mac_iface   : %02x:%02x:%02x:%02x:%02x:%02x\n",
+            entry->mac_iface[0], entry->mac_iface[1],
+            entry->mac_iface[2], entry->mac_iface[3],
+            entry->mac_iface[4], entry->mac_iface[5]);
     printf("|iface_index : %d\n", entry->iface_index);
     printf("|num_hops    : %d\n", entry->num_hops);
     printf("|timestamp   : %lu\n", (long)entry->timestamp);

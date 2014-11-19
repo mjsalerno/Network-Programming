@@ -30,5 +30,6 @@ struct hwa_info {
 /* function prototypes */
 struct hwa_info	*get_hw_addrs(void);
 void free_hwa_info(struct hwa_info *hwahead);
+struct hwa_info* find_hwa(int index, struct hwa_info* head);
 
 #endif /* GET_HW_ADDRS_H */
