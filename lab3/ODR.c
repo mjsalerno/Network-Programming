@@ -757,8 +757,9 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
             }
             free(tofree);
         } else {
-            /* no more msgs to send*/
-            return;
+            /* new route IP is after this entry, so keep looking */
+            prev = curr;
+            curr = curr->next;
         }
     }
 }
