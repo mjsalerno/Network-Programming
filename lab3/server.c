@@ -30,6 +30,8 @@ int main(void) {
 
     struct sigaction sigact;
 
+    vm_ip.s_addr = 0;
+
     err = gethostname(hostname, sizeof(hostname));
     if(err < 0) {
         perror("ERROR: gethostname()");
@@ -73,7 +75,6 @@ int main(void) {
 
     for(EVER) {
         _DEBUG("%s", "waiting for clients...\n");
-        /*todo: fix ip*/
         n = msg_recv(sock, buff, BUFF_SIZE, cli_ip_buff, &cliport);
         if(n < 0) {
             perror("ERROR: msg_recv()");

@@ -1,13 +1,13 @@
 #include "ODR.h"
 #include "debug.h"
 
-/* fixme: remove */
-static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
+static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1"; /* for testing on comps w/o eth0 */
 static char host_name[BUFF_SIZE];
-static struct tbl_entry route_table[NUM_NODES];
 static int unixsock, rawsock;
 static uint32_t broadcastID = 0;
 static struct bid_node* bid_list;
+static struct msg_queue data_queue, rrep_queue;
+static struct tbl_entry route_table[NUM_NODES];
 
 /**
 * Statistics: num RREQs sent is just broadcastID
@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
     char *buf_msg;                    /* buffer for local messages */
     struct odr_msg *msgp;               /* to cast buf_local_msg */
     struct odr_msg *out_msg;
-    struct msg_queue queue;
     int staleness;
     /* raw socket vars*/
     struct sockaddr_ll raw_addr;
@@ -149,7 +148,8 @@ int main(int argc, char *argv[]) {
     _NOTE("ODR at node %s (\"CanonicalIP\" %s): ready....\n", host_name, host_ip);
 
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
-    queue.head = NULL;             /* init the queue */
+    data_queue.head = NULL;             /* init the queues */
+    rrep_queue.head = NULL;
 
     FD_ZERO(&rset);
     stdinfd = fileno(stdin);
@@ -175,13 +175,14 @@ int main(int argc, char *argv[]) {
             }
             msgp = (struct odr_msg*) buf_msg;
             n_data_prod++;
-            _NOTE("Unix socket has from socket: %s, with dest: %s:%d\n",
+            _NOTE("%s\n", "The unix socket has something in it ..");
+            _DEBUG("src socket: %s, with dest: %s:%d\n",
                     local_addr.sun_path, msgp->dst_ip, msgp->dst_port);
             /* Get/Assign this service a port number */
             msgp->src_port = (uint16_t) svc_update(svcs, &local_addr);
             strcpy(msgp->src_ip, host_ip);
 
-            if(0 == strcmp(msgp->dst_ip, host_ip)) {
+            if(0 == strcmp(msgp->dst_ip, host_ip) || 0 == strncmp(msgp->dst_ip, "127", 3)) {
                 /* the destination IP of this svc's mesg is local */
                 _DEBUG("%s", "msg has local dest IP\n");
                 deliver_app_mesg(unixsock, svcs, msgp);
@@ -198,7 +199,7 @@ int main(int argc, char *argv[]) {
                     /* send RREQ */
                     /* either we don't have a route or force_redisc was set
                      so we pretend like we don't have a route */
-                    err = queue_store(&queue, msgp);
+                    err = queue_store(&data_queue, msgp);
                     if(!err) {
                         memset(out_msg, 0, ODR_MSG_MAX);
                         craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
@@ -245,7 +246,7 @@ int main(int argc, char *argv[]) {
                     eff = 0;
                     we_sent = 0;
 
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead, &queue);
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
                     if(err < 0) {
                         _DEBUG("%s\n", "the route was not added");
                     } else {
@@ -293,9 +294,9 @@ int main(int argc, char *argv[]) {
                         forw_index = find_route_index(route_table, msgp->dst_ip);
                         _DEBUG("forw_index: %d\n", forw_index);
                         if(forw_index < 0) {
-                            _NOTE("%s\n", "there was an error, no route found to forward RREP maybe staleness too low");
+                            _NOTE("%s\n", "no route found to forward RREP maybe staleness too low");
                             /*exit(EXIT_FAILURE);*/
-                            err = queue_store(&queue, out_msg);
+                            err = queue_store(&rrep_queue, out_msg);
                             if(!err) {
                                 craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                                 broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
@@ -307,7 +308,7 @@ int main(int argc, char *argv[]) {
                         eff = 0;
                         /* check to see if the their path is better than mine */
                         /* if force_redesc then always send theirs            */
-                        if(add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead, &queue)
+                        if(add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead)
                                 || eff || msgp->force_redisc) {
                             _DEBUG("%s\n", "forwarding their route");
                             n_rrep_forw++;
@@ -324,7 +325,7 @@ int main(int argc, char *argv[]) {
                         _DEBUG("%s\n", "it is for me :D");
                         eff = 0;
                         err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
-                                rawsock, hwahead, &queue);
+                                rawsock, hwahead);
                         if(err < 0 || eff < 1) {
                             _ERROR("got a RREP for me but it was not added to the table, err: %d  eff: %d\n", err, eff);
                         }
@@ -334,7 +335,7 @@ int main(int argc, char *argv[]) {
                     n_data_recv++;
                     _DEBUG("%s\n", "fell into case T_DATA");
                     err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
-                            rawsock, hwahead, &queue);
+                            rawsock, hwahead);
                     _DEBUG("added route result: %d\n", err);
 
                     if(its_me) {
@@ -343,11 +344,12 @@ int main(int argc, char *argv[]) {
                     } else if((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {
                         _DEBUG("forw_index: %d\n", forw_index);
                         _DEBUG("%s\n", "received data that is not mine, and i have the route\n");
-                        send_on_iface(rawsock, hwahead, msgp, route_table[forw_index]
-                                .iface_index, route_table[forw_index].mac_next_hop);
+                        send_on_iface(rawsock, hwahead, msgp,
+                                route_table[forw_index].iface_index,
+                                route_table[forw_index].mac_next_hop);
                     } else {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
-                        err = queue_store(&queue, msgp);
+                        err = queue_store(&data_queue, msgp);
                         if(!err) {
                             craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
@@ -558,6 +560,29 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
     }
 }
 
+char *getvmname(char ip[INET_ADDRSTRLEN]) {
+    struct in_addr vmaddr = {0};
+    struct hostent *he;
+    char *name;
+    int i = 0;
+    if(0 == inet_aton(ip, &vmaddr)) {
+        _ERROR("Bad ip: %s\n", ip);
+        exit(EXIT_FAILURE);
+    }
+
+    if(NULL == (he = gethostbyaddr(&vmaddr, 4, AF_INET))) {
+        herror("ERROR gethostbyaddr()");
+        exit(EXIT_FAILURE);
+    }
+    name = he->h_name;
+    while(name[0] != 'v' && name[1] != 'm' && name != NULL) {
+        name = he->h_aliases[i];
+        i++;
+    }
+
+    return name;
+}
+
 /**
 *
 * |----------------frame----------------|
@@ -572,8 +597,6 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
     size_t size;
     ssize_t ssize;
     struct sockaddr_ll raw_addr;
-    struct in_addr src_addr, dst_addr;
-    struct hostent *he;
 
     for(; hwa_head != NULL; hwa_head = hwa_head->hwa_next) {
         if(hwa_head->if_index == dst_if) {
@@ -591,25 +614,13 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
         case T_DATA: n_data_sent++; break;
         default: break;
     }
-    /* all this crap is for a printout !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-    if((0 == inet_aton(msgp->src_ip, &src_addr)) || (0 == inet_aton(msgp->dst_ip, &dst_addr))) {
-        _ERROR("One of these are bad: %s or %s\n", msgp->src_ip, msgp->src_ip);
-        exit(EXIT_FAILURE);
-    }
+
     printf("ODR at node %s: sending  frame hdr src %s dest ", host_name, host_name);
     printf("%02x:%02x:%02x:%02x:%02x:%02x\n", dst_mac[0], dst_mac[1],
             dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
-    if(NULL == (he = gethostbyaddr(&src_addr, 4, AF_INET))) {
-        herror("Serv ipaddr lookup error");
-        exit(EXIT_FAILURE);
-    }
-    printf("\tODR msg  type %d  src %s", msgp->type, he->h_name);
-    if(NULL == (he = gethostbyaddr(&dst_addr, 4, AF_INET))) {
-        herror("Serv ipaddr lookup error");
-        exit(EXIT_FAILURE);
-    }
-    printf("  dest %s\n", he->h_name);
-    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+    printf("\tODR msg  type %d  src %s", msgp->type, getvmname(msgp->src_ip));
+    printf("  dest %s\n", getvmname(msgp->dst_ip));
+
     size = craft_frame(dst_if, &raw_addr, buff, (unsigned char*)
             hwa_head->if_haddr, dst_mac, msgp,
             sizeof(struct odr_msg) + msgp->len);
@@ -712,7 +723,7 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
             if(cmp_eth0 == 0
                     && curr->ip_alias != IP_ALIAS && curr->ip_addr != NULL) {
                 strcpy(host_ip, inet_ntoa(((struct sockaddr_in*)curr->ip_addr)->sin_addr));
-                _DEBUG("Found the canonical ip of eth0: %s\n", host_ip);
+                _DEBUG("Setting host IP as canonical ip of eth0: %s\n", host_ip);
             }
             tofree = curr;
             curr = curr->hwa_next;
@@ -742,6 +753,56 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
 *               1  if the dst IP was already in the queue.
 */
 int queue_store(struct msg_queue *queue, struct odr_msg *m) {
+    /* fixme: change to queue_store_data() */
+    struct msg_node *new_node, *curr, *prev;
+    int cmp;
+    size_t real_len;
+    if(queue == NULL || m == NULL) {
+        _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
+        exit(EXIT_FAILURE);
+    }
+    new_node = malloc(sizeof(struct msg_node) + m->len); /* alloc the enclosing msg_node */
+    if(new_node == NULL) {
+        _ERROR("%s", "malloc() returned NULL! Failing!\n");
+        exit(EXIT_FAILURE);
+    }
+    real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
+    memcpy(&new_node->msg, m, real_len);
+    new_node->next = NULL;
+    _DEBUG("Storing msg in queue: msg Type %d\n", m->type);
+    curr = queue->head;
+    prev = NULL;
+    if(curr == NULL) {        /* case if list is empty */
+        queue->head = new_node;
+        return 0;
+    }
+    for( ; curr != NULL; prev = curr, curr = curr->next) {
+        cmp = strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
+        if(cmp <= 0){
+            new_node->next = curr;
+            if(prev == NULL) {
+                queue->head = new_node; /* case if before head */
+            } else {
+                prev->next = new_node;  /* case if after head*/
+            }
+            return (cmp == 0);
+        }
+    }
+    /* case if last element */
+    prev->next = new_node;
+    return 0;
+}
+
+/**
+*   Store the message into the queue, to be sent later (upon getting a route).
+*
+*   malloc()'s space for |-- odr_msg --|--  data  --|  and then puts it at the
+*   end of the queue.
+*   NOTE: malloc()'s 2 times
+*   RETURNS:    0   if the dst IP was not already in the queue
+*               1  if the dst IP was already in the queue.
+*/
+int queue_store_rrep(struct msg_queue *queue, struct odr_msg *m) {
     struct msg_node *new_node, *curr, *prev;
     int cmp;
     size_t real_len;
@@ -811,7 +872,7 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
                 if(strncmp(curr->msg.src_ip, host_ip, INET_ADDRSTRLEN) != 0) {
                     /* if this wasn't from this node */
                     n_data_forw++;
-                } /*fixme: else? */
+                }
             }
             send_on_iface(rawsock, hwa_head, &curr->msg, new_route->iface_index, new_route->mac_next_hop);
             /* now free the msg_node, since it was sent */
@@ -912,7 +973,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  *      efficient than the previous route.
  */
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
-        int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head, struct msg_queue* queue) {
+        int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
     int i, is_new_route = 0, exists = 0, err = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
@@ -976,8 +1037,9 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             print_tbl_entry(&(route_table[i]));
             #endif
             if(is_new_route == 1) {
-                /* todo: change from route_table to route_table[i] */
-                queue_send(queue, rawsock, hwa_head, &route_table[i]);
+                /* todo: send datas and rreps */
+                queue_send(&data_queue, rawsock, hwa_head, &route_table[i]);
+                queue_send(&rrep_queue, rawsock, hwa_head, &route_table[i]);
             }
             return i;
         }

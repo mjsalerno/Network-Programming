@@ -94,9 +94,8 @@ void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m);
 /* route table stuff */
 #define NEW_ROUTE 0x1
 #define EFF_ROUTE 0x2
-int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp,
-        struct sockaddr_ll* raw_addr, int staleness, int* eff_flag,
-        int rawsock, struct hwa_info* hwa_head, struct msg_queue* queue);
+int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
+        int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head);
 int find_route_index(struct tbl_entry route_table[NUM_NODES],
         char ip_dst[INET_ADDRSTRLEN]);
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index);
