@@ -7,6 +7,7 @@
 #include <net/ethernet.h>
 #include <time.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "common.h"
 #include "get_hw_addrs.h"
@@ -62,6 +63,7 @@ struct msg_queue {
     /*struct msg_node *tail;*/
 };
 
+/* fixme: remove broadcast_id, make list of {ip, broadcast_id} */
 struct tbl_entry {
     unsigned char mac_next_hop[ETH_ALEN];
     char ip_dst[INET_ADDRSTRLEN];
@@ -111,5 +113,7 @@ void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, i
 int queue_store(struct msg_queue *queue, struct odr_msg *m);
 void queue_send(struct msg_queue *queue, int rawsock,
         struct hwa_info *hwa_head, struct tbl_entry *new_route);
+
+void statistics(void);
 
 #endif /* ODR_H */

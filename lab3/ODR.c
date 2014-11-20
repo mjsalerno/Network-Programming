@@ -6,6 +6,20 @@ static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 static char host_name[BUFF_SIZE];
 static struct tbl_entry route_table[NUM_NODES];
 static int unixsock, rawsock;
+static uint32_t broadcastID = 0;
+
+/**
+* Statistics: num RREQs sent is just broadcastID
+* "sent"="unconditional sent"
+* "recv"="I got"
+* "flood"="flooded RREQ"
+* "prod"="I produced this"
+* "forw"="Not from me, but I passed it along"
+*
+*/
+static unsigned int n_rreq_recv = 0, n_rreq_flood = 0;
+static unsigned int n_rrep_sent = 0, n_rrep_prod = 0, n_rrep_recv = 0, n_rrep_forw = 0;
+static unsigned int n_data_sent = 0, n_data_prod = 0, n_data_recv = 0, n_data_delivered = 0, n_data_forw = 0;
 
 void handle_sigint(int sign) {
     /**
@@ -33,7 +47,6 @@ int main(int argc, char *argv[]) {
     char *buf_msg;                    /* buffer for local messages */
     struct odr_msg *msgp;               /* to cast buf_local_msg */
     struct odr_msg *out_msg;
-    uint32_t broadcastID = 0;
     struct msg_queue queue;
     int staleness;
     /* raw socket vars*/
@@ -160,6 +173,7 @@ int main(int argc, char *argv[]) {
                 goto cleanup;
             }
             msgp = (struct odr_msg*) buf_msg;
+            n_data_prod++;
             _NOTE("Unix socket has from socket: %s, with dest: %s:%d\n",
                     local_addr.sun_path, msgp->dst_ip, msgp->dst_port);
             /* Get/Assign this service a port number */
@@ -225,6 +239,7 @@ int main(int argc, char *argv[]) {
             switch(msgp->type) {
 
                 case T_RREQ:
+                    n_rreq_recv++;
                     _DEBUG("%s\n", "fell into case T_RREQ");
                     eff = 0;
                     we_sent = 0;
@@ -259,12 +274,14 @@ int main(int argc, char *argv[]) {
                         if(!we_sent || eff) {
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
+                            n_rreq_flood++;
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
                         }
                     }
 
                     break;
                 case T_RREP:
+                    n_rrep_recv++;
                     _DEBUG("%s\n", "fell into case T_RREP");
                     /* forwarding RREP */
                     if(!its_me) {
@@ -290,11 +307,13 @@ int main(int argc, char *argv[]) {
                         if(add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead, &queue)
                                 || eff || msgp->force_redisc) {
                             _DEBUG("%s\n", "forwarding their route");
+                            n_rrep_forw++;
                             send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                         } else { /*i have better route*/
                             /*todo i think this else is junk, I should never get here*/
                             _DEBUG("I have a better route, their hops: %d, my hops: %d\n", msgp->num_hops, route_table[forw_index].num_hops);
                             craft_rrep(out_msg, host_ip, msgp->dst_ip, 0, route_table[forw_index].num_hops);
+                            n_rrep_forw++;
                             send_on_iface(rawsock, hwahead, out_msg, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                         }
                     /* the rrep is for me :D */
@@ -309,6 +328,7 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 case T_DATA:
+                    n_data_recv++;
                     _DEBUG("%s\n", "fell into case T_DATA");
                     err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
                             rawsock, hwahead, &queue);
@@ -359,6 +379,7 @@ int main(int argc, char *argv[]) {
     close(rawsock);
     unlink(ODR_PATH);
     free_hwa_info(hwahead); /* FREE HW list*/
+    statistics();
     exit(EXIT_SUCCESS);
 cleanup:
     free(buff);
@@ -381,6 +402,7 @@ void deliver_app_mesg(int unixfd, struct svc_entry *svcs, struct odr_msg *m) {
     struct sockaddr_un dst_addr;
     socklen_t len;
     ssize_t err;
+    n_data_delivered++;
     if(svcs == NULL || m == NULL) {
         _ERROR("%s", "svcs or m is NULL, terminating.\n");
         exit(EXIT_FAILURE);
@@ -560,6 +582,12 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
         exit(EXIT_FAILURE);
     }
     _DEBUG("sending on iface: %d\n", dst_if);
+    switch(msgp->type) { /* update statistics */
+        /* case T_RREQ: this is covered by broadcastID */
+        case T_RREP: n_rrep_sent++; break;
+        case T_DATA: n_data_sent++; break;
+        default: break;
+    }
     /* all this crap is for a printout !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
     if((0 == inet_aton(msgp->src_ip, &src_addr)) || (0 == inet_aton(msgp->dst_ip, &dst_addr))) {
         _ERROR("One of these are bad: %s or %s\n", msgp->src_ip, msgp->src_ip);
@@ -647,6 +675,7 @@ void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, u
 
 /* Can pass NULL for srcip or dstip if not wanted. */
 void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, int num_hops) {
+    n_rrep_prod++;
     m->type = T_RREP;
     m->force_redisc = (uint8_t)force_redisc;
     m->broadcast_id = 0;
@@ -775,6 +804,12 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
             return;
         } else if(cmp_ip == 0) {
             /* msg has the same ip as the new route. */
+            if(curr->msg.type == T_DATA) { /* update stats */
+                if(strncmp(curr->msg.src_ip, host_ip, INET_ADDRSTRLEN) != 0) {
+                    /* if this wasn't from this node */
+                    n_data_forw++;
+                } /*fixme: else? */
+            }
             send_on_iface(rawsock, hwa_head, &curr->msg, new_route->iface_index, new_route->mac_next_hop);
             /* now free the msg_node, since it was sent */
             tofree = curr;
@@ -1006,4 +1041,17 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     }
 
     return -1;
+}
+
+void statistics(void) {
+//    static int n_rreq_recv = 0, n_rreq_flood = 0;
+//    static int n_rrep_sent = 0, n_rrep_recv = 0, n_rrep_forw = 0;
+//    static int n_data_sent = 0, n_data_delivered = 0, n_data_forw = 0;
+    _STATS("%s","=============== Statistics ================\n");
+    _STATS("Sent     :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", broadcastID, n_rrep_sent, n_data_sent);
+    _STATS("Produced :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", broadcastID, n_rrep_prod, n_data_prod);
+    _STATS("Received :  RREQs: %2u, RREPs: %2u, DATAs: %2u\n", n_rreq_recv, n_rrep_recv, n_data_recv);
+    _STATS("Delivered:                        DATAs: %2u\n", n_data_delivered);
+    _STATS("Forwarded:             RREPs: %2u, DATAs: %2u\n", n_rrep_forw, n_data_forw);
+    _STATS("Flooded  :  RREQs: %2u (Times decided to flood the RREQ)\n", n_rreq_flood);
 }
