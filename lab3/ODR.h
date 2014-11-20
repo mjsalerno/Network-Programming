@@ -73,7 +73,7 @@ struct tbl_entry {
     char ip_dst[INET_ADDRSTRLEN];
     int iface_index;
     uint16_t num_hops;
-    uint32_t broadcast_id;
+    //uint32_t broadcast_id;
     unsigned char mac_iface[6];
     time_t timestamp;
 };
@@ -118,7 +118,7 @@ int queue_store(struct msg_queue *queue, struct odr_msg *m);
 void queue_send(struct msg_queue *queue, int rawsock,
         struct hwa_info *hwa_head, struct tbl_entry *new_route);
 
-int add_bid(struct bid_node* head, uint32_t bradcast_id, char src_ip[INET_ADDRSTRLEN]);
+int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDRSTRLEN]);
 struct bid_node* get_bid(struct bid_node* head, char src_ip[INET_ADDRSTRLEN]);
 
 #endif /* ODR_H */

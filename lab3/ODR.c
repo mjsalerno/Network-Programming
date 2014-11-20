@@ -6,6 +6,7 @@ static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1";
 static char host_name[BUFF_SIZE];
 static struct tbl_entry route_table[NUM_NODES];
 static int unixsock, rawsock;
+static struct bid_node* bid_list;
 
 void handle_sigint(int sign) {
     /**
@@ -894,7 +895,8 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops &&
                     !msgp->force_redisc && (msgp->type == T_RREP || msgp->type == T_RREQ)) {
                 _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
-                route_table[i].broadcast_id = msgp->broadcast_id;
+                add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+                /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
                 *eff_flag = 0;
                 return -1;
             }
@@ -922,7 +924,8 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             route_table[i].timestamp = time(NULL) + staleness;
             strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
             if(msgp->type == T_RREQ) {  /*only update id if RREQ*/
-                route_table[i].broadcast_id = msgp->broadcast_id;
+                /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
+                add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
             }
             #ifdef DEBUG
             printf("New Route\n");
@@ -955,7 +958,7 @@ void print_tbl_entry(struct tbl_entry* entry) {
     printf("|iface_index : %d\n", entry->iface_index);
     printf("|num_hops    : %d\n", entry->num_hops);
     printf("|timestamp   : %lu\n", (long)entry->timestamp);
-    printf("|broadcast_id: %d\n", entry->broadcast_id);
+    /*printf("|broadcast_id: %d\n", entry->broadcast_id);*/
     printf("|ip_dst      : %s\n", entry->ip_dst);
     printf("-------------------------------\n");
 }
@@ -1008,14 +1011,26 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     return -1;
 }
 
-int add_bid(struct bid_node* head, uint32_t bradcast_id, char src_ip[INET_ADDRSTRLEN]) {
+/**
+* returns -1 if id was smaller then the one here
+* returns 0 is the id was the same
+* returns 1 if it was added/updated
+*/
+int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDRSTRLEN]) {
     struct bid_node* ptr;
     int rtn = 0;
 
-    for(ptr = head; ptr != NULL; ptr = ptr->next) {
+    for(ptr = *head; ptr != NULL; ptr = ptr->next) {
         if(0 == strcmp(ptr->src_ip, src_ip)) {
             _DEBUG("%s\n", "found maching bid node");
-            ptr->broadcast_id = bradcast_id;
+            if(ptr->broadcast_id > broadcast_id) {
+                _DEBUG("%s\n", "trying to add broadcast_id that was smaller");
+                return -1;
+            } else if(ptr->broadcast_id == broadcast_id) {
+                _DEBUG("%s\n", "trying to add broadcast_id that was equal");
+                return 0;
+            }
+            ptr->broadcast_id = broadcast_id;
             rtn = 1;
             break;
         }
@@ -1030,7 +1045,10 @@ int add_bid(struct bid_node* head, uint32_t bradcast_id, char src_ip[INET_ADDRST
         }
 
         strncpy(ptr->src_ip, src_ip, INET_ADDRSTRLEN);
+        ptr->broadcast_id = broadcast_id;
         rtn = 1;
+        ptr->next = *head;
+        *head = ptr;
     }
 
     return rtn;
