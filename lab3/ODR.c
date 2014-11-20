@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
                     /* send RREQ */
                     /* either we don't have a route or force_redisc was set
                      so we pretend like we don't have a route */
-                    err = queue_store(&data_queue, msgp);
+                    err = queue_store(msgp);
                     if(!err) {
                         memset(out_msg, 0, ODR_MSG_MAX);
                         craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
@@ -296,7 +296,7 @@ int main(int argc, char *argv[]) {
                         if(forw_index < 0) {
                             _NOTE("%s\n", "no route found to forward RREP maybe staleness too low");
                             /*exit(EXIT_FAILURE);*/
-                            err = queue_store(&rrep_queue, out_msg);
+                            err = queue_store(out_msg);
                             if(!err) {
                                 craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                                 broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
@@ -327,7 +327,7 @@ int main(int argc, char *argv[]) {
                         err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
                                 rawsock, hwahead);
                         if(err < 0 || eff < 1) {
-                            _ERROR("got a RREP for me but it was not added to the table, err: %d  eff: %d\n", err, eff);
+                            _ERROR("The RREP was for me but it was not added to the table, err: %d  eff: %d\n", err, eff);
                         }
                     }
                     break;
@@ -349,7 +349,7 @@ int main(int argc, char *argv[]) {
                                 route_table[forw_index].mac_next_hop);
                     } else {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
-                        err = queue_store(&data_queue, msgp);
+                        err = queue_store(msgp);
                         if(!err) {
                             craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
@@ -742,74 +742,44 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
     }
 }
 
-
-/**
-*   Store the message into the queue, to be sent later (upon getting a route).
-*
-*   malloc()'s space for |-- odr_msg --|--  data  --|  and then puts it at the
-*   end of the queue.
-*   NOTE: malloc()'s 2 times
-*   RETURNS:    0   if the dst IP was not already in the queue
-*               1  if the dst IP was already in the queue.
-*/
-int queue_store(struct msg_queue *queue, struct odr_msg *m) {
-    /* fixme: change to queue_store_data() */
-    struct msg_node *new_node, *curr, *prev;
-    int cmp;
-    size_t real_len;
-    if(queue == NULL || m == NULL) {
-        _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
-        exit(EXIT_FAILURE);
+void queue_insert(struct msg_queue *queue, struct msg_node *prev, struct msg_node *new, struct msg_node *curr) {
+    if(curr == queue->head) {   /* case if before head */
+        new->next = queue->head;
+        queue->head = new;
+    } else {                   /* case if after head*/
+        new->next = curr;
+        prev->next = new;
     }
-    new_node = malloc(sizeof(struct msg_node) + m->len); /* alloc the enclosing msg_node */
-    if(new_node == NULL) {
-        _ERROR("%s", "malloc() returned NULL! Failing!\n");
-        exit(EXIT_FAILURE);
-    }
-    real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
-    memcpy(&new_node->msg, m, real_len);
-    new_node->next = NULL;
-    _DEBUG("Storing msg in queue: msg Type %d\n", m->type);
-    curr = queue->head;
-    prev = NULL;
-    if(curr == NULL) {        /* case if list is empty */
-        queue->head = new_node;
-        return 0;
-    }
-    for( ; curr != NULL; prev = curr, curr = curr->next) {
-        cmp = strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
-        if(cmp <= 0){
-            new_node->next = curr;
-            if(prev == NULL) {
-                queue->head = new_node; /* case if before head */
-            } else {
-                prev->next = new_node;  /* case if after head*/
-            }
-            return (cmp == 0);
-        }
-    }
-    /* case if last element */
-    prev->next = new_node;
-    return 0;
 }
 
 /**
 *   Store the message into the queue, to be sent later (upon getting a route).
+*   NOTE: For RREPS: replaces an exisiting RREP if this RREP is better.
+*           Sorted by destination. (RREPs sorted by dst, then by src)
 *
 *   malloc()'s space for |-- odr_msg --|--  data  --|  and then puts it at the
 *   end of the queue.
-*   NOTE: malloc()'s 2 times
-*   RETURNS:    0   if the dst IP was not already in the queue
+*   RETURNS:    0  if the dst IP was not already in the queue
 *               1  if the dst IP was already in the queue.
 */
-int queue_store_rrep(struct msg_queue *queue, struct odr_msg *m) {
+int queue_store(struct odr_msg *m) {
     struct msg_node *new_node, *curr, *prev;
-    int cmp;
+    struct msg_queue *queue;
+    int cmp_dst, cmp_src;
     size_t real_len;
-    if(queue == NULL || m == NULL) {
+    if(m == NULL) {
         _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
         exit(EXIT_FAILURE);
     }
+    if(m->type == T_DATA) { /* choose the right queue */
+        queue = &data_queue;
+    } else if(m->type == T_RREP) {
+        queue = &rrep_queue;
+    } else {
+        _ERROR("Can't store this odr_msg type in a queue: %hhu\n", m->type);
+        exit(EXIT_FAILURE);
+    }
+
     new_node = malloc(sizeof(struct msg_node) + m->len); /* alloc the enclosing msg_node */
     if(new_node == NULL) {
         _ERROR("%s", "malloc() returned NULL! Failing!\n");
@@ -818,7 +788,7 @@ int queue_store_rrep(struct msg_queue *queue, struct odr_msg *m) {
     real_len = sizeof(struct odr_msg) + m->len; /* alloc the inner odr_msg */
     memcpy(&new_node->msg, m, real_len);
     new_node->next = NULL;
-    _DEBUG("Storing msg in queue: msg Type %d\n", m->type);
+    _DEBUG("Storing msg in queue: msg Type %hhu\n", m->type);
     curr = queue->head;
     prev = NULL;
     if(curr == NULL) {        /* case if list is empty */
@@ -826,15 +796,25 @@ int queue_store_rrep(struct msg_queue *queue, struct odr_msg *m) {
         return 0;
     }
     for( ; curr != NULL; prev = curr, curr = curr->next) {
-        cmp = strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
-        if(cmp <= 0){
-            new_node->next = curr;
-            if(prev == NULL) {
-                queue->head = new_node; /* case if before head */
-            } else {
-                prev->next = new_node;  /* case if after head*/
+        cmp_dst = strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
+        if(cmp_dst <= 0){
+            if(cmp_dst == 0 && m->type == T_RREP) {/* dup RREP deletion!! same dst_ip, so check if same src_ip*/
+                cmp_src = strncmp(m->src_ip, curr->msg.src_ip, INET_ADDRSTRLEN);
+                if(cmp_src < 0) {
+                    queue_insert(queue, prev, new_node, curr);
+                } else if(cmp_src == 0) { /* same src and dst ip of RREPs */
+                    if(m->num_hops < curr->msg.num_hops) {
+                        _INFO("Got a better RREP, dropping old, old_hops: %d, new_hops: %d\n", curr->msg.num_hops, m->num_hops);
+                        curr->msg.num_hops = m->num_hops;
+                    } else {
+                        _INFO("Got a worse RREP, dropping it, stored RREP hops: %d, its hops: %d\n", curr->msg.num_hops, m->num_hops);
+                    }
+                    free(new_node);
+                    return (cmp_dst == 0); /* should always be true (or 1) here */
+                }
             }
-            return (cmp == 0);
+            queue_insert(queue, prev, new_node, curr);
+            return (cmp_dst == 0);
         }
     }
     /* case if last element */
@@ -1124,7 +1104,7 @@ void statistics(void) {
     _STATS("Received :  RREQs: %2u, RREPs: %2u, DATAs: %2u\n", n_rreq_recv, n_rrep_recv, n_data_recv);
     _STATS("Delivered:                        DATAs: %2u\n", n_data_delivered);
     _STATS("Forwarded:             RREPs: %2u, DATAs: %2u\n", n_rrep_forw, n_data_forw);
-    _STATS("Flooded  :  RREQs: %2u (Times decided to flood the RREQ. Don't trust this.)\n", n_rreq_flood);
+    _STATS("Flooded  :  RREQs: %2u (Continued the RREQ after RREP'ing. Don't trust)\n", n_rreq_flood);
 }
 
 /**

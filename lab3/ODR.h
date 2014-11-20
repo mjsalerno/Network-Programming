@@ -115,7 +115,7 @@ void craft_rreq(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, u
 void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, int num_hops);
 
 /* funcs for msg_queue{} */
-int queue_store(struct msg_queue *queue, struct odr_msg *m);
+int queue_store(struct odr_msg *m);
 void queue_send(struct msg_queue *queue, int rawsock,
         struct hwa_info *hwa_head, struct tbl_entry *new_route);
 
