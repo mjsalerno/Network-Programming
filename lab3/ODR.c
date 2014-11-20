@@ -7,6 +7,7 @@ static char host_name[BUFF_SIZE];
 static struct tbl_entry route_table[NUM_NODES];
 static int unixsock, rawsock;
 static uint32_t broadcastID = 0;
+static struct bid_node* bid_list;
 
 /**
 * Statistics: num RREQs sent is just broadcastID
@@ -243,8 +244,8 @@ int main(int argc, char *argv[]) {
                     _DEBUG("%s\n", "fell into case T_RREQ");
                     eff = 0;
                     we_sent = 0;
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead, &queue);
 
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead, &queue);
                     if(err < 0) {
                         _DEBUG("%s\n", "the route was not added");
                     } else {
@@ -260,7 +261,7 @@ int main(int argc, char *argv[]) {
                                 we_sent = 1;
                             } else if ((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {   /* we have the route */
                                 _DEBUG("%s\n", "crafted a rrep since i know where it is");
-                                craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
+                                craft_rrep(out_msg, route_table[forw_index].ip_dst, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
                             } else {
                                 _DEBUG("%s\n", "Could send if route known, but I don't know it");
@@ -929,7 +930,8 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops &&
                     !msgp->force_redisc && (msgp->type == T_RREP || msgp->type == T_RREQ)) {
                 _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
-                route_table[i].broadcast_id = msgp->broadcast_id;
+                add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+                /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
                 *eff_flag = 0;
                 return -1;
             }
@@ -957,7 +959,8 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             route_table[i].timestamp = time(NULL) + staleness;
             strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
             if(msgp->type == T_RREQ) {  /*only update id if RREQ*/
-                route_table[i].broadcast_id = msgp->broadcast_id;
+                /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
+                add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
             }
             #ifdef DEBUG
             printf("New Route\n");
@@ -990,7 +993,7 @@ void print_tbl_entry(struct tbl_entry* entry) {
     printf("|iface_index : %d\n", entry->iface_index);
     printf("|num_hops    : %d\n", entry->num_hops);
     printf("|timestamp   : %lu\n", (long)entry->timestamp);
-    printf("|broadcast_id: %d\n", entry->broadcast_id);
+    /*printf("|broadcast_id: %d\n", entry->broadcast_id);*/
     printf("|ip_dst      : %s\n", entry->ip_dst);
     printf("-------------------------------\n");
 }
@@ -1044,9 +1047,6 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 }
 
 void statistics(void) {
-//    static int n_rreq_recv = 0, n_rreq_flood = 0;
-//    static int n_rrep_sent = 0, n_rrep_recv = 0, n_rrep_forw = 0;
-//    static int n_data_sent = 0, n_data_delivered = 0, n_data_forw = 0;
     _STATS("%s","=============== Statistics ================\n");
     _STATS("Sent     :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", broadcastID, n_rrep_sent, n_data_sent);
     _STATS("Produced :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", broadcastID, n_rrep_prod, n_data_prod);
@@ -1054,4 +1054,60 @@ void statistics(void) {
     _STATS("Delivered:                        DATAs: %2u\n", n_data_delivered);
     _STATS("Forwarded:             RREPs: %2u, DATAs: %2u\n", n_rrep_forw, n_data_forw);
     _STATS("Flooded  :  RREQs: %2u (Times decided to flood the RREQ)\n", n_rreq_flood);
+}
+
+/**
+* returns -1 if id was smaller then the one here
+* returns 0 is the id was the same
+* returns 1 if it was added/updated
+*/
+int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDRSTRLEN]) {
+    struct bid_node* ptr;
+    int rtn = 0;
+
+    for(ptr = *head; ptr != NULL; ptr = ptr->next) {
+        if(0 == strcmp(ptr->src_ip, src_ip)) {
+            _DEBUG("%s\n", "found maching bid node");
+            if(ptr->broadcast_id > broadcast_id) {
+                _DEBUG("%s\n", "trying to add broadcast_id that was smaller");
+                return -1;
+            } else if(ptr->broadcast_id == broadcast_id) {
+                _DEBUG("%s\n", "trying to add broadcast_id that was equal");
+                return 0;
+            }
+            ptr->broadcast_id = broadcast_id;
+            rtn = 1;
+            break;
+        }
+    }
+
+    if(rtn == 0) {
+        _DEBUG("%s\n", "did not find a matching bid_node, adding another");
+        ptr = malloc(sizeof(struct bid_node));
+        if(ptr == NULL) {
+            _ERROR("%s\n", "malloc for bid_node failed");
+            exit(EXIT_FAILURE);
+        }
+
+        strncpy(ptr->src_ip, src_ip, INET_ADDRSTRLEN);
+        ptr->broadcast_id = broadcast_id;
+        rtn = 1;
+        ptr->next = *head;
+        *head = ptr;
+    }
+
+    return rtn;
+}
+
+struct bid_node* get_bid(struct bid_node* head, char src_ip[INET_ADDRSTRLEN]) {
+    struct bid_node* ptr;
+
+    for(ptr = head; ptr != NULL; ptr = ptr->next) {
+        if(0 == strcmp(ptr->src_ip, src_ip)) {
+            _DEBUG("%s\n", "found maching bid node");
+            break;
+        }
+    }
+
+    return ptr;
 }

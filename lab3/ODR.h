@@ -42,6 +42,12 @@ struct odr_msg {
     uint8_t force_redisc:1;
 };
 
+struct bid_node {
+    uint32_t broadcast_id;
+    char src_ip[INET_ADDRSTRLEN];
+    struct bid_node* next;
+};
+
 /**
 *  The pending queue of T_DATA messages waiting for routes.
 *  NOTE: MISLEADING because the odr_msg is followed by data.
@@ -64,13 +70,12 @@ struct msg_queue {
     /*struct msg_node *tail;*/
 };
 
-/* fixme: remove broadcast_id, make list of {ip, broadcast_id} */
 struct tbl_entry {
     unsigned char mac_next_hop[ETH_ALEN];
     char ip_dst[INET_ADDRSTRLEN];
     int iface_index;
     uint16_t num_hops;
-    uint32_t broadcast_id;
+    //uint32_t broadcast_id;
     unsigned char mac_iface[6];
     time_t timestamp;
 };
@@ -114,6 +119,9 @@ void craft_rrep(struct odr_msg *m, char *srcip, char *dstip, int force_redisc, i
 int queue_store(struct msg_queue *queue, struct odr_msg *m);
 void queue_send(struct msg_queue *queue, int rawsock,
         struct hwa_info *hwa_head, struct tbl_entry *new_route);
+
+int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDRSTRLEN]);
+struct bid_node* get_bid(struct bid_node* head, char src_ip[INET_ADDRSTRLEN]);
 
 void statistics(void);
 
