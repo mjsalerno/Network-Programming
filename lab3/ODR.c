@@ -18,7 +18,7 @@ static struct bid_node* bid_list;
 * "forw"="Not from me, but I passed it along"
 *
 */
-static unsigned int n_rreq_recv = 0, n_rreq_flood = 0;
+static unsigned int n_rreq_sent = 0, n_rreq_recv = 0, n_rreq_flood = 0;
 static unsigned int n_rrep_sent = 0, n_rrep_prod = 0, n_rrep_recv = 0, n_rrep_forw = 0;
 static unsigned int n_data_sent = 0, n_data_prod = 0, n_data_recv = 0, n_data_delivered = 0, n_data_forw = 0;
 
@@ -275,7 +275,9 @@ int main(int argc, char *argv[]) {
                         if(!we_sent || eff) {
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
-                            n_rreq_flood++;
+                            if(we_sent) {
+                                n_rreq_flood++;
+                            }
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
                         }
                     }
@@ -584,7 +586,7 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
     }
     _DEBUG("sending on iface: %d\n", dst_if);
     switch(msgp->type) { /* update statistics */
-        /* case T_RREQ: this is covered by broadcastID */
+        case T_RREQ: n_rreq_sent++; break;
         case T_RREP: n_rrep_sent++; break;
         case T_DATA: n_data_sent++; break;
         default: break;
@@ -1055,12 +1057,12 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 
 void statistics(void) {
     _STATS("%s","=============== Statistics ================\n");
-    _STATS("Sent     :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", broadcastID, n_rrep_sent, n_data_sent);
+    _STATS("Sent     :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", n_rreq_sent, n_rrep_sent, n_data_sent);
     _STATS("Produced :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", broadcastID, n_rrep_prod, n_data_prod);
     _STATS("Received :  RREQs: %2u, RREPs: %2u, DATAs: %2u\n", n_rreq_recv, n_rrep_recv, n_data_recv);
     _STATS("Delivered:                        DATAs: %2u\n", n_data_delivered);
     _STATS("Forwarded:             RREPs: %2u, DATAs: %2u\n", n_rrep_forw, n_data_forw);
-    _STATS("Flooded  :  RREQs: %2u (Times decided to flood the RREQ)\n", n_rreq_flood);
+    _STATS("Flooded  :  RREQs: %2u (Times decided to flood the RREQ. Don't trust this.)\n", n_rreq_flood);
 }
 
 /**
