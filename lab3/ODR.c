@@ -911,7 +911,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  */
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head, struct msg_queue* queue) {
-    int i, is_new_route = 0, exists = 0;
+    int i, is_new_route = 0, exists = 0, err = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
@@ -928,9 +928,12 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
                 _DEBUG("%s\n", "adding the route");
             }
             if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops &&
-                    !msgp->force_redisc && (msgp->type == T_RREP || msgp->type == T_RREQ)) {
+                    !msgp->force_redisc && msgp->type == T_RREQ) {
                 _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
-                add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+                err = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+                if(err == -1) {
+                    return -5;
+                }
                 /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
                 *eff_flag = 0;
                 return -1;
@@ -947,6 +950,14 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             printf("Old Route\n");
             print_tbl_entry(&(route_table[i]));
             #endif
+            if(msgp->type == T_RREQ) {  /*only update id if RREQ*/
+                /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
+                err = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+                if(err == -1) {
+                    _DEBUG("%s\n", "this bid was already seen");
+                    return -5;
+                }
+            }
             memcpy(route_table[i].mac_next_hop, raw_addr->sll_addr, ETH_ALEN);
             hwa_ptr = find_hwa(raw_addr->sll_ifindex, hwa_head);
             if(hwa_ptr == NULL) {
@@ -958,10 +969,6 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             route_table[i].num_hops = msgp->num_hops;
             route_table[i].timestamp = time(NULL) + staleness;
             strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
-            if(msgp->type == T_RREQ) {  /*only update id if RREQ*/
-                /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
-                add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
-            }
             #ifdef DEBUG
             printf("New Route\n");
             print_tbl_entry(&(route_table[i]));
