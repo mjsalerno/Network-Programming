@@ -72,7 +72,7 @@ if(RREQ.broadcast_id > route.broadcast_id || EFF_ROUTE):  <--- same thing as add
         a. If I have route to RREQ.dst_ip:  then send RREP
         b. If I am dest and RREQ.force_redisc, keep RREQ.force_redisc set
 
-    3. RREQ flooding. Only if(!we_sent_RREP || EFF_ROUTE):
+    3. RREQ flooding. Only if(EFF_ROUTE):
         a. If we sent RREP, set the RREQ.rrep_sent flag.
         b. Send RREQ on all interfaces except the source interface.
 

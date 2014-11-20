@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
                             }
                         }
 
-                        if(!we_sent || eff) {
+                        if(eff) {
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
                             if(we_sent) {
@@ -972,7 +972,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             }
             if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops &&
                     !msgp->force_redisc && msgp->type == T_RREQ) {
-                _DEBUG("%s\n", "Found a less efficient route but updating bcast id");
+                _DEBUG("%s\n", "Found a less efficient route but might update bcast id");
                 err = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
                 if(err == -1) {
                     return -5;
