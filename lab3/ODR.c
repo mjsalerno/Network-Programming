@@ -1007,3 +1007,44 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 
     return -1;
 }
+
+int add_bid(struct bid_node* head, uint32_t bradcast_id, char src_ip[INET_ADDRSTRLEN]) {
+    struct bid_node* ptr;
+    int rtn = 0;
+
+    for(ptr = head; ptr != NULL; ptr = ptr->next) {
+        if(0 == strcmp(ptr->src_ip, src_ip)) {
+            _DEBUG("%s\n", "found maching bid node");
+            ptr->broadcast_id = bradcast_id;
+            rtn = 1;
+            break;
+        }
+    }
+
+    if(rtn == 0) {
+        _DEBUG("%s\n", "did not find a matching bid_node, adding another");
+        ptr = malloc(sizeof(struct bid_node));
+        if(ptr == NULL) {
+            _ERROR("%s\n", "malloc for bid_node failed");
+            exit(EXIT_FAILURE);
+        }
+
+        strncpy(ptr->src_ip, src_ip, INET_ADDRSTRLEN);
+        rtn = 1;
+    }
+
+    return rtn;
+}
+
+struct bid_node* get_bid(struct bid_node* head, char src_ip[INET_ADDRSTRLEN]) {
+    struct bid_node* ptr;
+
+    for(ptr = head; ptr != NULL; ptr = ptr->next) {
+        if(0 == strcmp(ptr->src_ip, src_ip)) {
+            _DEBUG("%s\n", "found maching bid node");
+            break;
+        }
+    }
+
+    return ptr;
+}
