@@ -58,6 +58,7 @@ struct msg_node {
 };
 
 /* A queue of un-sent messages */
+/* fixme: remove RREPs which have a greater hop count than this duplicate RREP we jsut got */
 struct msg_queue {
     struct msg_node *head;
     /*struct msg_node *tail;*/

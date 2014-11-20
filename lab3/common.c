@@ -69,7 +69,7 @@ ssize_t msg_send(int sock, char* ip, int port, char* msg, size_t msg_len, int fl
     memset(m, 0, sizeof(struct odr_msg) + msg_len);
     fill_mesg(m, ip, port, msg, msg_len, flag);
     m->type = 2;
-    _DEBUG("SEND: to %s:%d, reroute = %d\n", m->dst_ip, m->dst_port, m->force_redisc);
+    _DEBUG("SEND: to %s:%d, force_redisc = %d\n", m->dst_ip, m->dst_port, m->force_redisc);
     rtn = sendto(sock, m, (sizeof(struct odr_msg) + msg_len), 0, (struct sockaddr*)&odr_addr, odr_len);
     free(m);
     return rtn;
