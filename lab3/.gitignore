@@ -3,6 +3,7 @@ prhwaddrs
 client
 server
 *.o
+*.gcno
 socket_*
 aodv.pdf
 

@@ -215,7 +215,6 @@ int main(int argc, char *argv[]) {
             int eff, its_me, forw_index;
             uint8_t we_sent;
 
-            _NOTE("%s\n", "The raw socket has something in it ..");
             len = sizeof(raw_addr);
             n = recvfrom(rawsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&raw_addr, &len);
             if(n < 0) {
@@ -225,9 +224,10 @@ int main(int argc, char *argv[]) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
+            _NOTE("The raw socket had something on it on iface: %d", raw_addr.sll_ifindex);
 
             if(htons(raw_addr.sll_protocol) != PROTO) {
-                _ERROR("Got bad proto: %d, we are: %d\n", raw_addr.sll_protocol, PROTO);
+                _ERROR("Got bad proto: %d, we are: %d\n", htons(raw_addr.sll_protocol), PROTO);
                 continue;
             }
 
