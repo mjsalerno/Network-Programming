@@ -211,7 +211,8 @@ int main(int argc, char *argv[]) {
             /* note: invalidate ptr to buf_msg just to be safe*/
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
-            int eff, its_me, forw_index;
+            int eff, its_me, forw_index, back_index;
+            int should_bcast = 0;
             uint8_t we_sent;
 
             len = sizeof(raw_addr);
@@ -265,7 +266,8 @@ int main(int argc, char *argv[]) {
                                 craft_rrep(out_msg, route_table[forw_index].ip_dst, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
                             } else {
-                                _DEBUG("%s\n", "Could send if route known, but I don't know it");
+                                _DEBUG("%s\n", "Could send if route known, but I don't know it, asking everyone");
+                                should_bcast = 1;
                             }
                             if(we_sent) {
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
@@ -273,7 +275,7 @@ int main(int argc, char *argv[]) {
                             }
                         }
 
-                        if(eff) {
+                        if(eff || should_bcast) {
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
                             if(we_sent) {
