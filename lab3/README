@@ -79,11 +79,11 @@ if(RREQ.broadcast_id > route.broadcast_id || EFF_ROUTE):  <--- same thing as add
 
 On RREP received (Detailed):
 ============================
-1.  If the RREP was not for you, relay it using the path in the table
-    that was added when the corresponding RREQ was received.
-
 2.  Add/Update the path to the destination. If the route is suboptimal,
     DO NOT update the table and DO NOT relay the information to the destination. (what about when force_redsc??)
+
+1.  If the RREP was not for you, relay it using the path in the table
+    that was added when the corresponding RREQ was received.
 
 ?.  "maintaining a route and its associated timestamp in
     the table in response to RREPs received is done in the same manner described
