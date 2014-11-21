@@ -1,3 +1,4 @@
+#include <ldap.h>
 #include "ODR.h"
 #include "debug.h"
 
@@ -565,6 +566,10 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
     struct hostent *he;
     char *name;
     int i = 0;
+    if(strncmp(host_ip, ip, INET_ADDRSTRLEN) == 0) {
+        /* for vm9, it conflicts with nplclient29 */
+        return host_name;
+    }
     if(0 == inet_aton(ip, &vmaddr)) {
         _ERROR("Bad ip: %s\n", ip);
         exit(EXIT_FAILURE);
@@ -575,7 +580,7 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
         exit(EXIT_FAILURE);
     }
     name = he->h_name;
-    while(name[0] != 'v' && name[1] != 'm' && name != NULL) {
+    while(name != NULL && name[0] != 'v' && name[1] != 'm') {
         name = he->h_aliases[i];
         i++;
     }
