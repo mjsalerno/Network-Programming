@@ -24,24 +24,30 @@ set(HW_SOURCE_FILES
     get_hw_addrs.h
     debug.h)
 
-set(COMMON_SOURCE_FILES
-    common.c
-    common.h)
+set(ODR_API_SOURCE_FILES
+    ODR_api.c
+    ODR_api.h)
+
+set(ODR_UTIL_SOURCE_FILES
+    ODR_util.c
+    ODR_util.h)
 
 add_library(hwlib OBJECT ${HW_SOURCE_FILES})
-add_library(commonlib OBJECT ${COMMON_SOURCE_FILES})
+add_library(odr_api_lib OBJECT ${ODR_API_SOURCE_FILES})
+add_library(odr_util_lib OBJECT ${ODR_UTIL_SOURCE_FILES})
 
 add_executable(ODR
     ${ODR_SOURCE_FILES}
-    $<TARGET_OBJECTS:hwlib>)
+    $<TARGET_OBJECTS:hwlib>
+    $<TARGET_OBJECTS:odr_util_lib>)
 
 add_executable(server
 	${SERVER_SOURCE_FILES}
-	$<TARGET_OBJECTS:commonlib>)
+	$<TARGET_OBJECTS:odr_api_lib>)
 
 add_executable(client
 	${CLIENT_SOURCE_FILES}
-	$<TARGET_OBJECTS:commonlib>)
+	$<TARGET_OBJECTS:odr_api_lib>)
 
 #add_executable(testcli
 #   	testcli.c

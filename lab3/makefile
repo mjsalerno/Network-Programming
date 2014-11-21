@@ -17,17 +17,20 @@ all: ODR server client
 %.o: %.c %.h 
 	$(CC) $(FLAGS) -c $<
 
-%: %.o common.o
-	$(CC) $(FLAGS) common.o $< -o $@
+%: %.o ODR_api.o
+	$(CC) $(FLAGS) ODR_api.o $< -o $@
 
-common.o: common.c common.h
-	$(CC) $(FLAGS) -c common.c
+ODR_api.o: ODR_api.c ODR_api.h
+	$(CC) $(FLAGS) -c ODR_api.c
 
 ODR.o: ODR.c ODR.h debug.h get_hw_addrs.h
 	$(CC) $(FLAGS) -c $<
 
-ODR: ODR.o get_hw_addrs.o
-	$(CC) $(FLAGS) $< get_hw_addrs.o -o $@
+ODR_util.o: ODR_util.c ODR_util.h debug.h
+	$(CC) $(FLAGS) -c $<
+
+ODR: ODR.o get_hw_addrs.o ODR_util.o
+	$(CC) $(FLAGS) $< get_hw_addrs.o ODR_util.o -o $@
 
 clean:
 	rm -f  *.o ODR client server *core* sock_* 

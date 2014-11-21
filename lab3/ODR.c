@@ -1,8 +1,9 @@
 #include "ODR.h"
+#include "ODR_util.h"
 #include "debug.h"
 
-static char host_ip[INET_ADDRSTRLEN] = "127.0.0.1"; /* for testing on comps w/o eth0 */
-static char host_name[BUFF_SIZE];
+char host_ip[INET_ADDRSTRLEN] = "127.0.0.1"; /* for testing on comps w/o eth0 */
+char host_name[BUFF_SIZE];
 static int unixsock, rawsock;
 static uint32_t broadcastID = 0;
 static struct bid_node* bid_list;
@@ -560,32 +561,6 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
     }
 }
 
-char *getvmname(char ip[INET_ADDRSTRLEN]) {
-    struct in_addr vmaddr = {0};
-    struct hostent *he;
-    char *name;
-    int i = 0;
-    if(strncmp(host_ip, ip, INET_ADDRSTRLEN) == 0) {
-        /* for vm9, it conflicts with nplclient29 */
-        return host_name;
-    }
-    if(0 == inet_aton(ip, &vmaddr)) {
-        _ERROR("Bad ip: %s\n", ip);
-        exit(EXIT_FAILURE);
-    }
-
-    if(NULL == (he = gethostbyaddr(&vmaddr, 4, AF_INET))) {
-        herror("ERROR gethostbyaddr()");
-        exit(EXIT_FAILURE);
-    }
-    name = he->h_name;
-    while(name != NULL && name[0] != 'v' && name[1] != 'm') {
-        name = he->h_aliases[i];
-        i++;
-    }
-
-    return name;
-}
 
 /**
 *

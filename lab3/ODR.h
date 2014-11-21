@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#include "common.h"
+#include "ODR_api.h"
 #include "get_hw_addrs.h"
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
