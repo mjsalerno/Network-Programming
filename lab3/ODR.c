@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
             /* note: invalidate ptr to buf_msg just to be safe*/
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
-            int eff, its_me, forw_index, back_index;
+            int eff, its_me, forw_index, back_index, add_rout_rtn;
             int should_bcast = 0;
             uint8_t we_sent;
 
@@ -243,9 +243,11 @@ int main(int argc, char *argv[]) {
             }
 
             its_me = (0 == strcmp(msgp->dst_ip, host_ip));
-
             _DEBUG("its_me: %d\n", its_me);
             len = sizeof(raw_addr);
+
+            eff = 0;
+            add_rout_rtn = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
 
             _DEBUG("msg type: %d\n", msgp->type);
             switch(msgp->type) {
@@ -253,11 +255,9 @@ int main(int argc, char *argv[]) {
                 case T_RREQ:
                     n_rreq_recv++;
                     _DEBUG("%s\n", "fell into case T_RREQ");
-                    eff = 0;
                     we_sent = 0;
 
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
-                    if(err < 0) {
+                    if(add_rout_rtn < 0) {
                         /* scott: why just stop here? -1 means? */
                         _DEBUG("%s\n", "the route was not added");
                     } else {
@@ -272,6 +272,10 @@ int main(int argc, char *argv[]) {
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
                                 we_sent = 1;
                             } else if ((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {   /* we have the route */
+                                if(raw_addr.sll_ifindex == route_table[forw_index].iface_index) {
+                                    _DEBUG("%s\n", "I know the route but not telling, would cause bounce");
+                                    continue;
+                                }
                                 _DEBUG("%s\n", "crafted a rrep since i know where it is");
                                 craft_rrep(out_msg, route_table[forw_index].ip_dst, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
@@ -299,9 +303,6 @@ int main(int argc, char *argv[]) {
                 case T_RREP:
                     n_rrep_recv++;
                     _DEBUG("%s\n", "fell into case T_RREP");
-                    eff = 0;
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
-                    _DEBUG("added route result: %d\n", err);
                     /* forwarding somone elses RREP */
                     if(!its_me) {
                         _DEBUG("%s\n", "it is not for me");
@@ -341,10 +342,6 @@ int main(int argc, char *argv[]) {
                     break;
                 case T_DATA:
                     n_data_recv++;
-                    _DEBUG("%s\n", "fell into case T_DATA");
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
-                            rawsock, hwahead);
-                    _DEBUG("added route result: %d\n", err);
 
                     if(its_me) {
                         _DEBUG("%s\n", "received data for me");
@@ -942,7 +939,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
 
-    int i, is_new_route = 0, exists = 0, err = 0;
+    int i, is_new_route = 0, ip_diff = 0, err = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
@@ -951,15 +948,19 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
     _DEBUG("looking to add/update ip: %s\n", msgp->src_ip);
 
     for (i = 0; i < NUM_NODES; ++i) {
-        if(route_table[i].ip_dst[0] == 0 || (exists = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
+        if(route_table[i].ip_dst[0] == 0 || (ip_diff = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
+            if(route_table[i].ip_dst[0] == 0 || msgp->force_redisc) { /* this route is new */
+                *eff_flag = 1;
+                is_new_route = 1;
+            }
             _DEBUG("adding at index: %d\n", i);
-            if(exists) {
+            if(ip_diff == 0) {
                 _DEBUG("%s\n", "updating the route");
             } else {
                 _DEBUG("%s\n", "adding the route");
             }
             /* route occupied   &&    route hops are better  &&    !force */
-            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
+            if(!is_new_route && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
                 _DEBUG("%s\n", "Found a less efficient route but might update bcast id");
                 *eff_flag = 0;
                 if(msgp->type == T_RREQ) {
@@ -971,14 +972,10 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
                 /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
                 return -1;
             }
-            /*todo should this also be set if force_redesc?*/
-            if(route_table[i].num_hops > msgp->num_hops /*|| msgp.force_redesc*/) {
+            if(route_table[i].num_hops > msgp->num_hops) {
                 *eff_flag = 1;
             }
-            if(route_table[i].ip_dst[0] == 0) { /* this route is new */
-                *eff_flag = 1;
-                is_new_route = 1;
-            }
+
             #ifdef DEBUG
             printf("Old Route\n");
             print_tbl_entry(&(route_table[i]));
@@ -987,9 +984,16 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
                 /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
                 err = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
                 if(err == -1) {
-                    _DEBUG("%s\n", "this bid was already seen");
-                    return -5;
+                    if(!is_new_route) {
+                        _DEBUG("%s\n", "this bid was already seen");
+                        *eff_flag = 0;
+                        return -5;
+                    } else {
+                        *eff_flag = 0;
+                        _DEBUG("%s\n", "this bid was already seen, but this is a new route so i will add");
+                    }
                 }
+
             }
             memcpy(route_table[i].mac_next_hop, raw_addr->sll_addr, ETH_ALEN);
             hwa_ptr = find_hwa(raw_addr->sll_ifindex, hwa_head);
