@@ -32,5 +32,7 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
 }
 
 void print_odr_msg(struct odr_msg *m) {
-    printf("Type: %hhu, src %s --> ", m->type, getvmname(m->src_ip));
+    printf("Type: %hhu:  %s:%hu --> ", m->type, getvmname(m->src_ip), m->src_port);
+    printf("%s:%hu  BID=%2u, HOPS=%hu, DNR=%hhu, FORCE=%hhu\n", getvmname(m->dst_ip), m->dst_port,
+            m->broadcast_id, m->num_hops, m->do_not_rrep, m->force_redisc);
 }

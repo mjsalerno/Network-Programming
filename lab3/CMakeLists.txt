@@ -53,4 +53,4 @@ add_executable(client
 #   	testcli.c
 #   	${ODR_SOURCE_FILES}
 #   	$<TARGET_OBJECTS:hwlib>
-#   	$<TARGET_OBJECTS:commonlib>)
+#   	$<TARGET_OBJECTS:odr_api_lib>)
