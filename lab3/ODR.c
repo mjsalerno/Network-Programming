@@ -1,4 +1,3 @@
-#include <ldap.h>
 #include "ODR.h"
 #include "debug.h"
 
