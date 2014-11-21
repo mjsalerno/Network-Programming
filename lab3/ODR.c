@@ -605,6 +605,7 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
             dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
     printf("\tODR msg  type %d  src %s", msgp->type, getvmname(msgp->src_ip));
     printf("  dest %s\n", getvmname(msgp->dst_ip));
+    print_odr_msg(msgp);
 
     size = craft_frame(dst_if, &raw_addr, buff, (unsigned char*)
             hwa_head->if_haddr, dst_mac, msgp,
