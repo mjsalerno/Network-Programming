@@ -234,15 +234,15 @@ int main(int argc, char *argv[]) {
 
             msgp = (struct odr_msg*) (buf_msg +sizeof(struct ethhdr));
             ntoh_odr_msg(msgp);
+            msgp->num_hops++;
+            print_odr_msg(msgp);
 
-            if(strncmp(msgp->src_ip, host_ip, INET_ADDRSTRLEN)) {
+            if(strncmp(msgp->src_ip, host_ip, INET_ADDRSTRLEN) == 0) {
                 _INFO("%s\n", "Got an odr_msg from myself");
                 continue;
             }
 
-            msgp->num_hops++;
             its_me = (0 == strcmp(msgp->dst_ip, host_ip));
-            print_odr_msg(msgp);
 
             _DEBUG("its_me: %d\n", its_me);
             len = sizeof(raw_addr);
