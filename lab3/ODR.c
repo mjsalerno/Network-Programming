@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
                 _ERROR("recv'd odr_msg was too short!! n: %d\n", (int)n);
                 goto cleanup;
             }
-            _NOTE("The raw socket had something on it on iface: %d", raw_addr.sll_ifindex);
+            _NOTE("The RAW socket had something on it on iface: %d\n", raw_addr.sll_ifindex);
 
             if(htons(raw_addr.sll_protocol) != PROTO) {
                 _ERROR("Got bad proto: %d, we are: %d\n", htons(raw_addr.sll_protocol), PROTO);
@@ -287,49 +287,45 @@ int main(int argc, char *argv[]) {
                 case T_RREP:
                     n_rrep_recv++;
                     _DEBUG("%s\n", "fell into case T_RREP");
-                    /* forwarding RREP */
+                    _DEBUG("%s\n", "adding/updating route in mt table");
+                    eff = 0;
+                    add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
+                    /* forwarding somone elses RREP */
                     if(!its_me) {
                         _DEBUG("%s\n", "it is not for me");
                         /* then i should still have the path made from the request (unless staleness is really low)*/
                         forw_index = find_route_index(route_table, msgp->dst_ip);
+                        back_index = find_route_index(route_table, msgp->src_ip);
                         _DEBUG("forw_index: %d\n", forw_index);
+                        _DEBUG("back_index: %d\n", back_index);
                         if(forw_index < 0) {
                             _NOTE("%s\n", "no route found to forward RREP maybe staleness too low");
                             /*exit(EXIT_FAILURE);*/
                             err = queue_store(out_msg);
-                            if(!err) {
+                            if(err == 0) {
                                 craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                                 broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
+                            } else {
+                                _DEBUG("queue_store returned %d, I am already waiting for this RREP, waiting some more\n", err);
+                            }
+                            break;
+
+                        } else { /* still not for me but i know where to send it */
+                            if(route_table[back_index].num_hops <= msgp->num_hops) {
+                                _DEBUG("%s\n", "forwarding their route");
+                                n_rrep_forw++;
+                                send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
+                            } else { /* I have a better route than their route */
+                                _INFO("I have a better route, my hops: %d  their hops: %d", route_table[forw_index].num_hops, msgp->num_hops);
+                                n_rrep_forw++;
+                                craft_rrep(out_msg, msgp->src_ip, msgp->dst_ip, msgp->force_redisc, route_table[back_index].num_hops);
+                                send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                             }
                             break;
                         }
 
-                        /*todo see if the eff gets updated like i think it will*/
-                        eff = 0;
-                        /* check to see if the their path is better than mine */
-                        /* if force_redesc then always send theirs            */
-                        if(add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead)
-                                || eff || msgp->force_redisc) {
-                            _DEBUG("%s\n", "forwarding their route");
-                            n_rrep_forw++;
-                            send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
-                        } else { /*i have better route*/
-                            /*todo i think this else is junk, I should never get here*/
-                            _DEBUG("I have a better route, their hops: %d, my hops: %d\n", msgp->num_hops, route_table[forw_index].num_hops);
-                            craft_rrep(out_msg, host_ip, msgp->dst_ip, 0, route_table[forw_index].num_hops);
-                            n_rrep_forw++;
-                            send_on_iface(rawsock, hwahead, out_msg, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
-                        }
-                    /* the rrep is for me :D */
-                    } else {
-                        _DEBUG("%s\n", "it is for me :D");
-                        eff = 0;
-                        err = add_route(route_table, msgp, &raw_addr, staleness, &eff,
-                                rawsock, hwahead);
-                        if(err < 0 || eff < 1) {
-                            _ERROR("The RREP was for me but it was not added to the table, err: %d  eff: %d\n", err, eff);
-                        }
                     }
+                    _DEBUG("%s\n", "it was for me:D, nothing to do");
                     break;
                 case T_DATA:
                     n_data_recv++;
@@ -958,11 +954,12 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  */
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
+
     int i, is_new_route = 0, exists = 0, err = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
-        exit(EXIT_FAILURE);
+        abort();
     }
     _DEBUG("looking to add ip: %s\n", msgp->src_ip);
 
