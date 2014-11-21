@@ -258,6 +258,7 @@ int main(int argc, char *argv[]) {
 
                     err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
                     if(err < 0) {
+                        /* scott: why just stop here? -1 means? */
                         _DEBUG("%s\n", "the route was not added");
                     } else {
 
@@ -298,9 +299,9 @@ int main(int argc, char *argv[]) {
                 case T_RREP:
                     n_rrep_recv++;
                     _DEBUG("%s\n", "fell into case T_RREP");
-                    _DEBUG("%s\n", "adding/updating route in mt table");
                     eff = 0;
-                    add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
+                    _DEBUG("added route result: %d\n", err);
                     /* forwarding somone elses RREP */
                     if(!its_me) {
                         _DEBUG("%s\n", "it is not for me");
@@ -947,7 +948,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
         abort();
     }
-    _DEBUG("looking to add ip: %s\n", msgp->src_ip);
+    _DEBUG("looking to add/update ip: %s\n", msgp->src_ip);
 
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || (exists = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
@@ -957,15 +958,17 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             } else {
                 _DEBUG("%s\n", "adding the route");
             }
-            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops &&
-                    !msgp->force_redisc && msgp->type == T_RREQ) {
+            /* route occupied   &&    route hops are better  &&    !force */
+            if(route_table[i].ip_dst[0] != 0 && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
                 _DEBUG("%s\n", "Found a less efficient route but might update bcast id");
-                err = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
-                if(err == -1) {
-                    return -5;
+                *eff_flag = 0;
+                if(msgp->type == T_RREQ) {
+                    err = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+                    if (err == -1) {
+                        return -5; /* duplicate RREQ */
+                    }
                 }
                 /*was: route_table[i].broadcast_id = msgp->broadcast_id; */
-                *eff_flag = 0;
                 return -1;
             }
             /*todo should this also be set if force_redesc?*/
@@ -998,7 +1001,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             route_table[i].iface_index = raw_addr->sll_ifindex;
             route_table[i].num_hops = msgp->num_hops;
             route_table[i].timestamp = time(NULL) + staleness;
-            strncpy(route_table[i].ip_dst, msgp->src_ip, 16);
+            strncpy(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN);
             #ifdef DEBUG
             printf("New Route\n");
             print_tbl_entry(&(route_table[i]));
@@ -1072,11 +1075,14 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     int at;
-
+    /* find the last occupied index */
     for(at = 0; at < NUM_NODES && route_table[at].ip_dst[0] != 0; ++at);
 
     if(at < NUM_NODES) {
-        memcpy(&route_table[index], &route_table[at], sizeof(struct tbl_entry));
+        if(index != at) {
+            /* we're not deleting the last occupied index here */
+            memcpy(&route_table[index], &route_table[at], sizeof(struct tbl_entry));
+        }
         memset(&route_table[at], 0, sizeof(struct tbl_entry));
         return at;
     }
@@ -1101,7 +1107,6 @@ void statistics(void) {
 */
 int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDRSTRLEN]) {
     struct bid_node* ptr;
-    int rtn = 0;
 
     for(ptr = *head; ptr != NULL; ptr = ptr->next) {
         if(0 == strcmp(ptr->src_ip, src_ip)) {
@@ -1114,27 +1119,22 @@ int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDR
                 return 0;
             }
             ptr->broadcast_id = broadcast_id;
-            rtn = 1;
-            break;
+            return 1;
         }
     }
 
-    if(rtn == 0) {
-        _DEBUG("%s\n", "did not find a matching bid_node, adding another");
-        ptr = malloc(sizeof(struct bid_node));
-        if(ptr == NULL) {
-            _ERROR("%s\n", "malloc for bid_node failed");
-            exit(EXIT_FAILURE);
-        }
-
-        strncpy(ptr->src_ip, src_ip, INET_ADDRSTRLEN);
-        ptr->broadcast_id = broadcast_id;
-        rtn = 1;
-        ptr->next = *head;
-        *head = ptr;
+    _DEBUG("%s\n", "did not find a matching bid_node, adding another");
+    ptr = malloc(sizeof(struct bid_node));
+    if(ptr == NULL) {
+        _ERROR("%s\n", "malloc for bid_node failed");
+        exit(EXIT_FAILURE);
     }
 
-    return rtn;
+    strncpy(ptr->src_ip, src_ip, INET_ADDRSTRLEN);
+    ptr->broadcast_id = broadcast_id;
+    ptr->next = *head;
+    *head = ptr;
+    return 1;
 }
 
 struct bid_node* get_bid(struct bid_node* head, char src_ip[INET_ADDRSTRLEN]) {
