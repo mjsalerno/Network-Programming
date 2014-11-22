@@ -195,6 +195,7 @@ int main(int argc, char *argv[]) {
                 if(!msgp->force_redisc &&
                         -1 != (route_i = find_route_index(route_table, msgp->dst_ip))) {
                     /* send DATA */
+                    _DEBUG("%s\n", "calling send_on_iface");
                     send_on_iface(rawsock, hwahead, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
                     /* done ? */
                 } else {
@@ -205,6 +206,7 @@ int main(int argc, char *argv[]) {
                     if(!err || msgp->force_redisc) {
                         memset(out_msg, 0, ODR_MSG_MAX);
                         craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+                        _DEBUG("%s\n", "calling boradcast");
                         broadcast(rawsock, hwahead, out_msg, -1);
                     }
                     /* done ? */
@@ -285,6 +287,7 @@ int main(int argc, char *argv[]) {
                                 we_sent = 1;
                             }
                             if(we_sent /*&& (was_dup_rreq == 0)*/) { /* only RREP if we want to send AND this is not a dup RREQ */
+                                _DEBUG("%s\n", "calling send_on_iface");
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
                                 _DEBUG("%s\n", "we sent it");
                             }
@@ -296,6 +299,7 @@ int main(int argc, char *argv[]) {
                             if(we_sent) {
                                 n_rreq_flood++;
                             }
+                            _DEBUG("%s\n", "calling boradcast");
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
                         } else {
                             _DEBUG("%s", "Not flooding RREQ\n");
@@ -319,7 +323,9 @@ int main(int argc, char *argv[]) {
                             /*exit(EXIT_FAILURE);*/
                             err = queue_store(msgp);
                             if(err == 0) {
+                                memset(out_msg, 0, ODR_MSG_MAX);
                                 craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+                                _DEBUG("%s\n", "calling boradcast");
                                 broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
                             } else {
                                 _DEBUG("queue_store returned %d, I am already waiting for this RREP, waiting some more\n", err);
@@ -330,6 +336,7 @@ int main(int argc, char *argv[]) {
                             if(route_table[back_index].num_hops <= msgp->num_hops) {
                                 _DEBUG("%s\n", "forwarding their route");
                                 n_rrep_forw++;
+                                _DEBUG("%s\n", "calling send_on_iface");
                                 send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                             } else { /* I have a better route than their route */
                                 _INFO("Dropping worse RREP and doing nothing, my hops: %d  their hops: %d\n", route_table[forw_index].num_hops, msgp->num_hops);
@@ -356,6 +363,7 @@ int main(int argc, char *argv[]) {
                     } else if((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {
                         _DEBUG("forw_index: %d\n", forw_index);
                         _DEBUG("%s\n", "received data that is not mine, and i have the route\n");
+                        _DEBUG("%s\n", "calling send_on_iface");
                         send_on_iface(rawsock, hwahead, msgp,
                                 route_table[forw_index].iface_index,
                                 route_table[forw_index].mac_next_hop);
@@ -363,7 +371,9 @@ int main(int argc, char *argv[]) {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
                         err = queue_store(msgp);
                         if(!err) {
+                            memset(out_msg, 0, ODR_MSG_MAX);
                             craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
+                            _DEBUG("%s\n", "calling boradcast");
                             broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
                         }
                     }
@@ -509,7 +519,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], struct odr_msg* msgp, size_t data_len) {
+size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* msgp, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         _ERROR("%s\n", "ERROR: craft_frame(): data_len too big");
@@ -544,7 +554,6 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
     /* copy in the data and ethhdr */
-    hton_odr_msg(msgp);
     memcpy(buff + sizeof(struct ethhdr), msgp, data_len);
 
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
@@ -568,6 +577,7 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
             _DEBUG("skipping iface: %d\n", hwa_head->if_index);
             continue;
         }
+        /*_DEBUG("%s\n", "calling send_on_iface");*/
         send_on_iface(rawsock, hwa_head, msgp, hwa_head->if_index, bcast);
     }
 }
@@ -850,6 +860,7 @@ void queue_send(struct msg_queue *queue, int rawsock, struct hwa_info *hwa_head,
                     n_data_forw++;
                 }
             }
+            _DEBUG("%s\n", "calling send_on_iface");
             send_on_iface(rawsock, hwa_head, &curr->msg, new_route->iface_index, new_route->mac_next_hop);
             /* now free the msg_node, since it was sent */
             tofree = curr;
