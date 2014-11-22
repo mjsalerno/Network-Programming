@@ -212,8 +212,7 @@ int main(int argc, char *argv[]) {
             /* note: invalidate ptr to buf_msg just to be safe*/
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
-            int eff, its_me, forw_index, back_index, add_rout_rtn; /*, was_dup_rreq = -1; */
-            int should_bcast = 0;
+            int eff, its_me, forw_index, back_index, add_rout_rtn, was_dup_rreq = -1;
             uint8_t we_sent;
 
             len = sizeof(raw_addr);
@@ -247,12 +246,12 @@ int main(int argc, char *argv[]) {
             len = sizeof(raw_addr);
 
             eff = 0;
-            /*if(msgp->type == T_RREQ) {
+            if(msgp->type == T_RREQ) {
                 was_dup_rreq = is_dup_msg(bid_list, msgp);
-            }*/
+            }
             add_rout_rtn = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
 
-            _DEBUG("msg type: %d\n", msgp->type);
+            _DEBUG("add_route() eff=%d, return=%d\n", eff, add_rout_rtn);
             switch(msgp->type) {
 
                 case T_RREQ:
@@ -284,15 +283,14 @@ int main(int argc, char *argv[]) {
                                 we_sent = 1;
                             } else {
                                 _DEBUG("%s\n", "Could send if route known, but I don't know it, asking everyone");
-                                should_bcast = 1;
                             }
                             if(we_sent /*&& (was_dup_rreq == 0)*/) { /* only RREP if we want to send AND this is not a dup RREQ */
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
                                 _DEBUG("%s\n", "we sent it");
                             }
                         }
-
-                        if(eff || should_bcast) {
+                        /* not dup           OR  (was dup BUT more effiecient) */
+                        if(was_dup_rreq == 0 || ((was_dup_rreq == 1) && eff)) {
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
                             if(we_sent) {
