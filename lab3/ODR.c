@@ -363,7 +363,7 @@ int main(int argc, char *argv[]) {
                         err = queue_store(msgp);
                         if(!err) {
                             craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
-                            broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
+                            broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
                         }
                     }
                     break;
@@ -628,11 +628,11 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
 }
 
 void hton_odr_msg(struct odr_msg* msgp) {
-    msgp->broadcast_id = htonl(msgp->broadcast_id);
-    msgp->dst_port = htons(msgp->dst_port);
-    msgp->len = htons(msgp->len);
-    msgp->src_port = htons(msgp->src_port);
-    msgp->num_hops = ntohs(msgp->num_hops);
+    msgp->broadcast_id  = htonl(msgp->broadcast_id);
+    msgp->dst_port      = htons(msgp->dst_port);
+    msgp->len           = htons(msgp->len);
+    msgp->src_port      = htons(msgp->src_port);
+    msgp->num_hops      = htons(msgp->num_hops);
 }
 
 void ntoh_odr_msg(struct odr_msg* msgp) {
