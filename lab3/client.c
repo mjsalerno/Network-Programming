@@ -143,7 +143,7 @@ int main(void) {
             goto cleanup;
         } else if (err == 0) {
             /* timeout! */
-            printf("client at node %s: TIMEOUT on response from %s\n", hostname, srvname);
+            _NOTE("client at node %s: TIMEOUT on response from %s\n", hostname, srvname);
             /* todo: set a flag for first timeout */
             continue;
 

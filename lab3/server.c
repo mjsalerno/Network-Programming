@@ -92,7 +92,7 @@ int main(void) {
             unlink(TIME_SRV_PATH);
             exit(EXIT_FAILURE);
         }
-        printf("server at node: %s responding to request from: %s\n", hostname, vm->h_name);
+        _INFO("server at node: %s responding to request from: %s\n", hostname, vm->h_name);
 
         ticks = time(NULL);
         n = snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));

@@ -332,10 +332,11 @@ int main(int argc, char *argv[]) {
                                 n_rrep_forw++;
                                 send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
                             } else { /* I have a better route than their route */
-                                _INFO("I have a better route, my hops: %d  their hops: %d", route_table[forw_index].num_hops, msgp->num_hops);
+                                _INFO("Dropping worse RREP and doing nothing, my hops: %d  their hops: %d\n", route_table[forw_index].num_hops, msgp->num_hops);
+                                /*_INFO("I have a better route, my hops: %d  their hops: %d\n", route_table[forw_index].num_hops, msgp->num_hops);
                                 n_rrep_forw++;
                                 craft_rrep(out_msg, msgp->src_ip, msgp->dst_ip, msgp->force_redisc, route_table[back_index].num_hops);
-                                send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);
+                                send_on_iface(rawsock, hwahead, msgp, route_table[forw_index].iface_index, route_table[forw_index].mac_next_hop);*/
                             }
                             break;
                         }
