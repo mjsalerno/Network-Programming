@@ -1098,6 +1098,8 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 
     print_route_tbl(route_table);
 
+    print_route_tbl(route_table);
+
     if(at < NUM_NODES) {
         if(index != at) {
             /* we're not deleting the last occupied index here */
