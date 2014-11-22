@@ -33,6 +33,6 @@ ODR: ODR.o get_hw_addrs.o ODR_util.o
 	$(CC) $(FLAGS) $< get_hw_addrs.o ODR_util.o -o $@_cse533-11
 
 clean:
-	rm -f  *.o ODR client server *core* sock_* *_cse533-11
+	rm -f  *.o *core* sock_* *_cse533-11 /tmp/cse533-11_*
 
 .PHONY: all clean

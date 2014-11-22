@@ -263,9 +263,9 @@ int main(int argc, char *argv[]) {
                     _DEBUG("%s\n", "fell into case T_RREQ");
                     we_sent = 0;
 
-                    if(add_rout_rtn < 0) {
-                        /* could mean: worse duplicate RREQ, or */
-                    } else {
+                    /*if(add_rout_rtn < 0) {
+                          //could mean: worse duplicate RREQ, or}else{*/
+                  if(add_rout_rtn >= 0) {
 
                         _DEBUG("%s\n", "added the route");
                         /* We may only RREP if the next case holds. */
@@ -1031,7 +1031,7 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
 }
 
 void print_tbl_entry(struct tbl_entry* entry) {
-    printf("-------------------------------\n");
+    printf("--------------------------------\n");
     printf("|mac_next_hop: %02hhx:%02x:%02hhx:%02hhx:%02hhx:%02hhx\n",
             entry->mac_next_hop[0], entry->mac_next_hop[1],
             entry->mac_next_hop[2], entry->mac_next_hop[3],
@@ -1045,7 +1045,15 @@ void print_tbl_entry(struct tbl_entry* entry) {
     printf("|timestamp   : %lu\n", (long)entry->timestamp);
     printf("|ip_dst      : %s\n", entry->ip_dst);
     printf("|vm_name     : %s\n", getvmname(entry->ip_dst));
-    printf("-------------------------------\n");
+    printf("--------------------------------\n");
+}
+
+void print_route_tbl(struct tbl_entry route_table[NUM_NODES]) {
+    int i;
+    for(i = 0; i < NUM_NODES; ++i) {
+        print_tbl_entry(route_table + i);
+    }
+
 }
 
 /**
@@ -1085,8 +1093,11 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     int at;
     /* find the last occupied index */
+
     for(at = 0; at < NUM_NODES && route_table[at].ip_dst[0] != '\0'; ++at);
-    
+
+    print_route_tbl(route_table);
+
     if(at < NUM_NODES) {
         if(index != at) {
             /* we're not deleting the last occupied index here */
