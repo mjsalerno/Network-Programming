@@ -248,6 +248,7 @@ int main(int argc, char *argv[]) {
             eff = 0;
             if(msgp->type == T_RREQ) {
                 was_dup_rreq = is_dup_msg(bid_list, msgp);
+                _DEBUG("This RREQ is a duplicate: %s\n", (was_dup_rreq ? "YES" : "NO"));
             }
             add_rout_rtn = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
 
@@ -281,8 +282,6 @@ int main(int argc, char *argv[]) {
                                 _DEBUG("%s\n", "crafted a rrep since i know where it is");
                                 craft_rrep(out_msg, route_table[forw_index].ip_dst, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
-                            } else {
-                                _DEBUG("%s\n", "Could send if route known, but I don't know it, asking everyone");
                             }
                             if(we_sent /*&& (was_dup_rreq == 0)*/) { /* only RREP if we want to send AND this is not a dup RREQ */
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
@@ -297,6 +296,8 @@ int main(int argc, char *argv[]) {
                                 n_rreq_flood++;
                             }
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
+                        } else {
+                            _DEBUG("%s", "Not flooding RREQ\n");
                         }
                     }
 
