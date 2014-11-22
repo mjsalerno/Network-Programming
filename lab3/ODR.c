@@ -1042,8 +1042,8 @@ void print_tbl_entry(struct tbl_entry* entry) {
     printf("|iface_index : %d\n", entry->iface_index);
     printf("|num_hops    : %d\n", entry->num_hops);
     printf("|timestamp   : %lu\n", (long)entry->timestamp);
-    /*printf("|broadcast_id: %d\n", entry->broadcast_id);*/
     printf("|ip_dst      : %s\n", entry->ip_dst);
+    printf("|vm_name     : %s\n", getvmname(entry->ip_dst));
     printf("-------------------------------\n");
 }
 
