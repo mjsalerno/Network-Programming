@@ -1099,23 +1099,29 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 }
 
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
-    int at;
+    int last; int x;
     /* find the last occupied index */
 
-    for(at = 0; at < NUM_NODES && route_table[at].ip_dst[0] != '\0'; ++at);
+    for(last = 0; last < NUM_NODES && route_table[last].ip_dst[0] != '\0'; ++last);
 
     print_route_tbl(route_table);
 
-    if(at < NUM_NODES) {
-        if(index != at) {
-            /* we're not deleting the last occupied index here */
-            memcpy(&route_table[index], &route_table[at], sizeof(struct tbl_entry));
-        }
-        memset(&route_table[at], 0, sizeof(struct tbl_entry));
-        return at;
+    if(last >= NUM_NODES) {
+        last = NUM_NODES - 1;
     }
+    if(index != last) {
+        /* we're not deleting the last occupied index here */
+        memcpy(&route_table[index], &route_table[last], sizeof(struct tbl_entry));
+    } else { /* we're deleting the last route */
+        for(x = index + 1; x < NUM_NODES; x++) {
+            if(route_table[x].ip_dst[0] != '\0') {
+                _ERROR("We're deleting the last index %d, but there's stuff at index %d\n", index, x);
+            }
+        }
+    }
+    memset(&route_table[last], 0, sizeof(struct tbl_entry));
+    return last;
 
-    return -1;
 }
 
 void statistics(void) {
