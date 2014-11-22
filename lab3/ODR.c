@@ -294,7 +294,7 @@ int main(int argc, char *argv[]) {
                         }
                         /* not dup           OR  (was dup BUT more effiecient) */
                         if(was_dup_rreq == 0 || ((was_dup_rreq == 1) && eff)) {
-                            msgp->do_not_rrep = we_sent;
+                            msgp->do_not_rrep |= we_sent; /* Keep the old value of do_not_rrep */
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
                             if(we_sent) {
                                 n_rreq_flood++;
