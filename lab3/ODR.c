@@ -189,32 +189,29 @@ int main(int argc, char *argv[]) {
                 _DEBUG("%s", "msg has local dest IP\n");
                 deliver_app_mesg(unixsock, svcs, msgp);
             } else {
-                int route_i;
+                int route_i, waiting_for_rreq;
                 _DEBUG("msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
-                /* force_rediscid off  AND     we do have a route to the dest IP */
-
-                if(!msgp->force_redisc &&
-                        -1 != (route_i = find_route_index(route_table, msgp->dst_ip))) {
-                    /* send DATA */
-                    _DEBUG("%s\n", "calling send_on_iface");
-                    send_on_iface(rawsock, hwahead, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
-                    /* done ? */
-                } else {
-                    /* send RREQ */
-                    /* either we don't have a route or force_redisc was set
-                     so we pretend like we don't have a route */
-                    err = queue_store(msgp);
-                    if(!err || msgp->force_redisc) {
-                        memset(out_msg, 0, ODR_MSG_MAX);
-                        craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
-                        _DEBUG("%s\n", "calling broadcast");
-                        broadcast(rawsock, hwahead, out_msg, -1);
+                /* if we do have a route to the dest IP */
+                if(0 <= (route_i = find_route_index(route_table, msgp->dst_ip))) {
+                    if(msgp->force_redisc) {
+                        _INFO("Forcing deletion of route to %s, force_redesc was set\n", getvmname(route_table[route_i].ip_dst));
+                        delete_route_index(route_table, route_i);
+                    } else { /* send DATA */
+                        _DEBUG("%s\n", "calling send_on_iface");
+                        send_on_iface(rawsock, hwahead, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
+                        continue;
                     }
-                    /* done ? */
+                }
+                /* send RREQ */
+                /* either we don't have a route or force_redisc was set and we deleted the route */
+                waiting_for_rreq = queue_store(msgp);
+                if(!waiting_for_rreq || msgp->force_redisc) {
+                    memset(out_msg, 0, ODR_MSG_MAX);
+                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+                    _DEBUG("%s\n", "calling broadcast");
+                    broadcast(rawsock, hwahead, out_msg, -1);
                 }
             }
-            /* note: invalidate ptr to buf_msg just to be safe*/
-            msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
             int eff, its_me, forw_index, back_index, add_rout_rtn, was_dup_rreq = -1;
             uint8_t we_sent;
@@ -1093,14 +1090,11 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     int last;
-
     /* find the first un-occupied index */
     for(last = 0; last < NUM_NODES && route_table[last].ip_dst[0] != '\0'; ++last);
     /* then back up one to get the last occupied index */
     last--;
-
-    print_route_tbl(route_table);
-
+    _DEBUG("Deleting route index: %d (dst %s)\n", index, getvmname(route_table[index].ip_dst));
     if(index != last) {
         /* we're not deleting the last occupied index here */
         memcpy(&route_table[index], &route_table[last], sizeof(struct tbl_entry));
