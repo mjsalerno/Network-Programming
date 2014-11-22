@@ -1116,6 +1116,7 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
         for(x = index + 1; x < NUM_NODES; x++) {
             if(route_table[x].ip_dst[0] != '\0') {
                 _ERROR("We're deleting the last index %d, but there's stuff at index %d\n", index, x);
+                exit(EXIT_FAILURE);
             }
         }
     }
