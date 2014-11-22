@@ -1100,27 +1100,32 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     int last; int x;
-    /* find the last occupied index */
 
+    /* find the first un-occupied index */
     for(last = 0; last < NUM_NODES && route_table[last].ip_dst[0] != '\0'; ++last);
+    /* then back up one to get the last occupied index */
+    last--;
 
     print_route_tbl(route_table);
 
-    if(last >= NUM_NODES) {
-        last = NUM_NODES - 1;
+    if(route_table[last].ip_dst[0] == '\0') {
+        _ERROR("The \"last\" index %d, is empty. It should be occupied.\n", last);
+        exit(EXIT_FAILURE);
     }
+
     if(index != last) {
         /* we're not deleting the last occupied index here */
         memcpy(&route_table[index], &route_table[last], sizeof(struct tbl_entry));
-    } else { /* we're deleting the last route */
-        for(x = index + 1; x < NUM_NODES; x++) {
-            if(route_table[x].ip_dst[0] != '\0') {
-                _ERROR("We're deleting the last index %d, but there's stuff at index %d\n", index, x);
-                exit(EXIT_FAILURE);
-            }
-        }
     }
     memset(&route_table[last], 0, sizeof(struct tbl_entry));
+
+    for(x = last + 1; x < NUM_NODES; x++) {
+        if(route_table[x].ip_dst[0] != '\0') {
+            _ERROR("We're deleting the last index %d, but there's stuff at index %d\n", index, x);
+            exit(EXIT_FAILURE);
+        }
+    }
+
     return last;
 
 }
