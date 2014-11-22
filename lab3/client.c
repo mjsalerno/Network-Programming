@@ -125,7 +125,7 @@ int main(void) {
         printf("The server host is %s at %s\n", srvname, inet_ntoa(srv_in_addr));
 
         /* todo: if this is the 1st timeout, then msg_send rediscovery flag */
-        err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 1, 0);
+        err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 1, 1);
         if (err < 0) {
             perror("ERROR: msg_send()");
             goto cleanup;
