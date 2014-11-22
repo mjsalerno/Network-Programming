@@ -264,8 +264,7 @@ int main(int argc, char *argv[]) {
                     we_sent = 0;
 
                     if(add_rout_rtn < 0) {
-                        /* scott: why just stop here? -1 means? */
-                        _ERROR("%s\n", "the route was not added. ?!?!?!?!?!?!?!?!?!??");
+                        /* could mean: worse duplicate RREQ, or */
                     } else {
 
                         _DEBUG("%s\n", "added the route");
