@@ -954,7 +954,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
 
-    int i, is_new_route = 0, ip_diff = 0, added_bid = 0; int x;
+    int i, is_new_route = 0, ip_diff = 0, added_bid = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
@@ -964,13 +964,6 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
 
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || (ip_diff = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
-            for(x = i+1; x < NUM_NODES; x++) {
-                if(strncmp(route_table[x].ip_dst, msgp->src_ip, INET_ADDRSTRLEN) == 0) {
-                    _ERROR("Trying to add/update index %d, but index %d had the same dst ip.\n", i, x);
-                    print_route_tbl(route_table);
-                    exit(EXIT_FAILURE);
-                }
-            }
             if(msgp->type == T_RREQ) {
                 added_bid = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
             }
@@ -1099,7 +1092,7 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 }
 
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
-    int last; int x;
+    int last;
 
     /* find the first un-occupied index */
     for(last = 0; last < NUM_NODES && route_table[last].ip_dst[0] != '\0'; ++last);
@@ -1108,24 +1101,11 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 
     print_route_tbl(route_table);
 
-    if(route_table[last].ip_dst[0] == '\0') {
-        _ERROR("The \"last\" index %d, is empty. It should be occupied.\n", last);
-        exit(EXIT_FAILURE);
-    }
-
     if(index != last) {
         /* we're not deleting the last occupied index here */
         memcpy(&route_table[index], &route_table[last], sizeof(struct tbl_entry));
     }
     memset(&route_table[last], 0, sizeof(struct tbl_entry));
-
-    for(x = last + 1; x < NUM_NODES; x++) {
-        if(route_table[x].ip_dst[0] != '\0') {
-            _ERROR("We're deleting the last index %d, but there's stuff at index %d\n", index, x);
-            exit(EXIT_FAILURE);
-        }
-    }
-
     return last;
 
 }
