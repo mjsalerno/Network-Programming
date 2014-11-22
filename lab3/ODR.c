@@ -1100,15 +1100,14 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     int last; int x;
-    /* find the last occupied index */
 
+    /* find the first un-occupied index */
     for(last = 0; last < NUM_NODES && route_table[last].ip_dst[0] != '\0'; ++last);
+    /* then back up one to get the last occupied index */
+    last--;
 
     print_route_tbl(route_table);
 
-    if(last >= NUM_NODES) {
-        last = NUM_NODES - 1;
-    }
     if(route_table[last].ip_dst[0] == '\0') {
         _ERROR("The \"last\" index %d, is empty. It should be occupied.\n", last);
         exit(EXIT_FAILURE);
