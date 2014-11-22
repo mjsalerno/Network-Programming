@@ -1085,8 +1085,8 @@ int find_route_index(struct tbl_entry route_table[NUM_NODES], char ip_dst[INET_A
 int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
     int at;
     /* find the last occupied index */
-    for(at = 0; at < NUM_NODES && route_table[at].ip_dst[0] != 0; ++at);
-
+    for(at = 0; at < NUM_NODES && route_table[at].ip_dst[0] != '\0'; ++at);
+    
     if(at < NUM_NODES) {
         if(index != at) {
             /* we're not deleting the last occupied index here */

@@ -154,7 +154,7 @@ int main(void) {
                 goto cleanup;
             }
             buf[err] = 0;
-            printf("client at node %s: RECEIVED from %s %s", hostname, srvname, buf);
+            printf("client at node %s: RECEIVED from %s %s\n", hostname, srvname, buf);
         }
     }
 

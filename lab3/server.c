@@ -95,7 +95,7 @@ int main(void) {
         _INFO("server at node: %s responding to request from: %s\n", hostname, vm->h_name);
 
         ticks = time(NULL);
-        n = snprintf(buff, sizeof(buff), "%.24s\n", ctime(&ticks));
+        n = snprintf(buff, sizeof(buff), "%.24s", ctime(&ticks));
 
         err = msg_send(sock, cli_ip_buff, cliport, buff, (size_t)n, 0);
         if(err < 0) {
