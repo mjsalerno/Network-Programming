@@ -151,6 +151,7 @@ int main(int argc, char *argv[]) {
     svc_init(svcs, SVC_MAX_NUM);   /* ready to accept local msgs */
     data_queue.head = NULL;             /* init the queues */
     rrep_queue.head = NULL;
+    memset(route_table, 0, (NUM_NODES * sizeof(struct tbl_entry)));
 
     FD_ZERO(&rset);
     stdinfd = fileno(stdin);
@@ -953,7 +954,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
 
-    int i, is_new_route = 0, ip_diff = 0, added_bid = 0;
+    int i, is_new_route = 0, ip_diff = 0, added_bid = 0; int x;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
@@ -963,6 +964,13 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
 
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || (ip_diff = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
+            for(x = i+1; x < NUM_NODES; x++) {
+                if(strncmp(route_table[x].ip_dst, msgp->src_ip, INET_ADDRSTRLEN) == 0) {
+                    _ERROR("Trying to add/update index %d, but index %d had the same dst ip.\n", i, x);
+                    print_route_tbl(route_table);
+                    exit(EXIT_FAILURE);
+                }
+            }
             if(msgp->type == T_RREQ) {
                 added_bid = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
             }
