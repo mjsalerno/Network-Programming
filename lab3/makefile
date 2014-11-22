@@ -18,7 +18,7 @@ all: ODR server client
 	$(CC) $(FLAGS) -c $<
 
 %: %.o ODR_api.o
-	$(CC) $(FLAGS) ODR_api.o $< -o $@
+	$(CC) $(FLAGS) ODR_api.o $< -o $@_cse533-11
 
 ODR_api.o: ODR_api.c ODR_api.h
 	$(CC) $(FLAGS) -c ODR_api.c
@@ -30,9 +30,9 @@ ODR_util.o: ODR_util.c ODR_util.h debug.h
 	$(CC) $(FLAGS) -c $<
 
 ODR: ODR.o get_hw_addrs.o ODR_util.o
-	$(CC) $(FLAGS) $< get_hw_addrs.o ODR_util.o -o $@
+	$(CC) $(FLAGS) $< get_hw_addrs.o ODR_util.o -o $@_cse533-11
 
 clean:
-	rm -f  *.o ODR client server *core* sock_* 
+	rm -f  *.o ODR client server *core* sock_* *_cse533-11
 
 .PHONY: all clean
