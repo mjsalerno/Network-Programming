@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
                     if(!err || msgp->force_redisc) {
                         memset(out_msg, 0, ODR_MSG_MAX);
                         craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
-                        _DEBUG("%s\n", "calling boradcast");
+                        _DEBUG("%s\n", "calling broadcast");
                         broadcast(rawsock, hwahead, out_msg, -1);
                     }
                     /* done ? */
@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
                             if(we_sent) {
                                 n_rreq_flood++;
                             }
-                            _DEBUG("%s\n", "calling boradcast");
+                            _DEBUG("%s\n", "calling broadcast");
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
                         } else {
                             _DEBUG("%s", "Not flooding RREQ\n");
@@ -325,7 +325,7 @@ int main(int argc, char *argv[]) {
                             if(err == 0) {
                                 memset(out_msg, 0, ODR_MSG_MAX);
                                 craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
-                                _DEBUG("%s\n", "calling boradcast");
+                                _DEBUG("%s\n", "calling broadcast");
                                 broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
                             } else {
                                 _DEBUG("queue_store returned %d, I am already waiting for this RREP, waiting some more\n", err);
@@ -354,8 +354,6 @@ int main(int argc, char *argv[]) {
                 case T_DATA:
                     n_data_recv++;
                     _DEBUG("%s\n", "fell into case T_DATA");
-                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
-                    _DEBUG("added route result: %d\n", err);
 
                     if(its_me) {
                         _DEBUG("%s\n", "received data for me");
@@ -373,7 +371,7 @@ int main(int argc, char *argv[]) {
                         if(!err) {
                             memset(out_msg, 0, ODR_MSG_MAX);
                             craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
-                            _DEBUG("%s\n", "calling boradcast");
+                            _DEBUG("%s\n", "calling broadcast");
                             broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
                         }
                     }
@@ -956,7 +954,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
 
-    int i, is_new_route = 0, ip_diff = 0, added_bid;
+    int i, is_new_route = 0, ip_diff = 0, added_bid = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
@@ -966,20 +964,22 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
 
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || (ip_diff = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
-            added_bid = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+            if(msgp->type == T_RREQ) {
+                added_bid = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+            }
             if(route_table[i].ip_dst[0] == 0 || msgp->force_redisc) { /* this route is new */
                 *eff_flag = 1;
                 is_new_route = 1;
             }
-            _DEBUG("adding at index: %d\n", i);
+
             if(ip_diff == 0) {
-                _DEBUG("%s\n", "updating the route");
+                _DEBUG("updating the route at index: %d\n", i);
             } else {
-                _DEBUG("%s\n", "adding the route");
+                _DEBUG("adding the route at index: %d\n", i);
             }
             /* route occupied   &&    route hops are better  &&    !force */
             if(!is_new_route && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
-                _DEBUG("%s\n", "Found a less efficient route but might update bcast id");
+                _DEBUG("%s\n", "Received a less efficient route");
                 *eff_flag = 0;
                 if(msgp->type == T_RREQ) {
                     if (added_bid == -1) {
