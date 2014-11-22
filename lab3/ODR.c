@@ -6,8 +6,8 @@ char host_ip[INET_ADDRSTRLEN] = "127.0.0.1"; /* for testing on comps w/o eth0 */
 char host_name[BUFF_SIZE];
 static int unixsock, rawsock;
 static uint32_t broadcastID = 0;
-static struct bid_node* bid_list;
-static struct msg_queue data_queue, rrep_queue;
+static struct bid_node* bid_list = NULL;
+static struct msg_queue data_queue = {0}, rrep_queue = {0};
 static struct tbl_entry route_table[NUM_NODES];
 
 /**
@@ -283,7 +283,7 @@ int main(int argc, char *argv[]) {
                                 _DEBUG("%s\n", "Could send if route known, but I don't know it, asking everyone");
                                 should_bcast = 1;
                             }
-                            if(we_sent) {
+                            if(we_sent) { /* fixme: change to && eff  ??? */
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
                                 _DEBUG("%s\n", "we sent it");
                             }
@@ -314,7 +314,7 @@ int main(int argc, char *argv[]) {
                         if(forw_index < 0) {
                             _NOTE("%s\n", "no route found to forward RREP maybe staleness too low");
                             /*exit(EXIT_FAILURE);*/
-                            err = queue_store(out_msg);
+                            err = queue_store(msgp);
                             if(err == 0) {
                                 craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                                 broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
@@ -342,6 +342,9 @@ int main(int argc, char *argv[]) {
                     break;
                 case T_DATA:
                     n_data_recv++;
+                    _DEBUG("%s\n", "fell into case T_DATA");
+                    err = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
+                    _DEBUG("added route result: %d\n", err);
 
                     if(its_me) {
                         _DEBUG("%s\n", "received data for me");
@@ -1100,54 +1103,4 @@ void statistics(void) {
     _STATS("Delivered:                        DATAs: %2u\n", n_data_delivered);
     _STATS("Forwarded:             RREPs: %2u, DATAs: %2u\n", n_rrep_forw, n_data_forw);
     _STATS("Flooded  :  RREQs: %2u (Continued the RREQ after RREP'ing. Don't trust)\n", n_rreq_flood);
-}
-
-/**
-* returns -1 if id was smaller then the one here
-* returns 0 is the id was the same
-* returns 1 if it was added/updated
-*/
-int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDRSTRLEN]) {
-    struct bid_node* ptr;
-
-    for(ptr = *head; ptr != NULL; ptr = ptr->next) {
-        if(0 == strcmp(ptr->src_ip, src_ip)) {
-            _DEBUG("%s\n", "found maching bid node");
-            if(ptr->broadcast_id > broadcast_id) {
-                _DEBUG("%s\n", "trying to add broadcast_id that was smaller");
-                return -1;
-            } else if(ptr->broadcast_id == broadcast_id) {
-                _DEBUG("%s\n", "trying to add broadcast_id that was equal");
-                return 0;
-            }
-            ptr->broadcast_id = broadcast_id;
-            return 1;
-        }
-    }
-
-    _DEBUG("%s\n", "did not find a matching bid_node, adding another");
-    ptr = malloc(sizeof(struct bid_node));
-    if(ptr == NULL) {
-        _ERROR("%s\n", "malloc for bid_node failed");
-        exit(EXIT_FAILURE);
-    }
-
-    strncpy(ptr->src_ip, src_ip, INET_ADDRSTRLEN);
-    ptr->broadcast_id = broadcast_id;
-    ptr->next = *head;
-    *head = ptr;
-    return 1;
-}
-
-struct bid_node* get_bid(struct bid_node* head, char src_ip[INET_ADDRSTRLEN]) {
-    struct bid_node* ptr;
-
-    for(ptr = head; ptr != NULL; ptr = ptr->next) {
-        if(0 == strcmp(ptr->src_ip, src_ip)) {
-            _DEBUG("%s\n", "found maching bid node");
-            break;
-        }
-    }
-
-    return ptr;
 }
