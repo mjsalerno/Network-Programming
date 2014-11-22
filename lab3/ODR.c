@@ -956,7 +956,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
 
-    int i, is_new_route = 0, ip_diff = 0, added_bid;
+    int i, is_new_route = 0, ip_diff = 0, added_bid = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
@@ -966,7 +966,9 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
 
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || (ip_diff = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
-            added_bid = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+            if(msgp->type == T_RREQ) {
+                added_bid = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+            }
             if(route_table[i].ip_dst[0] == 0 || msgp->force_redisc) { /* this route is new */
                 *eff_flag = 1;
                 is_new_route = 1;
