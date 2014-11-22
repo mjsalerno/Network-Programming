@@ -584,12 +584,6 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
 
 /**
 *
-*/
-void
-
-
-/**
-*
 * |----------------frame----------------|
 * |-ethhdr-|-------------data-----------|
 * |-ethhdr-|---odr_msg---|---payload----|
