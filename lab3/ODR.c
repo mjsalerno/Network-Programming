@@ -980,28 +980,20 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             if(!is_new_route && route_table[i].num_hops < msgp->num_hops && !msgp->force_redisc) {
                 _DEBUG("%s\n", "Received a less efficient route");
                 *eff_flag = 0;
-                if(msgp->type == T_RREQ) {
-                    if (added_bid == -1) {
-                        return -5; /* duplicate RREQ */
-                    }
-                }
                 return -1;
             }
-            if(!is_new_route && route_table[i].num_hops > msgp->num_hops) {
+            if((!is_new_route && route_table[i].num_hops > msgp->num_hops) || msgp->force_redisc) {
                 *eff_flag = 1;
             }
 
-            if(msgp->type == T_RREQ) {  /*only update id if RREQ*/
-                if(added_bid == -1) {
+            if(msgp->type == T_RREQ && added_bid != 1) {  /*only update id if RREQ*/
+                if(!is_new_route) {
+                    _DEBUG("%s\n", "this bid was already seen");
                     *eff_flag = 0;
-                    if(!is_new_route) {
-                        _DEBUG("%s\n", "this bid was already seen");
-                        return -5;
-                    } else {
-                        _DEBUG("%s\n", "this bid was already seen, but this is a new route so i will add");
-                    }
+                    return -1;
+                } else {
+                    _DEBUG("%s\n", "this bid was already seen, but this is a new route so i will add");
                 }
-
             }
 
             #ifdef DEBUG
@@ -1025,7 +1017,6 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             print_tbl_entry(&(route_table[i]));
             #endif
             if(is_new_route == 1) {
-                /* todo: send datas and rreps */
                 queue_send(&data_queue, rawsock, hwa_head, &route_table[i]);
                 queue_send(&rrep_queue, rawsock, hwa_head, &route_table[i]);
             }
