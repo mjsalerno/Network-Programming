@@ -110,14 +110,14 @@ int is_dup_msg(struct bid_node* head, struct odr_msg *m) {
 
 //int update_route_tbl(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
 //        int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
-//    int i, was_empty = 0, is_new_route = 0, err = 0;
+//    int i, was_empty = 0, is_new_route = 0, err = 0, is_dup_rreq = -1;
 //    struct hwa_info* hwa_ptr;
 //    if(strcmp(msgp->src_ip, host_ip) == 0) {
 //        _ERROR("%s\n", "trying to add your own ip to the routing table ...");
 //        abort();
 //    }
 //    _DEBUG("looking to add/update ip: %s\n", msgp->src_ip);
-//
+//    /* first find the right index to add */
 //    for (i = 0; i < NUM_NODES; ++i) {
 //        if(route_table[i].ip_dst[0] != '\0') {                                      /* tbl_entry occupied */
 //            if(strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN) != 0) {
@@ -142,6 +142,7 @@ int is_dup_msg(struct bid_node* head, struct odr_msg *m) {
 //    // else: check stuff
 //    /* check if RREQ duplicate */
 //    if(msgp->type == T_RREQ) {
+//        is_dup_rreq = is_dup_msg(bid_list, msgp);
 //        err = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
 //        if(err < 0) {
 //            /* this BID is smaller, duplicate RREQ: update only if was_empty */

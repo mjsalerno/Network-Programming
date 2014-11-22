@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
             /* note: invalidate ptr to buf_msg just to be safe*/
             msgp = NULL;
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
-            int eff, its_me, forw_index, back_index, add_rout_rtn;
+            int eff, its_me, forw_index, back_index, add_rout_rtn; /*, was_dup_rreq = -1; */
             int should_bcast = 0;
             uint8_t we_sent;
 
@@ -247,6 +247,9 @@ int main(int argc, char *argv[]) {
             len = sizeof(raw_addr);
 
             eff = 0;
+            /*if(msgp->type == T_RREQ) {
+                was_dup_rreq = is_dup_msg(bid_list, msgp);
+            }*/
             add_rout_rtn = add_route(route_table, msgp, &raw_addr, staleness, &eff, rawsock, hwahead);
 
             _DEBUG("msg type: %d\n", msgp->type);
@@ -283,7 +286,7 @@ int main(int argc, char *argv[]) {
                                 _DEBUG("%s\n", "Could send if route known, but I don't know it, asking everyone");
                                 should_bcast = 1;
                             }
-                            if(we_sent) { /* fixme: change to && eff  ??? */
+                            if(we_sent /*&& (was_dup_rreq == 0)*/) { /* only RREP if we want to send AND this is not a dup RREQ */
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
                                 _DEBUG("%s\n", "we sent it");
                             }
@@ -934,7 +937,7 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
  * Add/Updates a route in the table. Updating is done based on hops.
  *
  * RETURNS: the index the route was added/updated at
- *          -1 if it was not added
+ *          -1 if it was not added, it was duplicate
  *
  * NOTE: After the call, flags will have 1 if this route was new or more
  *      efficient than the previous route.
