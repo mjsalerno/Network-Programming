@@ -191,6 +191,7 @@ int main(int argc, char *argv[]) {
                 int route_i;
                 _DEBUG("msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
                 /* force_rediscid off  AND     we do have a route to the dest IP */
+
                 if(!msgp->force_redisc &&
                         -1 != (route_i = find_route_index(route_table, msgp->dst_ip))) {
                     /* send DATA */
@@ -201,7 +202,7 @@ int main(int argc, char *argv[]) {
                     /* either we don't have a route or force_redisc was set
                      so we pretend like we don't have a route */
                     err = queue_store(msgp);
-                    if(!err) {
+                    if(!err || msgp->force_redisc) {
                         memset(out_msg, 0, ODR_MSG_MAX);
                         craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                         broadcast(rawsock, hwahead, out_msg, -1);
@@ -262,7 +263,7 @@ int main(int argc, char *argv[]) {
 
                     if(add_rout_rtn < 0) {
                         /* scott: why just stop here? -1 means? */
-                        _DEBUG("%s\n", "the route was not added");
+                        _ERROR("%s\n", "the route was not added. ?!?!?!?!?!?!?!?!?!??");
                     } else {
 
                         _DEBUG("%s\n", "added the route");
@@ -571,6 +572,11 @@ void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int
     }
 }
 
+/**
+*
+*/
+void
+
 
 /**
 *
@@ -618,7 +624,7 @@ void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp,
         _ERROR("%s\n", "there was an error crafting the packet");
         exit(EXIT_FAILURE);
     }
-
+    hton_odr_msg((struct odr_msg*)(buff + sizeof(struct ethhdr))); /* sigbus on RISC machines */
     ssize = sendto(rawsock, buff, size, 0, (struct sockaddr const *)&raw_addr,
             sizeof(raw_addr));
     if (ssize < (ssize_t) sizeof(struct ethhdr)) {
