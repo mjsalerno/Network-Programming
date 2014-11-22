@@ -266,39 +266,39 @@ int main(int argc, char *argv[]) {
 
                     /*if(add_rout_rtn < 0) {
                           //could mean: worse duplicate RREQ, or}else{*/
-                  if(add_rout_rtn >= 0) {
+                    if (add_rout_rtn >= 0) {
 
                         _DEBUG("%s\n", "added the route");
                         /* We may only RREP if the next case holds. */
                         /* we *may* RREP     AND (force_redisc is not set  OR  we're the dest IP) */
-                        if(!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
+                        if (!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
                             _DEBUG("%s\n", "If I have an answer I'll RREP...");
-                            if(its_me) {
+                            if (its_me) {
                                 _DEBUG("%s\n", "crafted a rrep for me");
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
                                 we_sent = 1;
                             } else if ((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {   /* we have the route */
-                                if(memcmp(raw_addr.sll_addr, route_table[forw_index].mac_next_hop, ETH_ALEN) == 0) {
-                                    _DEBUG("%s\n", "I know the route but not telling, would cause bounce");
+                                if(msgp->force_redisc) delete_route_index(route_table, forw_index); /* del the forw rout if force redisc */
+                                if (memcmp(raw_addr.sll_addr, route_table[forw_index].mac_next_hop, ETH_ALEN) == 0) {
+                                    _SPEC("%s\n", "I know the route but not telling, would cause bounce");
                                     continue;
                                 }
                                 _DEBUG("%s\n", "crafted a rrep since i know where it is");
                                 craft_rrep(out_msg, route_table[forw_index].ip_dst, msgp->src_ip, msgp->force_redisc, route_table[forw_index].num_hops);
                                 we_sent = 1;
                             }
-                            if(we_sent /*&& (was_dup_rreq == 0)*/) { /* only RREP if we want to send AND this is not a dup RREQ */
+                            if (we_sent /*&& (was_dup_rreq == 0)*/) { /* only RREP if we want to send AND this is not a dup RREQ */
                                 _DEBUG("%s\n", "calling send_on_iface");
                                 send_on_iface(rawsock, hwahead, out_msg, raw_addr.sll_ifindex, raw_addr.sll_addr);
                                 _DEBUG("%s\n", "we sent it");
                             }
                         }
+
                         /* not dup           OR  (was dup BUT more effiecient) */
-                        if(was_dup_rreq == 0 || ((was_dup_rreq == 1) && eff)) {
+                        if (was_dup_rreq == 0 || ((was_dup_rreq == 1) && eff)) {
                             msgp->do_not_rrep = we_sent;
                             _DEBUG("flooding out the good news except for index: %d\n", raw_addr.sll_ifindex);
-                            if(we_sent) {
-                                n_rreq_flood++;
-                            }
+                            n_rreq_flood++;
                             _DEBUG("%s\n", "calling broadcast");
                             broadcast(rawsock, hwahead, msgp, raw_addr.sll_ifindex);
                         } else {
