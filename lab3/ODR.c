@@ -322,6 +322,7 @@ int main(int argc, char *argv[]) {
                             /*exit(EXIT_FAILURE);*/
                             err = queue_store(msgp);
                             if(err == 0) {
+                                memset(out_msg, 0, ODR_MSG_MAX);
                                 craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                                 _DEBUG("%s\n", "calling boradcast");
                                 broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
@@ -369,6 +370,7 @@ int main(int argc, char *argv[]) {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
                         err = queue_store(msgp);
                         if(!err) {
+                            memset(out_msg, 0, ODR_MSG_MAX);
                             craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
                             _DEBUG("%s\n", "calling boradcast");
                             broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
@@ -516,7 +518,7 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 * returns a pointer to the new packet (the thing you already have)
 * returns NULL if there was an error (that's a lie)
 */
-size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], struct odr_msg* msgp, size_t data_len) {
+size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* msgp, size_t data_len) {
     struct ethhdr* et = buff;
     if(data_len > ETH_DATA_LEN) {
         _ERROR("%s\n", "ERROR: craft_frame(): data_len too big");
@@ -551,7 +553,6 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
     /* copy in the data and ethhdr */
-    hton_odr_msg(msgp);
     memcpy(buff + sizeof(struct ethhdr), msgp, data_len);
 
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
