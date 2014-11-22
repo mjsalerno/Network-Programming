@@ -5,7 +5,7 @@
 char host_ip[INET_ADDRSTRLEN] = "127.0.0.1"; /* for testing on comps w/o eth0 */
 char host_name[BUFF_SIZE];
 static int unixsock, rawsock;
-static uint32_t broadcastID = 0;
+static uint32_t broadcastID = 1;
 static struct bid_node* bid_list = NULL;
 static struct msg_queue data_queue = {0}, rrep_queue = {0};
 static struct tbl_entry route_table[NUM_NODES];
@@ -1114,7 +1114,7 @@ int delete_route_index(struct tbl_entry route_table[NUM_NODES], int index) {
 void statistics(void) {
     _STATS("%s","=============== Statistics ================\n");
     _STATS("Sent     :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", n_rreq_sent, n_rrep_sent, n_data_sent);
-    _STATS("Produced :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", broadcastID, n_rrep_prod, n_data_prod);
+    _STATS("Produced :  RREQs: %2"PRIu32", RREPs: %2u, DATAs: %2u\n", (broadcastID - 1), n_rrep_prod, n_data_prod);
     _STATS("Received :  RREQs: %2u, RREPs: %2u, DATAs: %2u\n", n_rreq_recv, n_rrep_recv, n_data_recv);
     _STATS("Delivered:                        DATAs: %2u\n", n_data_delivered);
     _STATS("Forwarded:             RREPs: %2u, DATAs: %2u\n", n_rrep_forw, n_data_forw);

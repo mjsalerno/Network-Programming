@@ -23,7 +23,7 @@ all: ODR server client
 ODR_api.o: ODR_api.c ODR_api.h
 	$(CC) $(FLAGS) -c ODR_api.c
 
-ODR.o: ODR.c ODR.h debug.h get_hw_addrs.h
+ODR.o: ODR.c ODR.h ODR_util.h ODR_api.h debug.h get_hw_addrs.h
 	$(CC) $(FLAGS) -c $<
 
 ODR_util.o: ODR_util.c ODR_util.h debug.h
