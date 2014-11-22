@@ -273,12 +273,16 @@ int main(int argc, char *argv[]) {
                         /* we *may* RREP     AND (force_redisc is not set  OR  we're the dest IP) */
                         if (!msgp->do_not_rrep && (!msgp->force_redisc || its_me)) {
                             _DEBUG("%s\n", "If I have an answer I'll RREP...");
-                            if (its_me) {
+                            if (its_me && !was_dup_rreq) {
                                 _DEBUG("%s\n", "crafted a rrep for me");
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
                                 we_sent = 1;
                             } else if ((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {   /* we have the route */
-                                if(msgp->force_redisc) delete_route_index(route_table, forw_index); /* del the forw rout if force redisc */
+                                if (msgp->force_redisc) { /* del the forw rout if force redisc */
+                                    _INFO("Forcing the deletion of route to %s, force_redesc was set\n", getvmname(route_table[forw_index].ip_dst));
+                                    delete_route_index(route_table, forw_index);
+                                }
+
                                 if (memcmp(raw_addr.sll_addr, route_table[forw_index].mac_next_hop, ETH_ALEN) == 0) {
                                     _SPEC("%s\n", "I know the route but not telling, would cause bounce");
                                     continue;
