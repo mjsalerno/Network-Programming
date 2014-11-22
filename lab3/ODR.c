@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
                                 craft_rrep(out_msg, host_ip, msgp->src_ip, msgp->force_redisc, 0);
                                 we_sent = 1;
                             } else if ((forw_index = find_route_index(route_table, msgp->dst_ip)) > -1) {   /* we have the route */
-                                if(raw_addr.sll_ifindex == route_table[forw_index].iface_index) {
+                                if(memcmp(raw_addr.sll_addr, route_table[forw_index].mac_next_hop, ETH_ALEN) == 0) {
                                     _DEBUG("%s\n", "I know the route but not telling, would cause bounce");
                                     continue;
                                 }
