@@ -35,9 +35,27 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
 }
 
 void print_odr_msg(struct odr_msg *m) {
-    printf("Type: %hhu:  %s:%hu --> ", m->type, getvmname(m->src_ip), m->src_port);
-    printf("%s:%hu  BID=%2u, HOPS=%hu, DNR=%hhu, FORCE=%hhu\n", getvmname(m->dst_ip), m->dst_port,
-            m->broadcast_id, m->num_hops, m->do_not_rrep, m->force_redisc);
+    switch(m->type) {
+        case T_RREQ:
+            printf("Type %hhu:  %s --> ", m->type, getvmname(m->src_ip));
+            printf("%s  ", getvmname(m->dst_ip));
+            printf("BID=%3u, HOPS=%hu, DNR=%hhu, FORCE=%hhu\n", m->broadcast_id, m->num_hops, m->do_not_rrep, m->force_redisc);
+            break;
+        case T_RREP:
+            printf("Type %hhu:  %s --> ", m->type, getvmname(m->src_ip));
+            printf("%s  ", getvmname(m->dst_ip));
+            printf("         HOPS=%hu,        FORCE=%hhu\n", m->num_hops, m->force_redisc);
+            break;
+        case T_DATA:
+            printf("Type %hhu:  %s:%hu --> ", m->type, getvmname(m->src_ip), m->src_port);
+            printf("%s:%hu  ", getvmname(m->dst_ip), m->dst_port);
+            printf("         HOPS=%hu\n", m->num_hops);
+            break;
+        default:
+            _ERROR("Bad odr msg type: %hhu\n", m->type);
+            break;
+    }
+
 }
 
 /**
