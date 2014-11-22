@@ -9,12 +9,15 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
     struct hostent *he;
     char *name;
     int i = 0;
+    if(ip[0] == '\0') {
+        return NULL;
+    }
     if(strncmp(host_ip, ip, INET_ADDRSTRLEN) == 0) {
         /* for vm9, it conflicts with nplclient29 */
         return host_name;
     }
     if(0 == inet_aton(ip, &vmaddr)) {
-        _ERROR("Bad ip: %s\n", ip);
+        _ERROR("inet_aton(): bad ip %s\n", ip);
         exit(EXIT_FAILURE);
     }
 
