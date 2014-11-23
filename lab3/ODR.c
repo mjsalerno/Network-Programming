@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
                 /* send RREQ */
                 /* either we don't have a route or force_redisc was set and we deleted the route */
                 waiting_for_rreq = queue_store(msgp);
-                if(!waiting_for_rreq || msgp->force_redisc) {
+                if(!waiting_for_rreq || msgp->force_redisc) { /* send if we were not already waiting OR force_redisc is set*/
                     memset(out_msg, 0, ODR_MSG_MAX);
                     craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
                     _DEBUG("%s\n", "calling broadcast");
