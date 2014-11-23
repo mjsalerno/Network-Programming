@@ -4,11 +4,22 @@ README for Assignment 3
 |  Michael Salerno  cse533-8   108512298  |
 ===========================================
 
+BUILDING IT!     makefile
+-------------------------
+For none of our debug printouts and no color, just type:
+$ make
+
+For ANSI CoLoR, type (same printouts as no color but easier to read)
+$ make color
+
+For debug printouts with ANSI CoLoR, just type:
+$ make debug
+
 When running the client and ODR the user can type ^D to terminate.
 The server doesn't have that.
 
 
-To look at ANSI color output that has been written to a file:
+To look at ANSI color output that has been written to a file: (only works when built with 'make debug')
 $ less -R fileWithANSIColor
 
 
