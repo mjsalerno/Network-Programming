@@ -355,6 +355,9 @@ int main(int argc, char *argv[]) {
                 case T_DATA:
                     n_data_recv++;
                     _DEBUG("%s\n", "fell into case T_DATA");
+                    if(msgp->force_redisc) {
+                        _ERROR("%s\n", "force_redesc was set, seems strange ..");
+                    }
 
                     if(its_me) {
                         _DEBUG("%s\n", "received data for me");
