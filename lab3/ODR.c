@@ -166,6 +166,7 @@ int main(int argc, char *argv[]) {
             perror("ERROR: select()");
             goto cleanup;
         } else if(FD_ISSET(unixsock, &rset)) {
+            int should_force = 0;
             len = sizeof(local_addr);
             n = recvfrom(unixsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
             if(n < 0) {
@@ -204,8 +205,9 @@ int main(int argc, char *argv[]) {
                 }
                 /* send RREQ */
                 /* either we don't have a route or force_redisc was set and we deleted the route */
+                should_force = msgp->force_redisc;
                 msgp->force_redisc = 0;  /* when we eventually send this it can't have force_redisc set, it's DATA*/
-                store_msg_find_route(msgp, hwahead, -1);
+                store_msg_find_route(msgp, hwahead, should_force, -1);
             }
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
             int eff, its_me, forw_index, back_index, add_rout_rtn, was_dup_rreq = -1;
@@ -321,7 +323,7 @@ int main(int argc, char *argv[]) {
                         _DEBUG("back_index: %d\n", back_index);
                         if(forw_index < 0) {
                             _NOTE("%s\n", "no route found to forward RREP maybe staleness too low");
-                            store_msg_find_route(msgp, hwahead, raw_addr.sll_ifindex);
+                            store_msg_find_route(msgp, hwahead, msgp->force_redisc,raw_addr.sll_ifindex);
                             break;
                         } else { /* still not for me but i know where to send it */
                             if(route_table[back_index].num_hops <= msgp->num_hops) {
@@ -361,7 +363,7 @@ int main(int argc, char *argv[]) {
                                 route_table[forw_index].mac_next_hop);
                     } else {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
-                        store_msg_find_route(msgp, hwahead, raw_addr.sll_ifindex);
+                        store_msg_find_route(msgp, hwahead, msgp->force_redisc, raw_addr.sll_ifindex);
                     }
                     break;
                 default:
@@ -546,12 +548,12 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     return sizeof(struct ethhdr) + data_len;
 }
 
-void store_msg_find_route(struct odr_msg *msgp, struct hwa_info *hwahead, int except) {
+void store_msg_find_route(struct odr_msg *msgp, struct hwa_info *hwahead, int force_redisc, int except) {
     char out_msg[ODR_MSG_MAX];
     int waiting_for_rreq = queue_store(msgp);
     if(!waiting_for_rreq || msgp->force_redisc) { /* send if we were not already waiting OR force_redisc is set*/
         memset(out_msg, 0, ODR_MSG_MAX);
-        craft_rreq((struct odr_msg*)out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+        craft_rreq((struct odr_msg*)out_msg, host_ip, msgp->dst_ip, force_redisc, broadcastID++);
         _DEBUG("%s\n", "calling broadcast");
         broadcast(rawsock, hwahead, (struct odr_msg*)out_msg, except);
     } else {

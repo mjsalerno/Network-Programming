@@ -99,7 +99,7 @@ void print_route_tbl(struct tbl_entry route_table[NUM_NODES]);
 
 /* funcs for raw pkt stuffs */
 size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* msgp, size_t data_len);
-void store_msg_find_route(struct odr_msg *msgp, struct hwa_info *hwahead, int except);
+void store_msg_find_route(struct odr_msg *msgp, struct hwa_info *hwahead, int force_redisc, int except);
 void broadcast(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int except);
 void send_on_iface(int rawsock, struct hwa_info *hwa_head, struct odr_msg* msgp, int dst_if, unsigned char dst_mac[ETH_ALEN]);
 
