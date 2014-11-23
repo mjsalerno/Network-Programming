@@ -717,7 +717,7 @@ void rm_eth0_lo(struct hwa_info	**hwahead) {
 }
 
 void queue_insert(struct msg_queue *queue, struct msg_node *prev, struct msg_node *new, struct msg_node *curr) {
-    if(curr == queue->head) {   /* case if before head */
+    if(prev == NULL) {   /* case if before head */
         new->next = queue->head;
         queue->head = new;
     } else {                   /* case if after head*/
@@ -776,6 +776,7 @@ int queue_store(struct odr_msg *m) {
                 src_cmp = strncmp(m->src_ip, curr->msg.src_ip, INET_ADDRSTRLEN);
                 if(src_cmp < 0) {
                     queue_insert(queue, prev, new_node, curr);
+                    return (dst_cmp == 0);
                 } else if(src_cmp == 0) { /* same src and dst ip of RREPs */
                     if(m->num_hops < curr->msg.num_hops) {
                         _INFO("Got a better RREP, dropping old, old_hops: %d, new_hops: %d\n", curr->msg.num_hops, m->num_hops);
