@@ -129,6 +129,39 @@ int is_dup_msg(struct bid_node* head, struct odr_msg *m) {
 }
 
 
+void hton_odr_msg(struct odr_msg* msgp) {
+    msgp->broadcast_id  = htonl(msgp->broadcast_id);
+    msgp->dst_port      = htons(msgp->dst_port);
+    msgp->len           = htons(msgp->len);
+    msgp->src_port      = htons(msgp->src_port);
+    msgp->num_hops      = htons(msgp->num_hops);
+}
+
+void ntoh_odr_msg(struct odr_msg* msgp) {
+    msgp->broadcast_id = ntohl(msgp->broadcast_id);
+    msgp->dst_port     = ntohs(msgp->dst_port);
+    msgp->len          = ntohs(msgp->len);
+    msgp->src_port     = ntohs(msgp->src_port);
+    msgp->num_hops     = ntohs(msgp->num_hops);
+}
+
+void hton_sockll(struct sockaddr_ll* addr) {
+    addr->sll_family = htons(addr->sll_family);
+    addr->sll_hatype = htons(addr->sll_hatype);
+    addr->sll_ifindex = htonl((uint32_t)addr->sll_ifindex);
+    addr->sll_protocol = htons(addr->sll_protocol);
+
+}
+
+void ntoh_sockll(struct sockaddr_ll* addr) {
+    addr->sll_family = ntohs(addr->sll_family);
+    addr->sll_hatype = ntohs(addr->sll_hatype);
+    addr->sll_ifindex = ntohl((uint32_t)addr->sll_ifindex);
+    addr->sll_protocol = ntohs(addr->sll_protocol);
+
+}
+
+
 //int update_route_tbl(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
 //        int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
 //    int i, was_empty = 0, is_new_route = 0, err = 0, is_dup_rreq = -1;

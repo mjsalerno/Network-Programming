@@ -15,4 +15,9 @@ void print_odr_msg(struct odr_msg *m);
 int add_bid(struct bid_node** head, uint32_t broadcast_id, char src_ip[INET_ADDRSTRLEN]);
 int is_dup_msg(struct bid_node* head, struct odr_msg *m);
 
+void hton_odr_msg(struct odr_msg* msgp);
+void ntoh_odr_msg(struct odr_msg* msgp);
+void ntoh_sockll(struct sockaddr_ll* addr);
+void hton_sockll(struct sockaddr_ll* addr);
+
 #endif /* ODR_UTIL_H */
