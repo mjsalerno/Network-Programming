@@ -158,6 +158,7 @@ int main(void) {
                 }
                 buf[err] = 0;
                 printf("client at node %s: RECEIVED from %s %s\n", hostname, srvname, buf);
+                break;
             }
         }
     }

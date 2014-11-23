@@ -16,12 +16,8 @@ Special Cases:
 1. If two clients on a vm1 both msg_send() to vm5, and vm1 has no route to vm5,
   then only the first msg_send() will generate an RREQ.
 
-
-2. *** FIX to immediately drop the route: ***
-    If a msg_send() has set force_redisc we do not immediately drop the route
-  from our routing table. Instead we send a RREQ with the force_redisc flag
-  set. The corresponding RREP that eventually comes back will also have the
-  force_redisc flag set, causing us to forcefully update our route.
+2. If a msg_send() has set force_redisc we  immediately drop the route
+  from our routing table.
 
 =======================
 Outline of ODR Program:
