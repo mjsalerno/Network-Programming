@@ -196,7 +196,6 @@ int main(int argc, char *argv[]) {
                     if(msgp->force_redisc) {
                         _INFO("Forcing deletion of route to %s, force_redesc was set\n", getvmname(route_table[route_i].ip_dst));
                         delete_route_index(route_table, route_i);
-                        msgp->force_redisc = 0;  /* when we eventually send this it can't have force_redisc set, it's DATA*/
                     } else { /* send DATA */
                         _DEBUG("%s\n", "calling send_on_iface");
                         send_on_iface(rawsock, hwahead, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
@@ -205,7 +204,8 @@ int main(int argc, char *argv[]) {
                 }
                 /* send RREQ */
                 /* either we don't have a route or force_redisc was set and we deleted the route */
-                handle_rreq_broadcast(msgp, hwahead, -1);
+                msgp->force_redisc = 0;  /* when we eventually send this it can't have force_redisc set, it's DATA*/
+                store_msg_find_route(msgp, hwahead, -1);
             }
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
             int eff, its_me, forw_index, back_index, add_rout_rtn, was_dup_rreq = -1;
@@ -321,7 +321,7 @@ int main(int argc, char *argv[]) {
                         _DEBUG("back_index: %d\n", back_index);
                         if(forw_index < 0) {
                             _NOTE("%s\n", "no route found to forward RREP maybe staleness too low");
-                            handle_rreq_broadcast(msgp, hwahead, raw_addr.sll_ifindex);
+                            store_msg_find_route(msgp, hwahead, raw_addr.sll_ifindex);
                             break;
                         } else { /* still not for me but i know where to send it */
                             if(route_table[back_index].num_hops <= msgp->num_hops) {
@@ -361,7 +361,7 @@ int main(int argc, char *argv[]) {
                                 route_table[forw_index].mac_next_hop);
                     } else {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
-                        handle_rreq_broadcast(msgp, hwahead, raw_addr.sll_ifindex);
+                        store_msg_find_route(msgp, hwahead, raw_addr.sll_ifindex);
                     }
                     break;
                 default:
@@ -546,7 +546,7 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
     return sizeof(struct ethhdr) + data_len;
 }
 
-void handle_rreq_broadcast(struct odr_msg *msgp, struct hwa_info *hwahead, int except) {
+void store_msg_find_route(struct odr_msg *msgp, struct hwa_info *hwahead, int except) {
     char out_msg[ODR_MSG_MAX];
     int waiting_for_rreq = queue_store(msgp);
     if(!waiting_for_rreq || msgp->force_redisc) { /* send if we were not already waiting OR force_redisc is set*/
