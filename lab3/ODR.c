@@ -787,9 +787,10 @@ int queue_store(struct odr_msg *m) {
                     free(new_node);
                     return (dst_cmp == 0); /* should always be true (or 1) here */
                 }
+            } else {
+                queue_insert(queue, prev, new_node, curr);
+                return (dst_cmp == 0);
             }
-            queue_insert(queue, prev, new_node, curr);
-            return (dst_cmp == 0);
         }
     }
     /* case if last element */

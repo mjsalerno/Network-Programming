@@ -41,11 +41,19 @@ int main(void) {
     while(curr != NULL) {
         prev = curr;
         curr = curr->next;
-        printf("Dst: %s,  Src: %s\n", prev->msg.dst_ip, prev->msg.src_ip);
+        printf("Dst: %s,  Src: %s, Hops: %d\n", prev->msg.dst_ip, prev->msg.src_ip, prev->msg.num_hops);
         free(prev);
     }
 
     return 0;
+}
+
+void print_queue(struct msg_queue *queue) {
+    struct msg_node *curr = queue->head;
+    while (curr != NULL) {
+        printf("Dst: %s,  Src: %s, Hops: %d\n", curr->msg.dst_ip, curr->msg.src_ip, curr->msg.num_hops);
+        curr = curr->next;
+    }
 }
 
 /* Can pass NULL for srcip or dstip if not wanted. */
@@ -75,6 +83,7 @@ void queue_insert(struct msg_queue *queue, struct msg_node *prev, struct msg_nod
         new->next = curr;
         prev->next = new;
     }
+    print_queue(queue);
 }
 
 /**
@@ -118,6 +127,7 @@ int queue_store(struct odr_msg *m) {
     prev = NULL;
     if(curr == NULL) {        /* case if list is empty */
         queue->head = new_node;
+        print_queue(queue);
         return 0;
     }
     for( ; curr != NULL; prev = curr, curr = curr->next) {
@@ -138,13 +148,15 @@ int queue_store(struct odr_msg *m) {
                     free(new_node);
                     return (dst_cmp == 0); /* should always be true (or 1) here */
                 }
+            } else {
+                queue_insert(queue, prev, new_node, curr);
+                return (dst_cmp == 0);
             }
-            queue_insert(queue, prev, new_node, curr);
-            return (dst_cmp == 0);
         }
     }
     /* case if last element */
     prev->next = new_node;
+    print_queue(queue);
     return 0;
 }
 
