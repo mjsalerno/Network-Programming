@@ -165,7 +165,8 @@ int main(int argc, char *argv[]) {
         if(err < 0) {
             perror("ERROR: select()");
             goto cleanup;
-        } else if(FD_ISSET(unixsock, &rset)) {
+        }
+        if(FD_ISSET(unixsock, &rset)) {
             int should_force = 0;
             len = sizeof(local_addr);
             n = recvfrom(unixsock, buf_msg, ODR_MSG_MAX, 0, (struct sockaddr*)&local_addr, &len);
@@ -209,7 +210,8 @@ int main(int argc, char *argv[]) {
                 msgp->force_redisc = 0;  /* when we eventually send this it can't have force_redisc set, it's DATA*/
                 store_msg_find_route(msgp, hwahead, should_force, -1);
             }
-        } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
+        }
+        if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
             int eff, its_me, forw_index, back_index, add_rout_rtn, was_dup_rreq = -1;
             uint8_t we_sent;
 
@@ -373,7 +375,8 @@ int main(int argc, char *argv[]) {
             }
 
 
-        } else if(FD_ISSET(stdinfd, &rset)) {                   /* so user can ^D to terminate */
+        }
+        if(FD_ISSET(stdinfd, &rset)) {                   /* so user can ^D to terminate */
             char *errc = fgets(buf_msg, ODR_MSG_MAX, stdin);
             if (errc == NULL) {
                 if(ferror(stdin)) {
