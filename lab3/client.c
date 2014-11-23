@@ -1,3 +1,4 @@
+#include <ldap.h>
 #include "client.h"
 
 static char fname[] = TIME_CLI_PATH;  /* template for mkstemp */
@@ -19,6 +20,7 @@ void handle_sigint(int sign) {
 
 int main(void) {
     int filefd, err;
+    unsigned int timeout;
     socklen_t len;
     struct sockaddr_un my_addr, name_addr;
     char srvname[BUFF_SIZE] = {0}, prev_srvname[BUFF_SIZE] = {0};
@@ -86,7 +88,6 @@ int main(void) {
     printf("socket --> %s\n", name_addr.sun_path);
 
     for(EVER) {
-
         /* prompts the user to choose one of vm1, ..., vm10 as a server node. */
         printf("Enter server host (vm1, vm2, ..., vm10 or ^D to quit):\n> ");
         errc = fgets(srvname, sizeof(srvname), stdin);
@@ -124,37 +125,41 @@ int main(void) {
         srv_in_addr = **((struct in_addr **) (he->h_addr_list));
         printf("The server host is %s at %s\n", srvname, inet_ntoa(srv_in_addr));
 
-        /* todo: if this is the 1st timeout, then msg_send rediscovery flag */
-        err = (int)msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 1, 1);
-        if (err < 0) {
-            perror("ERROR: msg_send()");
-            goto cleanup;
-        }
-        printf("client at node %s: SENDING request to server at %s\n", hostname, srvname);
-
-        FD_ZERO(&rset);
-        FD_SET(sockfd, &rset);
-        tv.tv_sec = 2;
-        tv.tv_usec = 0;
-        _DEBUG("waiting for reply, timeout is %ld secs....\n", (long) tv.tv_sec);
-        err = select(sockfd + 1, &rset, NULL, NULL, &tv);
-        if (err < 0) {
-            perror("ERROR: select()");
-            goto cleanup;
-        } else if (err == 0) {
-            /* timeout! */
-            _NOTE("client at node %s: TIMEOUT on response from %s\n", hostname, srvname);
-            /* todo: set a flag for first timeout */
-            continue;
-
-        } else if (FD_ISSET(sockfd, &rset)) {
-            err = (int) msg_recv(sockfd, buf, sizeof(buf), ip_buf, &port);
+        timeout = 0;
+        for(EVER) {
+            err = (int) msg_send(sockfd, inet_ntoa(srv_in_addr), TIME_PORT, "H", 1, timeout);
             if (err < 0) {
-                perror("ERROR: msg_recv()");
+                perror("ERROR: msg_send()");
                 goto cleanup;
             }
-            buf[err] = 0;
-            printf("client at node %s: RECEIVED from %s %s\n", hostname, srvname, buf);
+            printf("client at node %s: SENDING request to server at %s\n", hostname, srvname);
+
+            FD_ZERO(&rset);
+            FD_SET(sockfd, &rset);
+            tv.tv_sec = 2;
+            tv.tv_usec = 0;
+            _DEBUG("waiting for reply, timeout is %ld secs....\n", (long) tv.tv_sec);
+            err = select(sockfd + 1, &rset, NULL, NULL, &tv);
+            if (err < 0) {
+                perror("ERROR: select()");
+                goto cleanup;
+            } else if (err == 0) {
+                /* timeout! */
+                if(timeout == 1) { /* 2nd timeout*/
+                    _ERROR("client at node %s: TIMEOUT on response from %s\n", hostname, srvname);
+                    break;
+                }
+                _NOTE("client at node %s: TIMEOUT on response from %s\n", hostname, srvname);
+                timeout = 1;       /* 1st timeout*/
+            } else if (FD_ISSET(sockfd, &rset)) {
+                err = (int) msg_recv(sockfd, buf, sizeof(buf), ip_buf, &port);
+                if (err < 0) {
+                    perror("ERROR: msg_recv()");
+                    goto cleanup;
+                }
+                buf[err] = 0;
+                printf("client at node %s: RECEIVED from %s %s\n", hostname, srvname, buf);
+            }
         }
     }
 
