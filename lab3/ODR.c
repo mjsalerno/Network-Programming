@@ -739,7 +739,7 @@ void queue_insert(struct msg_queue *queue, struct msg_node *prev, struct msg_nod
 int queue_store(struct odr_msg *m) {
     struct msg_node *new_node, *curr, *prev;
     struct msg_queue *queue;
-    int cmp_dst, cmp_src;
+    int dst_cmp, src_cmp;
     size_t real_len;
     if(m == NULL) {
         _ERROR("%s", "You're msg queue stuff's NULL! Failing!\n");
@@ -770,13 +770,13 @@ int queue_store(struct odr_msg *m) {
         return 0;
     }
     for( ; curr != NULL; prev = curr, curr = curr->next) {
-        cmp_dst = strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
-        if(cmp_dst <= 0){
-            if(cmp_dst == 0 && m->type == T_RREP) {/* dup RREP deletion!! same dst_ip, so check if same src_ip*/
-                cmp_src = strncmp(m->src_ip, curr->msg.src_ip, INET_ADDRSTRLEN);
-                if(cmp_src < 0) {
+        dst_cmp = strncmp(m->dst_ip, curr->msg.dst_ip, INET_ADDRSTRLEN);
+        if(dst_cmp <= 0){
+            if(dst_cmp == 0 && m->type == T_RREP) { /* dup RREP deletion!! same dst_ip, so check if same src_ip*/
+                src_cmp = strncmp(m->src_ip, curr->msg.src_ip, INET_ADDRSTRLEN);
+                if(src_cmp < 0) {
                     queue_insert(queue, prev, new_node, curr);
-                } else if(cmp_src == 0) { /* same src and dst ip of RREPs */
+                } else if(src_cmp == 0) { /* same src and dst ip of RREPs */
                     if(m->num_hops < curr->msg.num_hops) {
                         _INFO("Got a better RREP, dropping old, old_hops: %d, new_hops: %d\n", curr->msg.num_hops, m->num_hops);
                         curr->msg.num_hops = m->num_hops;
@@ -784,11 +784,11 @@ int queue_store(struct odr_msg *m) {
                         _INFO("Got a worse RREP, dropping it, stored RREP hops: %d, its hops: %d\n", curr->msg.num_hops, m->num_hops);
                     }
                     free(new_node);
-                    return (cmp_dst == 0); /* should always be true (or 1) here */
+                    return (dst_cmp == 0); /* should always be true (or 1) here */
                 }
             }
             queue_insert(queue, prev, new_node, curr);
-            return (cmp_dst == 0);
+            return (dst_cmp == 0);
         }
     }
     /* case if last element */
