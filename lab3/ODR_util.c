@@ -1,8 +1,6 @@
 #include "ODR_util.h"
 #include "debug.h"
 
-extern char host_ip[INET_ADDRSTRLEN];
-extern char host_name[BUFF_SIZE];
 
 char *getvmname(char ip[INET_ADDRSTRLEN]) {
     struct in_addr vmaddr = {0};
@@ -11,10 +9,6 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
     int i = 0;
     if(ip[0] == '\0') {
         return NULL;
-    }
-    if(strncmp(host_ip, ip, INET_ADDRSTRLEN) == 0) {
-        /* for vm9, it conflicts with nplclient29 */
-        return host_name;
     }
     if(0 == inet_aton(ip, &vmaddr)) {
         _ERROR("inet_aton(): bad ip %s\n", ip);
