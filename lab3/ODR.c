@@ -196,6 +196,7 @@ int main(int argc, char *argv[]) {
                     if(msgp->force_redisc) {
                         _INFO("Forcing deletion of route to %s, force_redesc was set\n", getvmname(route_table[route_i].ip_dst));
                         delete_route_index(route_table, route_i);
+                        msgp->force_redisc = 0;  /* when we eventually send this it can't have force_redisc set, it's DATA*/
                     } else { /* send DATA */
                         _DEBUG("%s\n", "calling send_on_iface");
                         send_on_iface(rawsock, hwahead, msgp, route_table[route_i].iface_index, route_table[route_i].mac_next_hop);
@@ -345,7 +346,7 @@ int main(int argc, char *argv[]) {
                     n_data_recv++;
                     _DEBUG("%s\n", "fell into case T_DATA");
                     if(msgp->force_redisc) {
-                        _ERROR("%s\n", "force_redesc was set, seems strange ..");
+                        _ERROR("%s\n", "force_redesc was set, seems strange..");
                     }
 
                     if(its_me) {
@@ -954,14 +955,14 @@ int svc_update(struct svc_entry *svcs, struct sockaddr_un *svc_addr) {
 int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, struct sockaddr_ll* raw_addr,
         int staleness, int* eff_flag, int rawsock, struct hwa_info* hwa_head) {
 
-    int i, is_new_route = 0, ip_diff = 0, added_bid = 0, is_rreq = 0;
+    int i, is_new_route = 0, ip_diff = 0, is_dup_rreq = 0, is_rreq = 0;
     struct hwa_info* hwa_ptr;
     if(strcmp(msgp->src_ip, host_ip) == 0) {
         _ERROR("%s\n", "trying to add your own ip to the routing table ...");
         abort();
     }
     _DEBUG("looking to add/update ip: %s\n", msgp->src_ip);
-    is_rreq = msgp->type == T_RREQ;
+    is_rreq = (msgp->type == T_RREQ);
     for (i = 0; i < NUM_NODES; ++i) {
         if(route_table[i].ip_dst[0] == 0 || (ip_diff = strncmp(route_table[i].ip_dst, msgp->src_ip, INET_ADDRSTRLEN)) == 0) {
             if(ip_diff == 0) {
@@ -971,19 +972,19 @@ int add_route(struct tbl_entry route_table[NUM_NODES], struct odr_msg* msgp, str
             }
 
             if(is_rreq) {
-                added_bid = add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip);
+                is_dup_rreq = (1 != add_bid(&bid_list, msgp->broadcast_id, msgp->src_ip));
             }
-            if(route_table[i].ip_dst[0] == 0 || (msgp->force_redisc && is_rreq && (added_bid == 1))){ /* this route is new */
+            if(route_table[i].ip_dst[0] == 0 || (msgp->force_redisc && is_rreq && !is_dup_rreq)){ /* this route is new */
                 *eff_flag = 1;
                 is_new_route = 1;
             }
-            if(is_rreq && added_bid != 1) {  /*only update id if RREQ*/
-                if(!is_new_route) {
-                    _DEBUG("%s\n", "this bid was already seen");
+            if(is_rreq && is_dup_rreq) {  /*only update id if RREQ*/
+                if(!is_new_route && route_table[i].num_hops < msgp->num_hops) {
+                    _DEBUG("%s\n", "Duplicate RREQ has worse route, won't update.");
                     *eff_flag = 0;
                     return -1;
                 } else {
-                    _DEBUG("%s\n", "this bid was already seen, but this is a new route so i will add");
+                    _DEBUG("%s\n", "Duplicate RREQ has better or same hops, will update.");
                 }
             }
 
