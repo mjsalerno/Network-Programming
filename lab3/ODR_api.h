@@ -16,9 +16,9 @@
 
 #define BUFF_SIZE 1024
 #define EVER ;;
-#define ODR_PATH        "/tmp/cse533-11_odr"
-#define TIME_SRV_PATH   "/tmp/cse533-11_timesrv"
-#define TIME_CLI_PATH   "/tmp/cse533-11_timecli_XXXXXX"
+#define ODR_PATH        "/tmp/cse533-8_odr"
+#define TIME_SRV_PATH   "/tmp/cse533-8_timesrv"
+#define TIME_CLI_PATH   "/tmp/cse533-8_timecli_XXXXXX"
 #define TIME_PORT 0
 #define PROTO 2691
 #define NUM_NODES 10
