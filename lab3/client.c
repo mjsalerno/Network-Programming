@@ -1,4 +1,3 @@
-#include <ldap.h>
 #include "client.h"
 
 static char fname[] = TIME_CLI_PATH;  /* template for mkstemp */
