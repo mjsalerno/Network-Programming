@@ -554,7 +554,7 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
 void store_msg_find_route(struct odr_msg *msgp, struct hwa_info *hwahead, int force_redisc, int except) {
     char out_msg[ODR_MSG_MAX];
     int waiting_for_rreq = queue_store(msgp);
-    if(!waiting_for_rreq || msgp->force_redisc) { /* send if we were not already waiting OR force_redisc is set*/
+    if(!waiting_for_rreq || force_redisc) { /* send if we were not already waiting OR force_redisc is set*/
         memset(out_msg, 0, ODR_MSG_MAX);
         craft_rreq((struct odr_msg*)out_msg, host_ip, msgp->dst_ip, force_redisc, broadcastID++);
         _DEBUG("%s\n", "calling broadcast");
