@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
                 _DEBUG("%s", "msg has local dest IP\n");
                 deliver_app_mesg(unixsock, svcs, msgp);
             } else {
-                int route_i, waiting_for_rreq;
+                int route_i;
                 _DEBUG("msg has NON-LOCAL dst IP: %s, host IP: %s\n", msgp->dst_ip, host_ip);
                 /* if we do have a route to the dest IP */
                 if(0 <= (route_i = find_route_index(route_table, msgp->dst_ip))) {
@@ -204,16 +204,10 @@ int main(int argc, char *argv[]) {
                 }
                 /* send RREQ */
                 /* either we don't have a route or force_redisc was set and we deleted the route */
-                waiting_for_rreq = queue_store(msgp);
-                if(!waiting_for_rreq || msgp->force_redisc) { /* send if we were not already waiting OR force_redisc is set*/
-                    memset(out_msg, 0, ODR_MSG_MAX);
-                    craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
-                    _DEBUG("%s\n", "calling broadcast");
-                    broadcast(rawsock, hwahead, out_msg, -1);
-                }
+                handle_rreq_broadcast(msgp, hwahead, -1);
             }
         } else if(FD_ISSET(rawsock, &rset)) {   /* something on the raw socket */
-            int eff, its_me, waitting_for_rreq, forw_index, back_index, add_rout_rtn, was_dup_rreq = -1;
+            int eff, its_me, forw_index, back_index, add_rout_rtn, was_dup_rreq = -1;
             uint8_t we_sent;
 
             len = sizeof(raw_addr);
@@ -321,18 +315,8 @@ int main(int argc, char *argv[]) {
                         _DEBUG("back_index: %d\n", back_index);
                         if(forw_index < 0) {
                             _NOTE("%s\n", "no route found to forward RREP maybe staleness too low");
-                            /*exit(EXIT_FAILURE);*/
-                            waitting_for_rreq = queue_store(msgp);
-                            if(waitting_for_rreq == 0 || msgp->force_redisc) {
-                                memset(out_msg, 0, ODR_MSG_MAX);
-                                craft_rreq(out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
-                                _DEBUG("%s\n", "calling broadcast");
-                                broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
-                            } else {
-                                _DEBUG("queue_store returned %d, I am already waiting for this RREP, waiting some more\n", err);
-                            }
+                            handle_rreq_broadcast(msgp, hwahead, raw_addr.sll_ifindex);
                             break;
-
                         } else { /* still not for me but i know where to send it */
                             if(route_table[back_index].num_hops <= msgp->num_hops) {
                                 _DEBUG("%s\n", "forwarding their route");
@@ -368,13 +352,7 @@ int main(int argc, char *argv[]) {
                                 route_table[forw_index].mac_next_hop);
                     } else {
                         _DEBUG("%s\n", "received data that is not for me, I do NOT have the route");
-                        waitting_for_rreq = queue_store(msgp);
-                        if(0 == waitting_for_rreq || msgp->force_redisc) {
-                            memset(out_msg, 0, ODR_MSG_MAX);
-                            craft_rreq(out_msg, host_ip, msgp->dst_ip, 0, broadcastID++);
-                            _DEBUG("%s\n", "calling broadcast");
-                            broadcast(rawsock, hwahead, out_msg, raw_addr.sll_ifindex);
-                        }
+                        handle_rreq_broadcast(msgp, hwahead, raw_addr.sll_ifindex);
                     }
                     break;
                 default:
@@ -557,6 +535,19 @@ size_t craft_frame(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned
 
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
     return sizeof(struct ethhdr) + data_len;
+}
+
+void handle_rreq_broadcast(struct odr_msg *msgp, struct hwa_info *hwahead, int except) {
+    char out_msg[ODR_MSG_MAX];
+    int waiting_for_rreq = queue_store(msgp);
+    if(!waiting_for_rreq || msgp->force_redisc) { /* send if we were not already waiting OR force_redisc is set*/
+        memset(out_msg, 0, ODR_MSG_MAX);
+        craft_rreq((struct odr_msg*)out_msg, host_ip, msgp->dst_ip, msgp->force_redisc, broadcastID++);
+        _DEBUG("%s\n", "calling broadcast");
+        broadcast(rawsock, hwahead, (struct odr_msg*)out_msg, except);
+    } else {
+        _DEBUG("Already RREQ'd for %s, waiting some more.\n", getvmname(msgp->dst_ip));
+    }
 }
 
 /**
