@@ -27,8 +27,8 @@ check: cov
 %: %.o
 	$(CC) $(FLAGS) $< -o $@
 
-test: test.o ping.o
-	$(CC) $(FLAGS) $< -o $@ ping.o
+test: test.o common.o
+	$(CC) $(FLAGS) $< common.o -o $@ 
 
 clean:
 	rm -fr  *.o *core* test *.gcno *.gcda *.info *.xml coverage

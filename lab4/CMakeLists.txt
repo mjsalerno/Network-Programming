@@ -11,9 +11,15 @@ set(PING_SRC_FILES
 set(TEST_SRC_FILES
     test.c)
 
+set(COMMON_SRC_FILES
+    common.c
+    common.h)
+
 add_library(ping_lib OBJECT ${PING_SRC_FILES})
+add_library(common_lib OBJECT ${COMMON_SRC_FILES})
 
 
 add_executable(test
     ${TEST_SRC_FILES}
-    $<TARGET_OBJECTS:ping_lib>)
+    $<TARGET_OBJECTS:ping_lib>
+    $<TARGET_OBJECTS:common_lib>)
