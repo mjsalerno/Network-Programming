@@ -1,59 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>           // close()
-#include <string.h>           // strcpy, memset(), and memcpy()
-
-#include <netdb.h>            // struct addrinfo
-#include <sys/types.h>        // needed for socket(), uint8_t, uint16_t, uint32_t
-#include <sys/socket.h>       // needed for socket()
-#include <netinet/in.h>       // IPPROTO_ICMP, INET_ADDRSTRLEN
-#include <netinet/ip.h>       // struct ip and IP_MAXPACKET (which is 65535)
-#include <netinet/ip_icmp.h>  // struct icmp, ICMP_ECHO
-#include <arpa/inet.h>        // inet_pton() and inet_ntop()
-#include <sys/ioctl.h>        // macro ioctl is defined
-#include <bits/ioctls.h>      // defines values for argument "request" of ioctl.
-#include <net/if.h>           // struct ifreq
-#include <linux/if_ether.h>   // ETH_P_IP = 0x0800, ETH_P_IPV6 = 0x86DD
-#include <linux/if_packet.h>  // struct sockaddr_ll (see man 7 packet)
-#include <net/ethernet.h>
-
-#include <errno.h>            // errno, perror()
-#include "debug.h"
-
-#define PROTO 0
-#define IP4_HDRLEN 20
-#define ICMP_HDRLEN 8
-
-uint16_t ip_csum(struct ip* iph, size_t len);
+#include "ping.h"
 
 
-int main () {
-
-    //0x4500 0x003c 0x1c46 0x4000 0x4006 0xb1e6 0xac10 0x0a63 0xac10 0x0a0c -> 0xB1E6
-
-    unsigned short fake_ip[10];
-
-    fake_ip[0] = 0x4500;
-    fake_ip[1] = 0x003c;
-    fake_ip[2] = 0x1c46;
-    fake_ip[3] = 0x4000;
-    fake_ip[4] = 0x4006;
-    fake_ip[5] = 0x0000; //csum set to zero
-    fake_ip[6] = 0xac10;
-    fake_ip[7] = 0x0a63;
-    fake_ip[8] = 0xac10;
-    fake_ip[9] = 0x0a0c;
-
-    uint16_t csum = ip_csum((struct ip*)fake_ip, 20);
-
-    if(csum == 0xB1E6) {
-        printf("WIN  :D\n");
-    } else {
-        printf("LOST :,(  %X\n", csum);
-    }
-
-    return 0;
-}
 
 /**
 * fills in the raw packet with the src and dst mac addresses.
