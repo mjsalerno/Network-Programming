@@ -16,15 +16,9 @@
 #include <linux/if_ether.h>   // ETH_P_IP = 0x0800, ETH_P_IPV6 = 0x86DD
 #include <linux/if_packet.h>  // struct sockaddr_ll (see man 7 packet)
 #include <net/ethernet.h>
+#include <stdint.h>
 
 #include <errno.h>            // errno, perror()
 
 #include "debug.h"
 
-#define PROTO 0
-#define IP4_HDRLEN 20
-#define ICMP_HDRLEN 8
-
-uint16_t ip_csum(struct ip* iph, size_t len);
-size_t craft_icmp_pkt(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN],
-        unsigned char dst_mac[ETH_ALEN], in_addr_t* ip_src, in_addr_t* ip_dst, void* data, size_t data_len);
