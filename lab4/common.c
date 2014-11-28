@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <net/if.h>
 #include "common.h"
 
 size_t craft_eth(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* data, size_t data_len) {
