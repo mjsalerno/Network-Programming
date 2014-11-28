@@ -1,0 +1,6 @@
+*.xml
+coverage/
+*.info
+*.gcda
+*.gcno
+test

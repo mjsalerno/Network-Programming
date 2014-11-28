@@ -1,0 +1,36 @@
+# Author Mike Salerno
+# Author Scott Harvey
+CC = clang
+CC = gcc
+
+FLAGS = -g -Wall -Wextra -Werror -DDEBUG
+
+all: test
+
+%: %.c
+
+debug: FLAGS=-g -Wall -Werror -Wextra -DDEBUG
+debug: all
+
+cov: FLAGS=-g -Wall -Werror -Wextra --coverage -DDEBUG
+cov: all
+
+check: cov
+	./test
+	lcov -c -d . -o out.info
+	genhtml out.info -o coverage
+	gcovr -r . --xml > coverage.xml
+
+%.o: %.c %.h
+	$(CC) $(FLAGS) -c $<
+
+%: %.o
+	$(CC) $(FLAGS) $< -o $@
+
+test: test.o ping.o
+	$(CC) $(FLAGS) $< -o $@ ping.o
+
+clean:
+	rm -fr  *.o *core* test *.gcno *.gcda *.info coverage
+
+.PHONY: all clean debug cov
