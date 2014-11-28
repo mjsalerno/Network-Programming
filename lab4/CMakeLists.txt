@@ -3,10 +3,17 @@ project(lab4)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Werror -Wextra")
 
-set(SOURCE_FILES
+set(PING_SRC_FILES
     ping.c
-    ping.h)
+    ping.h
+    debug.h)
 
-#include_directories(.)
+set(TEST_SRC_FILES
+    test.c)
 
-add_executable(ping ${SOURCE_FILES})
+add_library(ping_lib OBJECT ${PING_SRC_FILES})
+
+
+add_executable(test
+    ${TEST_SRC_FILES}
+    $<TARGET_OBJECTS:ping_lib>)
