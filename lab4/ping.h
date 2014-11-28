@@ -26,3 +26,5 @@
 #define ICMP_HDRLEN 8
 
 uint16_t ip_csum(struct ip* iph, size_t len);
+size_t craft_icmp_pkt(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN],
+        unsigned char dst_mac[ETH_ALEN], in_addr_t* ip_src, in_addr_t* ip_dst, void* data, size_t data_len);
