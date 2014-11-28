@@ -31,6 +31,6 @@ test: test.o ping.o
 	$(CC) $(FLAGS) $< -o $@ ping.o
 
 clean:
-	rm -fr  *.o *core* test *.gcno *.gcda *.info coverage
+	rm -fr  *.o *core* test *.gcno *.gcda *.info *.xml coverage
 
 .PHONY: all clean debug cov
