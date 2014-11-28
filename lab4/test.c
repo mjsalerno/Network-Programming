@@ -1,5 +1,6 @@
 #include <assert.h>
 #include "ping.h"
+#include "common.h"
 
 void testping ();
 
@@ -25,7 +26,7 @@ void testping () {
     fake_ip[8] = 0xac10;
     fake_ip[9] = 0x0a0c;
 
-    uint16_t csum = ip_csum((struct ip*)fake_ip, 20);
+    uint16_t mycsum = csum(fake_ip, 20);
 
-    assert(csum == 0xB1E6);
+    assert(mycsum == 0xB1E6);
 }
