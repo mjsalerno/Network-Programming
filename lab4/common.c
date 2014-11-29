@@ -131,9 +131,9 @@ uint16_t csum(void*data, size_t len) {
     return ((uint16_t) ~sum);
 }
 
-/** Write "n" bytes to a descriptor.
-* RETURN:
-* bytes written or -1 on error
+/**
+* Write "n" bytes to a descriptor.
+* RETURN: "n", the of bytes written or -1 on error
 **/
 ssize_t write_n(int fd, char *buf, size_t n) {
     ssize_t curr_n = 0;
@@ -192,3 +192,6 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
 
     return name;
 }
+
+
+

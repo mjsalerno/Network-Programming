@@ -38,9 +38,13 @@ size_t craft_ip(int index, struct sockaddr_ll* raw_addr, void* buff, in_addr_t s
 size_t craft_icmp(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* data, size_t data_len);
 uint16_t csum(void* data, size_t len);
 
+/* Try to write n bytes of the buffer. Checks for EINTR */
 ssize_t write_n(int fd, char *buf, size_t n);
 
+/* Print generic hardware address of length len. */
 void print_hwa(char* mac, int len);
 
+/* Convert string IP to host name */
+char *getvmname(char ip[INET_ADDRSTRLEN]);
 
 #endif /*COMMON_H*/

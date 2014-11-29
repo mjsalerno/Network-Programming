@@ -5,7 +5,7 @@ CC = gcc
 
 FLAGS = -g -Wall -Wextra -Werror -DDEBUG
 
-all: test ARP
+all: test ARP tour
 
 %: %.c
 
@@ -32,6 +32,9 @@ test: test.o common.o
 
 ARP: ARP.o common.o get_hw_addrs.o
 	$(CC) $(FLAGS) $< common.o get_hw_addrs.o -o $@
+
+tour: tour.o common.o
+	$(CC) $(FLAGS) $< common.o -o $@
 
 clean:
 	rm -fr  *.o *core* test *.gcno *.gcda *.info *.xml coverage
