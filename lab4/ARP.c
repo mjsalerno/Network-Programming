@@ -49,7 +49,7 @@ int main() {
     unix_addr.sun_family = AF_LOCAL;
     unix_addr.sun_path[sizeof(unix_addr.sun_path) - 1] = '\0';
 
-    sizeof(struct sockaddr_ll);
+    raw_len = sizeof(struct sockaddr_ll);
     unix_len = sizeof(struct sockaddr_un);
 
     erri = connect(unixsock, (struct sockaddr*)&unix_addr, unix_len);
