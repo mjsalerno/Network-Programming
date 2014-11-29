@@ -1,4 +1,5 @@
 #include "get_hw_addrs.h"
+#include "debug.h"
 
 /* internal helper */
 struct hwa_info *Get_hw_addrs() {
@@ -117,4 +118,124 @@ void free_hwa_info(struct hwa_info *hwahead) {
 		hwa_next = hwa->hwa_next;	/* can't fetch hwa_next after free() */
 		free(hwa);			        /* the hwa_info{} itself */
 	}
+}
+
+void print_hw_addrs(struct hwa_info	*hwahead) {
+	struct hwa_info	*hwa_curr;
+	struct sockaddr	*sa;
+	char   *ptr, straddrbuf[INET6_ADDRSTRLEN];
+	int    i, prflag;
+
+	hwa_curr = hwahead;
+
+	printf("\n");
+	for(; hwa_curr != NULL; hwa_curr = hwa_curr->hwa_next) {
+
+		printf("%s :%s", hwa_curr->if_name, ((hwa_curr->ip_alias) == IP_ALIAS) ? " (alias)\n" : "\n");
+
+		if ((sa = hwa_curr->ip_addr) != NULL) {
+			switch(sa->sa_family) {
+				case AF_INET:
+					inet_ntop(AF_INET, &((struct sockaddr_in *) sa)->sin_addr, straddrbuf, INET_ADDRSTRLEN);
+					printf("         IP addr = %s\n", straddrbuf);
+					break;
+				case AF_INET6:
+					inet_ntop(AF_INET6, &((struct sockaddr_in6 *) sa)->sin6_addr, straddrbuf, INET6_ADDRSTRLEN);
+					printf("         IP6 addr = %s\n", straddrbuf);
+					break;
+				default:
+					break;
+			}
+		}
+
+		prflag = 0;
+		i = 0;
+		do {
+			if(hwa_curr->if_haddr[i] != '\0') {
+				prflag = 1;
+				break;
+			}
+		} while(++i < IFHWADDRLEN);
+
+		if(prflag) {                        /* print the MAC address ex) FF:FF:FF:FF:FF:FF */
+			printf("         HW addr = ");
+			ptr = hwa_curr->if_haddr;
+			i = IFHWADDRLEN;
+			do {
+				printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+			} while(--i > 0);
+			printf("\n");
+		}
+
+		printf("         interface index = %d\n\n", hwa_curr->if_index);
+	}
+}
+
+void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sockaddr_in  *ip_addr) {
+	struct hwa_ip * curr_mip_hwa;
+	curr_mip_hwa = *mip_head;
+
+	if(*mip_head == NULL) {
+		mip_head = malloc(sizeof(struct hwa_ip));
+		if(mip_head == NULL) {
+			_ERROR("%s\n", "mip_head malloc failed");
+			exit(EXIT_FAILURE);
+		}
+
+		memcpy((*mip_head)->if_haddr, if_haddr, IFHWADDRLEN);
+		memcpy((*mip_head)->ip_addr, ip_addr, IFHWADDRLEN);
+		(*mip_head)->next = NULL;
+		curr_mip_hwa = (*mip_head);
+	} else {
+		if(curr_mip_hwa->next != NULL) {
+			_ERROR("%s\n", "Somthing as gone wrong with my linked list");
+			exit(EXIT_FAILURE);
+		}
+
+		curr_mip_hwa->next = malloc(sizeof(struct hwa_ip));
+		curr_mip_hwa = curr_mip_hwa->next;
+		if(curr_mip_hwa == NULL) {
+			_DEBUG("%s\n", "malloc failed");
+		}
+
+		memcpy((*mip_head)->if_haddr, if_haddr, IFHWADDRLEN);
+		memcpy((*mip_head)->ip_addr, ip_addr ,IFHWADDRLEN);
+		(*mip_head)->next = NULL;
+	}
+}
+
+
+/**
+* Removes all but eth0 from the list of interfaces.
+* Stores the IP of eth0 into the static host_ip
+*/
+void keep_eth0(struct hwa_info	**hwahead, struct hwa_ip ** mip_head) {
+	struct hwa_info *curr;
+	struct hwa_ip *curr_mip_hwa;
+	curr = *hwahead;
+	curr_mip_hwa = *mip_head;
+
+	while (curr != NULL) {
+		if (0 == strcmp(curr->if_name, "eth0")) {
+			_DEBUG("Leaving interface %s in the interface list.\n", curr->if_name);
+			add_mips(mip_head, curr->if_haddr, curr_mip_hwa->ip_addr);
+		}
+		curr = curr->hwa_next;
+	}
+}
+
+void print_hwa_list(struct hwa_ip* head) {
+
+	for(; head != NULL; head = head->next) {
+		print_hwa_ip(head);
+	}
+
+}
+
+void print_hwa_ip(struct hwa_ip* node) {
+
+	node->ip_addr->sin_addr.s_addr = ntohl(node->ip_addr->sin_addr.s_addr);
+	printf("%s\n", inet_ntoa(node->ip_addr->sin_addr));
+	print_hwa(node->if_haddr, 6);
+
 }

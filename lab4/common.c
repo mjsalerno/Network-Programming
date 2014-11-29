@@ -156,13 +156,13 @@ ssize_t write_n(int fd, char *buf, size_t n) {
     return tot_n;
 }
 
-void print_hwa(struct hwaddr *HWaddr) {
+void print_hwa(char* mac, int len) {
     int n;
     char *fmt_first = "%02x", *fmt_rest = ":%02x";
     char *fmt = fmt_first;
 
-    for(n = 0; n < HWaddr->sll_halen; n++) {
-        printf(fmt, HWaddr->sll_addr[n]);
+    for(n = 0; n < len; n++) {
+        printf(fmt, mac[n]);
         fmt = fmt_rest;
     }
 }

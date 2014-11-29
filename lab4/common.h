@@ -40,6 +40,6 @@ uint16_t csum(void* data, size_t len);
 
 ssize_t write_n(int fd, char *buf, size_t n);
 
-void print_hwa(struct hwaddr *HWaddr);
+void print_hwa(char* mac, int len);
 
 #endif /*COMMON_H*/
