@@ -20,9 +20,11 @@
 #include "debug.h"
 
 
+#define EVER ;;
 #define PROTO 0x2691
 #define IP4_HDRLEN 20
 #define ICMP_HDRLEN 8
+#define BUFSIZE 512
 #define ARP_PATH "/tmp/cse533-11_arp"
 
 struct hwaddr {

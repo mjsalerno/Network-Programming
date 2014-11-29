@@ -31,6 +31,7 @@ struct hwa_info {
 struct hwa_ip {
   char    if_haddr[IFHWADDRLEN];/* hardware address */
   struct  sockaddr_in  *ip_addr;	/* IP address */
+  int if_index;
   struct hwa_ip * next;
 };
 

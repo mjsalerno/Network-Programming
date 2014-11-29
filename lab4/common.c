@@ -80,8 +80,8 @@ size_t craft_icmp(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned 
     // ICMP header
     icmp_pkt->icmp_type = ICMP_ECHO;
     icmp_pkt->icmp_code = 0;
-    icmp_pkt->icmp_id = htons (1000);
-    icmp_pkt->icmp_seq = htons (0);
+    icmp_pkt->icmp_id = htons(1000);
+    icmp_pkt->icmp_seq = htons(0);
     icmp_pkt->icmp_cksum = 0;
     memcpy(icmp_pkt + 1, data, data_len);
     icmp_pkt->icmp_cksum = csum(icmp_pkt, sizeof(struct icmp) + data_len);
