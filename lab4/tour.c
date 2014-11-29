@@ -1,6 +1,6 @@
 #include "tour.h"
 
-int main(int argc, char *argv[]) {
+int main(/*int argc, char *argv[]*/) {
     return 0;
 }
 
@@ -69,7 +69,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     } while (n > 0);
 
     printf("areq found: ");
-    print_hwa(HWaddr);
+    print_hwa((char*)HWaddr->sll_addr, 6);
     printf("\n");
 
     return 0;
