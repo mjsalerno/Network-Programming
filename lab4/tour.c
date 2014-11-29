@@ -1,10 +1,47 @@
 #include "tour.h"
 
-int main(/*int argc, char *argv[]*/) {
-    return 0;
+int socket_ip_raw(int proto);
+int init_tour_msg(void *hdrbuf, char *vms[], int n);
+
+int main(int argc, char *argv[]) {
+    int rtsock, pgsock;
+    int erri, startedtour = 0;
+    char *hdrbuf = NULL;
+
+    if(argc > 1) {
+        startedtour = 1;
+    }
+    rtsock = socket_ip_raw(IPPROTO_TOUR);
+    pgsock = socket_ip_raw(IPPROTO_ICMP);
+
+    if(startedtour) {              /* We are initiating a new tour. */
+        /* We'll have (argc - 1) stops in the tour */
+        hdrbuf = malloc(sizeof(struct tourhdr) +
+                sizeof(struct in_addr) * (argc - 1));
+        erri = init_tour_msg(hdrbuf, (argv + 1), (argc - 1));
+        if(erri < 0) {
+            perror("ERROR: init_tour_msg()");
+            goto cleanup;
+        }
+    }
+
+
+    // listen for tour msgs on rt socket, ping on pg socket
+
+    if(startedtour)
+        free(hdrbuf);
+    close(rtsock);
+    close(pgsock);
+    exit(EXIT_SUCCESS);
+cleanup:
+    if(startedtour)
+        free(hdrbuf);
+    close(rtsock);
+    close(pgsock);
+    exit(EXIT_FAILURE);
 }
 
-/**
+/*
 * Connects to the ARP process to fill out the HWaddr struct with the hardware
 * address and outgoing interface index.
 *
@@ -71,6 +108,55 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     printf("areq found: ");
     print_hwa((char*)HWaddr->sll_addr, 6);
     printf("\n");
+
+    return 0;
+}
+
+int socket_ip_raw(int proto) {
+    int fd;
+    fd = socket(AF_INET, SOCK_RAW, proto);
+    if(fd < 0) {
+        _ERROR("socket(AF_INET, SOCK_RAW, %d): %m\n", proto);
+        exit(EXIT_FAILURE);
+    }
+    return fd;
+}
+
+/**
+* Takes list of n hostnames, converts hostnames to ips.
+* RETURNS: 0 in success, -1 on failure
+* NOTE: hdrbuf is assumed to be larger enough to hold the message.
+*/
+int init_tour_msg(void *hdrbuf, char *vms[], int n) {
+    int i;
+    struct tourhdr *hdrp;   /* base of hdrbuf */
+    struct in_addr *curr_ip; /* points into hdrbuf */
+    struct hostent *he;
+
+    hdrp = (struct tourhdr*)hdrbuf;
+    hdrp->g_ip.s_addr = 0; /* fixme */
+    hdrp->g_port = 0; /* fixme */
+    hdrp->index = 3;
+    hdrp->num_ips = (uint32_t)n;
+
+    curr_ip = TOUR_CURR(hdrp);
+
+    for(i = 0; i < n; i++, curr_ip++) {
+        /* don't check if's a "vmXX", just call gethostbyname() */
+        if(vms[i][0] != 'v' || vms[i][1] != 'm') {
+            errno = EINVAL;
+            return -1;
+        }
+        he = gethostbyname(vms[i]);
+        if (he == NULL) {
+            herror("ERROR: gethostbyname()");
+            errno = EINVAL;
+            return -1;
+        }
+        /* take out the first addr from the h_addr_list */
+        *curr_ip = **((struct in_addr **) (he->h_addr_list));
+        _DEBUG("Tour: %s is %s\n", vms[i], inet_ntoa(*curr_ip));
+    }
 
     return 0;
 }

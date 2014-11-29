@@ -131,9 +131,9 @@ uint16_t csum(void*data, size_t len) {
     return ((uint16_t) ~sum);
 }
 
-/** Write "n" bytes to a descriptor.
-* RETURN:
-* bytes written or -1 on error
+/**
+* Write "n" bytes to a descriptor.
+* RETURN: "n", the of bytes written or -1 on error
 **/
 ssize_t write_n(int fd, char *buf, size_t n) {
     ssize_t curr_n = 0;
@@ -166,3 +166,32 @@ void print_hwa(char* mac, int len) {
         fmt = fmt_rest;
     }
 }
+
+char *getvmname(char ip[INET_ADDRSTRLEN]) {
+    struct in_addr vmaddr = {0};
+    struct hostent *he;
+    char *name;
+    int i = 0;
+    if(ip[0] == '\0') {
+        return NULL;
+    }
+    if(0 == inet_aton(ip, &vmaddr)) {
+        _ERROR("inet_aton(): bad ip %s\n", ip);
+        exit(EXIT_FAILURE);
+    }
+
+    if(NULL == (he = gethostbyaddr(&vmaddr, 4, AF_INET))) {
+        herror("ERROR gethostbyaddr()");
+        exit(EXIT_FAILURE);
+    }
+    name = he->h_name;
+    while(name != NULL && name[0] != 'v' && name[1] != 'm') {
+        name = he->h_aliases[i];
+        i++;
+    }
+
+    return name;
+}
+
+
+
