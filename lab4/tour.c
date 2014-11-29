@@ -4,7 +4,7 @@ int main(/*int argc, char *argv[]*/) {
     return 0;
 }
 
-/**
+/*
 * Connects to the ARP process to fill out the HWaddr struct with the hardware
 * address and outgoing interface index.
 *

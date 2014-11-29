@@ -15,7 +15,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <net/ethernet.h>
-#include <errno.h>
+#include <netdb.h>
 
 #include "debug.h"
 
@@ -41,5 +41,6 @@ uint16_t csum(void* data, size_t len);
 ssize_t write_n(int fd, char *buf, size_t n);
 
 void print_hwa(char* mac, int len);
+
 
 #endif /*COMMON_H*/
