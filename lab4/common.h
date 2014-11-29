@@ -27,6 +27,10 @@
 #define BUFSIZE 512
 #define ARP_PATH "/tmp/cse533-11_arp"
 
+#ifndef MAX
+#define MAX(x,y) ((x)>(y)?(x):(y))
+#endif
+
 struct hwaddr {
     int             sll_ifindex;	 /* Interface number */
     unsigned short  sll_hatype;	     /* Hardware type */
