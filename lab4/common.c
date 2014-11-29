@@ -130,3 +130,39 @@ uint16_t csum(void*data, size_t len) {
     printf("rtn sum before not: %X\n", sum);
     return ((uint16_t) ~sum);
 }
+
+/** Write "n" bytes to a descriptor.
+* RETURN:
+* bytes written or -1 on error
+**/
+ssize_t write_n(int fd, char *buf, size_t n) {
+    ssize_t curr_n = 0;
+    size_t tot_n = 0;
+
+    while(0 < n){
+        curr_n = write(fd, buf, n);
+        if(curr_n <= 0){
+            if(errno == EINTR){
+                continue;
+            }
+            return -1;
+        }
+        else{
+            n -= curr_n;
+            tot_n += curr_n;
+            buf += curr_n;
+        }
+    }
+    return tot_n;
+}
+
+void print_hwa(struct hwaddr *HWaddr) {
+    int n;
+    char *fmt_first = "%02x", *fmt_rest = ":%02x";
+    char *fmt = fmt_first;
+
+    for(n = 0; n < HWaddr->sll_halen; n++) {
+        printf(fmt, HWaddr->sll_addr[n]);
+        fmt = fmt_rest;
+    }
+}
