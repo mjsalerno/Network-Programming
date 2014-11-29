@@ -78,7 +78,7 @@ int main() {
                 perror("recvfrom(raw)");
                 exit(EXIT_FAILURE);
             }
-            _DEBUG("Got something on the raw socket");
+            _DEBUG("%s\n", "Got something on the raw socket");
         }
 
         if(FD_ISSET(unixsock, &fdset)) {
@@ -87,7 +87,7 @@ int main() {
                 perror("recvfrom(raw)");
                 exit(EXIT_FAILURE);
             }
-            _DEBUG("Got something on the unix socket");
+            _DEBUG("%s\n", "Got something on the unix socket");
         }
     }
 
