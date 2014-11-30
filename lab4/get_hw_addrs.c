@@ -171,20 +171,23 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 	}
 }
 
-void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sockaddr_in  *ip_addr) {
+void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sockaddr_in  *ip_addr, int index) {
+	/*todo: this method really needs to be rewritten*/
+
 	struct hwa_ip * curr_mip_hwa;
 	curr_mip_hwa = *mip_head;
 
 	if(*mip_head == NULL) {
-		mip_head = malloc(sizeof(struct hwa_ip));
-		if(mip_head == NULL) {
+		*mip_head = malloc(sizeof(struct hwa_ip));
+		if(*mip_head == NULL) {
 			_ERROR("%s\n", "mip_head malloc failed");
 			exit(EXIT_FAILURE);
 		}
 
 		memcpy((*mip_head)->if_haddr, if_haddr, IFHWADDRLEN);
-		memcpy((*mip_head)->ip_addr, ip_addr, IFHWADDRLEN);
+		memcpy((*mip_head)->ip_addr, ip_addr, INET_ADDRSTRLEN);
 		(*mip_head)->next = NULL;
+		(*mip_head)->if_index = index;
 		curr_mip_hwa = (*mip_head);
 	} else {
 		if(curr_mip_hwa->next != NULL) {
@@ -196,10 +199,13 @@ void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sock
 		curr_mip_hwa = curr_mip_hwa->next;
 		if(curr_mip_hwa == NULL) {
 			_DEBUG("%s\n", "malloc failed");
+			exit(EXIT_FAILURE);
 		}
 
-		memcpy((*mip_head)->if_haddr, if_haddr, IFHWADDRLEN);
-		memcpy((*mip_head)->ip_addr, ip_addr ,IFHWADDRLEN);
+		memcpy(curr_mip_hwa->if_haddr, if_haddr, IFHWADDRLEN);
+		memcpy(curr_mip_hwa->ip_addr, ip_addr ,IFHWADDRLEN);
+		curr_mip_hwa->if_index = index;
+
 		(*mip_head)->next = NULL;
 	}
 }
@@ -211,14 +217,14 @@ void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sock
 */
 void keep_eth0(struct hwa_info	**hwahead, struct hwa_ip ** mip_head) {
 	struct hwa_info *curr;
-	struct hwa_ip *curr_mip_hwa;
 	curr = *hwahead;
-	curr_mip_hwa = *mip_head;
 
 	while (curr != NULL) {
 		if (0 == strcmp(curr->if_name, "eth0")) {
 			_DEBUG("Leaving interface %s in the interface list.\n", curr->if_name);
-			add_mips(mip_head, curr->if_haddr, curr_mip_hwa->ip_addr);
+			add_mips(mip_head, curr->if_haddr, (struct sockaddr_in*)curr->ip_addr, curr->if_index);
+		} else {
+			_DEBUG("Skipping interface %s in the interface list.\n", curr->if_name);
 		}
 		curr = curr->hwa_next;
 	}
@@ -233,9 +239,7 @@ void print_hwa_list(struct hwa_ip* head) {
 }
 
 void print_hwa_ip(struct hwa_ip* node) {
-
-	node->ip_addr->sin_addr.s_addr = ntohl(node->ip_addr->sin_addr.s_addr);
-	printf("%s\n", inet_ntoa(node->ip_addr->sin_addr));
+	printf("IP: %s\nMAC: ", inet_ntoa(node->ip_addr->sin_addr));
 	print_hwa(node->if_haddr, 6);
-
+	printf("\n");
 }
