@@ -1,25 +1,48 @@
 #include "tour.h"
 
+/* prototypes for private funcs */
 int socket_ip_raw(int proto);
 int init_tour_msg(void *hdrbuf, char *vms[], int n);
+void ping(void *null);
+
+
+int pgsock;
+char host_name[128];
+struct in_addr host_ip;
 
 int main(int argc, char *argv[]) {
-    int rtsock, pgsock;
+    int rtsock;
     int erri, startedtour = 0;
     char *hdrbuf = NULL;
+    struct hostent *he;
 
-    if(argc > 1) {
+    erri = gethostname(host_name, 128); /* get the host name */
+    if (erri < 0) {
+        perror("ERROR gethostname()");
+        exit(EXIT_FAILURE);
+    }
+    he = gethostbyname(host_name);      /* get the host ip */
+    if (he == NULL) {
+        herror("ERROR: gethostbyname()");
+        exit(EXIT_FAILURE);
+    }
+    /* take out the first addr from the h_addr_list */
+    host_ip = **((struct in_addr **) (he->h_addr_list));
+
+
+    if (argc > 1) {
         startedtour = 1;
     }
-    rtsock = socket_ip_raw(IPPROTO_TOUR);
-    pgsock = socket_ip_raw(IPPROTO_ICMP);
 
-    if(startedtour) {              /* We are initiating a new tour. */
+    rtsock = socket_ip_raw(IPPROTO_TOUR);
+    pgsock = socket_ip_raw(IPPROTO_ICMP); /* make the ping pg socket for the threads */
+
+    if (startedtour) {               /* We are initiating a new tour. */
         /* We'll have (argc - 1) stops in the tour */
         hdrbuf = malloc(sizeof(struct tourhdr) +
                 sizeof(struct in_addr) * (argc - 1));
         erri = init_tour_msg(hdrbuf, (argv + 1), (argc - 1));
-        if(erri < 0) {
+        if (erri < 0) {
             perror("ERROR: init_tour_msg()");
             goto cleanup;
         }
@@ -28,13 +51,13 @@ int main(int argc, char *argv[]) {
 
     // listen for tour msgs on rt socket, ping on pg socket
 
-    if(startedtour)
+    if (startedtour)
         free(hdrbuf);
     close(rtsock);
     close(pgsock);
     exit(EXIT_SUCCESS);
-cleanup:
-    if(startedtour)
+    cleanup:
+    if (startedtour)
         free(hdrbuf);
     close(rtsock);
     close(pgsock);
@@ -136,7 +159,7 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
     hdrp = (struct tourhdr*)hdrbuf;
     hdrp->g_ip.s_addr = 0; /* fixme */
     hdrp->g_port = 0; /* fixme */
-    hdrp->index = 3;
+    hdrp->index = 0;
     hdrp->num_ips = (uint32_t)n;
 
     curr_ip = TOUR_CURR(hdrp);

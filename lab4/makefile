@@ -39,4 +39,4 @@ tour: tour.o common.o
 clean:
 	rm -fr  *.o *core* test *.gcno *.gcda *.info *.xml coverage
 
-.PHONY: all clean debug cov
+.PHONY: all clean debug cov check
