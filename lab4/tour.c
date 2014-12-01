@@ -88,6 +88,7 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
     hdrp->index = 0;
     hdrp->num_ips = (uint32_t)n;
 
+    /* get the address of the first ip to store into hdrbuf*/
     curr_ip = TOUR_CURR(hdrp);
 
     for(i = 0; i < n; i++, curr_ip++) {
@@ -116,7 +117,8 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
 * initial tour msg. Otherwise it will just return.
 */
 int start_tour(int argc, char *argv[]) {
-    char *hdrbuf = NULL;
+    void *hdrbuf = NULL;
+    struct in_addr *next_ip;
     int erri;
 
     if(argc <= 1) {
@@ -128,12 +130,17 @@ int start_tour(int argc, char *argv[]) {
     hdrbuf = malloc(sizeof(struct tourhdr) + sizeof(struct in_addr) * (argc - 1));
     erri = init_tour_msg(hdrbuf, (argv + 1), (argc - 1));
     if (erri < 0) {
-        perror("ERROR: init_tour_msg()");
+        _ERROR("%s", "args must be list of: vmXX, vmYY, vmZZ,...\n");
         free(hdrbuf);
         return -1;
     }
 
-    /* fixme: send the initial tour msg here. */
+    /* grab the next destination IP */
+    next_ip = TOUR_NEXT((struct tourhdr*)hdrbuf);
+    next_ip->s_addr++; /* fixme !!!!!*/
+
+    /*craft_ip();*/
+    /* fixme: send the initial tour msg here (hdrbuf). */
 
     free(hdrbuf);
     return 0;
@@ -241,6 +248,8 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     printf("areq found: ");
     print_hwa(HWaddr->sll_addr, 6);
     printf("\n");
+    /* fixme: call getsockname(), unlink() the file */
 
+    close(unixfd);
     return 0;
 }
