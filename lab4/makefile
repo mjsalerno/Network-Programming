@@ -6,6 +6,7 @@ CC = gcc
 BINS = ARP tour test
 
 FLAGS = -g -Wall -Wextra -Werror -DDEBUG
+FLAGS = -g -Wall -Wextra -Werror -DDEBUG
 
 all: $(BINS)
 

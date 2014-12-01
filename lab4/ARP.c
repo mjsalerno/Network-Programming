@@ -1,8 +1,9 @@
-#include "get_hw_addrs.h"
+#include "ARP.h"
 
 int main() {
     struct hwa_info* hw_list = NULL;
     struct hwa_ip * mip_head = NULL;
+    /*struct arp_cache* arp_lst = NULL;*/
 
     struct sockaddr_un unix_addr;
     struct sockaddr_ll raw_addr;
@@ -89,6 +90,7 @@ int main() {
             }
             _DEBUG("%s\n", "Got something on the unix socket");
         }
+
     }
 
     return 1;
