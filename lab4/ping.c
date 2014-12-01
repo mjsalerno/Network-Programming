@@ -4,7 +4,7 @@
 * The argument sock is a int* to a socket.
 */
 void *ping(void /* *sock */) {
-    /*int pgsock = *((int*)sock);*/
+    /*int pgrecver = *((int*)sock);*/
     /*char buf[sizeof(struct ip) + sizeof(struct icmp)];*/
     /*struct ip *iphdrp = (struct ip*)buf;*/
     /*struct icmp *icmphdrp = (struct icmp*)(buf + sizeof(struct ip));*/

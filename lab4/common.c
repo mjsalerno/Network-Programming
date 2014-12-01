@@ -193,5 +193,23 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
     return name;
 }
 
+/* Fill in the hostname and the host ip. Calls gethostname , gethostbyname */
+int gethostname_ip(char *host_name, struct in_addr *host_ip) {
+    int erri;
+    struct hostent *he;
+    erri = gethostname(host_name, 128); /* get the host name */
+    if (erri < 0) {
+        perror("ERROR gethostname()");
+        return -1;
+    }
+    he = gethostbyname(host_name);      /* get the host ip */
+    if (he == NULL) {
+        herror("ERROR: gethostbyname()");
+        return -1;
+    }
+    /* take out the first addr from the h_addr_list */
+    *host_ip = **((struct in_addr **) (he->h_addr_list));
 
+    return 0;
+}
 

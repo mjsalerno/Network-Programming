@@ -1,14 +1,16 @@
 #include "tour.h"
 
 /* prototypes for private funcs */
+int socket_pf_raw(int proto);
 int socket_ip_raw(int proto);
 int init_tour_msg(void *hdrbuf, char *vms[], int n);
 void ping(void *null);
 int handle_tour(void);
 
 /* sockets */
-static int pgsock; /* for receiving pings replies */
-static int rtsock; /* for recv/sending tour messages */
+static int pgrecver; /* PF_INET RAW -- receiving pings replies */
+static int pgsender; /* PF_PACKET RAW -- sending ping echo requests */
+static int rtsock; /* PF_INET RAW HDR_INCLD -- recv/sending tour messages */
 
 char host_name[128];
 struct in_addr host_ip;
@@ -16,28 +18,21 @@ struct in_addr host_ip;
 int main(int argc, char *argv[]) {
     int erri, startedtour = 0;
     char *hdrbuf = NULL;
-    struct hostent *he;
 
-    erri = gethostname(host_name, 128); /* get the host name */
-    if (erri < 0) {
-        perror("ERROR gethostname()");
+    erri = gethostname_ip(host_name, &host_ip);
+    if(erri < 0) {
         exit(EXIT_FAILURE);
     }
-    he = gethostbyname(host_name);      /* get the host ip */
-    if (he == NULL) {
-        herror("ERROR: gethostbyname()");
-        exit(EXIT_FAILURE);
-    }
-    /* take out the first addr from the h_addr_list */
-    host_ip = **((struct in_addr **) (he->h_addr_list));
-
 
     if (argc > 1) {
+        /* if we have been invoked to start/initiate the tour */
         startedtour = 1;
     }
 
+    /* create the two ping sockets and the tour (rt) socket */
+    pgsender = socket_pf_raw(ETH_P_IP);
     rtsock = socket_ip_raw(IPPROTO_TOUR);
-    pgsock = socket_ip_raw(IPPROTO_ICMP); /* make the ping pg socket for the threads */
+    pgrecver = socket_ip_raw(IPPROTO_ICMP); /* make the ping pg socket for the threads */
 
     if (startedtour) {               /* We are initiating a new tour. */
         /* We'll have (argc - 1) stops in the tour */
@@ -48,26 +43,29 @@ int main(int argc, char *argv[]) {
             perror("ERROR: init_tour_msg()");
             goto cleanup;
         }
+        /* call start_tour() */
     }
 
+    /* now handle all messages */
     erri = handle_tour();
     if(erri < 0) {
-        _ERROR("%s: %m", "areq()");
         goto cleanup;
     }
 
     // listen for tour msgs on rt socket, ping on pg socket
 
-    if (startedtour)
+    if(startedtour)
         free(hdrbuf);
     close(rtsock);
-    close(pgsock);
+    close(pgsender);
+    close(pgrecver);
     exit(EXIT_SUCCESS);
     cleanup:
-    if (startedtour)
+    if(startedtour)
         free(hdrbuf);
     close(rtsock);
-    close(pgsock);
+    close(pgsender);
+    close(pgrecver);
     exit(EXIT_FAILURE);
 }
 
@@ -82,7 +80,6 @@ int handle_tour(void) {
 
     err = areq((struct sockaddr*)&dstaddr, slen, &HWaddr);
     if(err < 0) {
-        _ERROR("%s: %m", "areq()");
         return -1;
     }
     _DEBUG("%s", "Got a mac: ");
@@ -92,10 +89,13 @@ int handle_tour(void) {
 }
 
 /*
-* Connects to the ARP process to fill out the HWaddr struct with the hardware
-* address and outgoing interface index.
+* Translate a destination IP to a outgoing hardware address (MAC and interface
+* index).
+* 1. Connects to the ARP process.
+* 2. Sends the IP in IPaddr.
+* 3. Recv's (with a timeout) to fill in the HWaddr struct.
 *
-* RETURNS: 0 on success, -1 on failure with errno containing the error code.
+* RETURNS: 0 on success, -1 on failure with perror printed.
 */
 int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) {
     int unixfd, erri;
@@ -106,15 +106,17 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     fd_set rset;
     struct timeval tm;
 
-    if(sockaddrlen != sizeof(struct sockaddr_in)) {
-        errno = EINVAL; /* we only support AF_INET */
+    if(sockaddrlen != sizeof(struct sockaddr_in)) { /* we only support AF_INET */
+        _ERROR("Only AF_INET(%d) addresses are supported, not: %d\n", AF_INET, IPaddr->sa_family);
         return -1;
     }
     printf("areq for IP: %s\n", inet_ntoa(((struct sockaddr_in*)IPaddr)->sin_addr));
 
     unixfd = socket(AF_LOCAL, SOCK_STREAM, 0);
-    if(unixfd < 0)
+    if(unixfd < 0) {
+        _ERROR("%s: %m\n", "socket()");
         return -1;
+    }
 
     arp_addr.sun_family = AF_LOCAL;
     strncpy(arp_addr.sun_path, ARP_PATH, sizeof(arp_addr.sun_path));
@@ -123,13 +125,17 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
 
     arp_len = sizeof(struct sockaddr_un);
     erri = connect(unixfd, (struct sockaddr*)&arp_addr, arp_len);
-    if(erri < 0)
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "connect()");
         return -1;
+    }
 
     /* todo: create the request to send to ARP */
     errs = write_n(unixfd, buf, 512);
-    if(errs < 0)
+    if(errs < 0) {
+        _ERROR("%s: %m\n", "write()");
         return -1;
+    }
 
     FD_ZERO(&rset);
     FD_SET(unixfd, &rset);
@@ -137,11 +143,14 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     tm.tv_usec = 0;
 
     erri = select(unixfd + 1, &rset, NULL, NULL, &tm);
-    if(erri < 0)
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "select()");
         return -1;
+    }
     if(erri == 0) {
         errno = ETIMEDOUT;
         /* timedout will printout when perror */
+        _ERROR("%s: %m\n", "areq()");
         return -1;
     }
     do {
@@ -150,6 +159,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
         if(n < 0) {
             if(errno == EINTR)
                 continue;
+            _ERROR("%s: %m\n", "read()");
             return -1;
         }
         tot_n += n;
@@ -162,6 +172,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     return 0;
 }
 
+/* create an AF_INET, SOCK_RAW socket */
 int socket_ip_raw(int proto) {
     int fd;
     fd = socket(AF_INET, SOCK_RAW, proto);
@@ -172,6 +183,7 @@ int socket_ip_raw(int proto) {
     return fd;
 }
 
+/* create an PF_PACKET, SOCK_RAW socket */
 int socket_pf_raw(int proto) {
     int fd;
     fd = socket(PF_PACKET, SOCK_RAW, proto);
@@ -194,8 +206,8 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
     struct hostent *he;
 
     hdrp = (struct tourhdr*)hdrbuf;
-    hdrp->g_ip.s_addr = 0; /* fixme */
-    hdrp->g_port = 0; /* fixme */
+    inet_pton(AF_INET, TOUR_GRP_IP, &hdrp->g_ip);
+    hdrp->g_port = TOUR_GRP_PORT;
     hdrp->index = 0;
     hdrp->num_ips = (uint32_t)n;
 

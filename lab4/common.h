@@ -26,9 +26,11 @@
 #define ICMP_HDRLEN 8
 #define BUFSIZE 512
 #define ARP_PATH "/tmp/cse533-11_arp"
+#define TOUR_GRP_IP "236.236.236.236"
+#define TOUR_GRP_PORT 2691
 
 #ifndef MAX
-#define MAX(x,y) ((x)>(y)?(x):(y))
+# define MAX(x,y) ((x)>(y)?(x):(y))
 #endif
 
 struct hwaddr {
@@ -52,5 +54,7 @@ void print_hwa(unsigned char* mac, char mac_len);
 
 /* Convert string IP to host name */
 char *getvmname(char ip[INET_ADDRSTRLEN]);
+
+int gethostname_ip(char *host_name, struct in_addr *host_ip);
 
 #endif /*COMMON_H*/
