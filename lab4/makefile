@@ -3,7 +3,7 @@
 CC = clang
 CC = gcc
 
-FLAGS = -g -Wall -Wextra -Werror -DDEBUG
+FLAGS = -g -Wall -Werror -Wextra -DDEBUG
 
 all: test ARP tour
 
