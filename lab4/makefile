@@ -3,15 +3,18 @@
 CC = clang
 CC = gcc
 
+BINS = ARP tour test
+
 FLAGS = -g -Wall -Wextra -Werror -DDEBUG
 
-all: test ARP tour
+all: $(BINS)
 
 %: %.c
 
 debug: FLAGS=-g -Wall -Werror -Wextra -DDEBUG
 debug: all
 
+# targets for code coverage using GNU gcovr
 cov: FLAGS=-g -Wall -Werror -Wextra --coverage -DDEBUG
 cov: all
 
@@ -37,6 +40,6 @@ tour: tour.o common.o
 	$(CC) $(FLAGS) $< common.o -o $@
 
 clean:
-	rm -fr  *.o *core* test *.gcno *.gcda *.info *.xml coverage
+	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage
 
 .PHONY: all clean debug cov check

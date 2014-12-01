@@ -156,12 +156,12 @@ ssize_t write_n(int fd, char *buf, size_t n) {
     return tot_n;
 }
 
-void print_hwa(char* mac, int len) {
+void print_hwa(unsigned char* mac, char mac_len) {
     int n;
     char *fmt_first = "%02x", *fmt_rest = ":%02x";
     char *fmt = fmt_first;
 
-    for(n = 0; n < len; n++) {
+    for(n = 0; n < mac_len; n++) {
         printf(fmt, mac[n]);
         fmt = fmt_rest;
     }

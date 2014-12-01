@@ -4,14 +4,16 @@
 int socket_ip_raw(int proto);
 int init_tour_msg(void *hdrbuf, char *vms[], int n);
 void ping(void *null);
+int handle_tour(void);
 
+/* sockets */
+static int pgsock; /* for receiving pings replies */
+static int rtsock; /* for recv/sending tour messages */
 
-int pgsock;
 char host_name[128];
 struct in_addr host_ip;
 
 int main(int argc, char *argv[]) {
-    int rtsock;
     int erri, startedtour = 0;
     char *hdrbuf = NULL;
     struct hostent *he;
@@ -48,6 +50,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    erri = handle_tour();
+    if(erri < 0) {
+        _ERROR("%s: %m", "areq()");
+        goto cleanup;
+    }
 
     // listen for tour msgs on rt socket, ping on pg socket
 
@@ -62,6 +69,26 @@ int main(int argc, char *argv[]) {
     close(rtsock);
     close(pgsock);
     exit(EXIT_FAILURE);
+}
+
+int handle_tour(void) {
+    int err;
+    struct hwaddr HWaddr;
+    struct sockaddr_in dstaddr;
+    socklen_t slen;
+    dstaddr.sin_family = AF_INET;
+    dstaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    slen = sizeof(dstaddr);
+
+    err = areq((struct sockaddr*)&dstaddr, slen, &HWaddr);
+    if(err < 0) {
+        _ERROR("%s: %m", "areq()");
+        return -1;
+    }
+    _DEBUG("%s", "Got a mac: ");
+    print_hwa(HWaddr.sll_addr, HWaddr.sll_halen);
+    printf("\n");
+    return 0;
 }
 
 /*
@@ -129,7 +156,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     } while (n > 0);
 
     printf("areq found: ");
-    print_hwa((char*)HWaddr->sll_addr, 6);
+    print_hwa(HWaddr->sll_addr, 6);
     printf("\n");
 
     return 0;
@@ -140,6 +167,16 @@ int socket_ip_raw(int proto) {
     fd = socket(AF_INET, SOCK_RAW, proto);
     if(fd < 0) {
         _ERROR("socket(AF_INET, SOCK_RAW, %d): %m\n", proto);
+        exit(EXIT_FAILURE);
+    }
+    return fd;
+}
+
+int socket_pf_raw(int proto) {
+    int fd;
+    fd = socket(PF_PACKET, SOCK_RAW, proto);
+    if(fd < 0) {
+        _ERROR("socket(PF_PACKET, SOCK_RAW, %d): %m\n", proto);
         exit(EXIT_FAILURE);
     }
     return fd;

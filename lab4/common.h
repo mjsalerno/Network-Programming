@@ -48,7 +48,7 @@ uint16_t csum(void* data, size_t len);
 ssize_t write_n(int fd, char *buf, size_t n);
 
 /* Print generic hardware address of length len. */
-void print_hwa(char* mac, int len);
+void print_hwa(unsigned char* mac, char mac_len);
 
 /* Convert string IP to host name */
 char *getvmname(char ip[INET_ADDRSTRLEN]);
