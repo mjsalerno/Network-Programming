@@ -5,12 +5,14 @@ int initiate_tour(int argc, char *argv[]);
 int process_tour(void);
 int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
+int init_multicast_sock(in_port_t group_port);
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
 static int pgsender; /* PF_PACKET RAW -- sending ping echo requests */
 /* PF_INET RAW HDR_INCLD -- "route traversal" recv/sending tour messages */
 static int rtsock;
+static int mcaster; /* multicast -- recv/sending group messages */
 
 static char host_name[128];
 static struct in_addr host_ip;
@@ -41,11 +43,23 @@ int main(int argc, char *argv[]) {
     pgsender = socket(PF_PACKET, SOCK_RAW, ETH_P_IP);
     if(pgsender < 0) {
         _ERROR("%s: %m\n", "socket(PF_PACKET, SOCK_RAW, ETH_P_IP)");
+        close(rtsock);
         exit(EXIT_FAILURE);
     }
     pgrecver = socket(AF_INET, SOCK_RAW, IPPROTO_TOUR);
     if(pgrecver < 0) {
         _ERROR("%s: %m\n", "socket(AF_INET, SOCK_RAW, IPPROTO_TOUR)");
+        close(rtsock);
+        close(pgsender);
+        exit(EXIT_FAILURE);
+    }
+    /* create the multicast socket (will be binded/joined later) */
+    mcaster = socket(AF_INET, SOCK_DGRAM, 0);
+    if(pgrecver < 0) {
+        _ERROR("%s: %m\n", "socket(AF_INET, SOCK_DGRAM, 0)");
+        close(rtsock);
+        close(pgsender);
+        close(pgrecver);
         exit(EXIT_FAILURE);
     }
 
@@ -208,12 +222,14 @@ ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
 
 /**
 * Handles all of the tour processing (except for sending the initial msg).
+* Monitors the rtsock and the multicast socket.
 */
 int process_tour(void) {
     int err;
     struct hwaddr HWaddr;
     struct sockaddr_in dstaddr;
     socklen_t slen;
+
     dstaddr.sin_family = AF_INET;
     dstaddr.sin_addr.s_addr = INADDR_LOOPBACK;
     slen = sizeof(dstaddr);
@@ -233,6 +249,30 @@ int process_tour(void) {
 * Call from process_tour(), then return to recv your own message.
 */
 int shutdown_tour() {
+    return 0;
+}
+
+/**
+* Called when Tour receives its first tour msg.
+*/
+int init_multicast_sock(in_port_t group_port) {
+    struct sockaddr_in bindaddr;
+    int erri;
+
+    memset(&bindaddr, 0, sizeof(bindaddr));
+    bindaddr.sin_family = AF_INET;
+    bindaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    bindaddr.sin_port = group_port;
+    erri = bind(mcaster, (struct sockaddr*)&bindaddr, sizeof(bindaddr));
+    if(erri < 0) {
+        return -1;
+    }
+    /**
+    *  todo setsockopt(MCAST_JOIN_GROUP)
+    *  todo setsockopt(IP_MULTICAST_IF) eth0
+    *  todo setsockopt(IP_MULTICAST_TTL) 1
+    *  todo setsockopt(IP_MULTICAST_LOOP) on
+    */
     return 0;
 }
 

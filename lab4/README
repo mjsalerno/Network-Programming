@@ -15,6 +15,8 @@ $ make color
 For debug printouts with ANSI CoLoR, just type:
 $ make debug
 
+Before make'ing different targets (debug, color) you must run:
+$ make clean
 
 To look at ANSI color output that has been re-directed to a file:
 (only works when built with 'make debug')
@@ -30,7 +32,7 @@ The tour header format.
 The struct tourhdr is defined in tour.h as the below:
         struct tourhdr {
             struct in_addr g_ip;
-            uint16_t g_port;
+            in_port_t g_port;
             uint16_t index;    /* (struct in_addr)trhdr + trhdr->index + 3 */
             uint32_t num_ips;
             /* struct in_addr ip_1 */

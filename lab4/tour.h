@@ -17,7 +17,7 @@
 
 struct tourhdr {
     struct in_addr g_ip;
-    uint16_t g_port;
+    in_port_t g_port;
     uint16_t index;    /* (struct in_addr)trhdr + trhdr->index + 3 */
     uint32_t num_ips;
     /* struct in_addr a_1 */
