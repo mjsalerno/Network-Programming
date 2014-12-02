@@ -139,14 +139,14 @@ int start_tour(int argc, char *argv[]) {
 
     /* We'll have (argc - 1) nodes in the tour, +1 for our own ip */
     trhdrlen = sizeof(struct tourhdr) + sizeof(struct in_addr) * argc;
-    ip_pktlen = sizeof(struct ip) + trhdrlen;
+    ip_pktlen = IP4_HDRLEN + trhdrlen;
 
     ip_pktbuf = malloc(ip_pktlen);
     if(ip_pktbuf == NULL) {
         _ERROR("%s: %m\n", "malloc failed!");
         return -1;
     }
-    trhdrbuf = ((char*)ip_pktbuf) + sizeof(struct ip);
+    trhdrbuf = ((char*)ip_pktbuf) + IP4_HDRLEN;
 
     erri = init_tour_msg(trhdrbuf, (argv + 1), (argc - 1));
     if (erri < 0) {
@@ -183,7 +183,7 @@ int handle_tour(void) {
     struct sockaddr_in dstaddr;
     socklen_t slen;
     dstaddr.sin_family = AF_INET;
-    dstaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    dstaddr.sin_addr.s_addr = INADDR_LOOPBACK;
     slen = sizeof(dstaddr);
 
     err = areq((struct sockaddr*)&dstaddr, slen, &HWaddr);
@@ -256,7 +256,6 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     }
     if(erri == 0) {
         errno = ETIMEDOUT;
-        /* timedout will printout when perror */
         _ERROR("%s: %m\n", "areq()");
         return -1;
     }
@@ -268,6 +267,10 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
                 continue;
             _ERROR("%s: %m\n", "read()");
             return -1;
+        } else if(n == 0) { /* the socket was closed by the server */
+            errno = ECONNRESET;
+            _ERROR("%s: %m\n", "read()");
+            return -1;
         }
         tot_n += n;
     } while (n > 0);
@@ -275,7 +278,6 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     printf("areq found: ");
     print_hwa(HWaddr->sll_addr, 6);
     printf("\n");
-    /* fixme: call getsockname(), unlink() the file */
 
     close(unixfd);
     return 0;
