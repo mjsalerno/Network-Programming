@@ -220,7 +220,8 @@ void keep_eth0(struct hwa_info	**hwahead, struct hwa_ip ** mip_head) {
 	curr = *hwahead;
 
 	while (curr != NULL) {
-		if (0 == strcmp(curr->if_name, "eth0")) {
+		_DEBUG("Looking for '%s'\n", IFACE_TO_KEEP);
+		if (0 == strcmp(curr->if_name, IFACE_TO_KEEP)) {
 			_DEBUG("Leaving interface %s in the interface list.\n", curr->if_name);
 			add_mips(mip_head, curr->if_haddr, (struct sockaddr_in*)curr->ip_addr, curr->if_index);
 		} else {
