@@ -172,42 +172,23 @@ void print_hw_addrs(struct hwa_info	*hwahead) {
 }
 
 void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sockaddr_in  *ip_addr, int index) {
-	/*todo: this method really needs to be rewritten*/
+	struct hwa_ip* curr = *mip_head;
+	struct hwa_ip* prev = curr;
 
-	struct hwa_ip * curr_mip_hwa;
-	curr_mip_hwa = *mip_head;
+	for(; curr != NULL; prev = curr, curr = curr->next);
 
-	if(*mip_head == NULL) {
-		*mip_head = malloc(sizeof(struct hwa_ip));
-		if(*mip_head == NULL) {
-			_ERROR("%s\n", "mip_head malloc failed");
-			exit(EXIT_FAILURE);
-		}
-
-		memcpy((*mip_head)->if_haddr, if_haddr, IFHWADDRLEN);
-		memcpy((*mip_head)->ip_addr, ip_addr, INET_ADDRSTRLEN);
-		(*mip_head)->next = NULL;
-		(*mip_head)->if_index = index;
-		curr_mip_hwa = (*mip_head);
+	if(prev == NULL) {
+		curr = malloc(sizeof(struct hwa_ip));
+		*mip_head = curr;
 	} else {
-		if(curr_mip_hwa->next != NULL) {
-			_ERROR("%s\n", "Somthing as gone wrong with my linked list");
-			exit(EXIT_FAILURE);
-		}
-
-		curr_mip_hwa->next = malloc(sizeof(struct hwa_ip));
-		curr_mip_hwa = curr_mip_hwa->next;
-		if(curr_mip_hwa == NULL) {
-			_DEBUG("%s\n", "malloc failed");
-			exit(EXIT_FAILURE);
-		}
-
-		memcpy(curr_mip_hwa->if_haddr, if_haddr, IFHWADDRLEN);
-		memcpy(curr_mip_hwa->ip_addr, ip_addr ,IFHWADDRLEN);
-		curr_mip_hwa->if_index = index;
-
-		(*mip_head)->next = NULL;
+		prev->next = malloc(sizeof(struct hwa_ip));
+		curr = prev->next;
 	}
+
+	curr->if_index = index;
+	memcpy(curr->if_haddr, if_haddr, 6);
+	memcpy(curr->ip_addr, ip_addr, sizeof(struct sockaddr_in));
+
 }
 
 
