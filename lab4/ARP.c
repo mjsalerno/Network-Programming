@@ -3,13 +3,14 @@
 int main() {
     struct hwa_info* hw_list = NULL;
     struct hwa_ip * mip_head = NULL;
-    /*struct arp_cache* arp_lst = NULL;*/
+    struct arp_cache* arp_lst = NULL;
 
     struct sockaddr_un unix_addr;
     struct sockaddr_ll raw_addr;
 
-    int rawsock, unixsock, max_fd;
+    int rawsock, unixsock, max_fd, listening_unix_sock;
     socklen_t raw_len, unix_len;
+    struct arp_cache* tmp_arp;
     int erri;
     ssize_t errs;
 
@@ -23,14 +24,19 @@ int main() {
     free_hwa_info(hw_list);
     print_hwa_list(mip_head);
 
+    if(mip_head == NULL) {
+        _ERROR("%s\n", "eth0 not found\n");
+        exit(EXIT_FAILURE);
+    }
+
     rawsock = socket(AF_PACKET, SOCK_RAW, htons(PROTO));
-    if(rawsock < 3) {
+    if(rawsock < 0) {
         perror("There was an error creating the raw soket");
         exit(EXIT_FAILURE);
     }
 
     unixsock = socket(AF_LOCAL, SOCK_STREAM, 0);
-    if(unixsock < 3) {
+    if(unixsock < 0) {
         perror("There was an error creating the unix soket");
         exit(EXIT_FAILURE);
     }
@@ -46,16 +52,26 @@ int main() {
     raw_addr.sll_addr[6] = 0;
     raw_addr.sll_addr[7] = 0;
 
-    strncpy(unix_addr.sun_path, ARP_PATH, sizeof(unix_addr.sun_family));
+    strncpy(unix_addr.sun_path, ARP_PATH, sizeof(unix_addr.sun_path));
+    _DEBUG("will bind to: %s\n", ARP_PATH);
     unix_addr.sun_family = AF_LOCAL;
     unix_addr.sun_path[sizeof(unix_addr.sun_path) - 1] = '\0';
 
     raw_len = sizeof(struct sockaddr_ll);
     unix_len = sizeof(struct sockaddr_un);
 
-    erri = connect(unixsock, (struct sockaddr*)&unix_addr, unix_len);
-    if(erri < 0) {
-        perror("arp.connect(unixsock)");
+    unlink(ARP_PATH);
+    erri = bind(unixsock, (struct sockaddr const *)&unix_addr, unix_len);
+    if(erri != 0) {
+        perror("arp.bind(unix)");
+        close(unixsock);
+        exit(EXIT_FAILURE);
+    }
+
+    erri = listen(unixsock, 128);
+    if(erri != 0) {
+        perror("arp.listen(unix)");
+        close(unixsock);
         exit(EXIT_FAILURE);
     }
 
@@ -76,19 +92,39 @@ int main() {
         if(FD_ISSET(rawsock, &fdset)) {
             errs = recvfrom(rawsock, buf, sizeof(buf), 0, (struct sockaddr *)&raw_addr, &raw_len);
             if(errs < 0) {
-                perror("recvfrom(raw)");
+                perror("arp.recvfrom(raw)");
                 exit(EXIT_FAILURE);
             }
             _DEBUG("%s\n", "Got something on the raw socket");
         }
 
         if(FD_ISSET(unixsock, &fdset)) {
-            errs = recvfrom(unixsock, buf, sizeof(buf), 0, (struct sockaddr *)&unix_addr, &unix_len);
-            if(errs < 0) {
-                perror("recvfrom(raw)");
+
+            listening_unix_sock = accept(unixsock, (struct sockaddr*)&unix_addr, &unix_len);
+            if(listening_unix_sock < 0) {
+                perror("arp.connect(unixsock)");
+                close(unixsock);
                 exit(EXIT_FAILURE);
             }
-            _DEBUG("%s\n", "Got something on the unix socket");
+
+            errs = recv(listening_unix_sock, buf, sizeof(buf), 0);
+            if(errs < 0) {
+                perror("arp.recv(unix)");
+                exit(EXIT_FAILURE);
+            }
+            uint32_t host_ip = ntohl((uint32_t)*buf);
+            memcpy(buf, &host_ip, 4);
+            _DEBUG("Got something on the unix socket %d : %s\n", (int)errs, buf);
+            _DEBUG("got areq for IP: %s\n", inet_ntoa(((struct sockaddr_in*)buf)->sin_addr));
+
+            tmp_arp = has_arp(arp_lst, (in_addr_t)*buf);
+
+            if(tmp_arp != NULL) {
+                _DEBUG("%s\n", "found a matching ip, need to ask");
+            } else {
+                _DEBUG("%s\n", "did not find a matching ip, need to ask");
+            }
+
         }
 
     }
