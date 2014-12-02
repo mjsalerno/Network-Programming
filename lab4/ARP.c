@@ -23,7 +23,7 @@ int main() {
     free_hwa_info(hw_list);
     print_hwa_list(mip_head);
 
-    rawsock = socket(AF_PACKET, SOCK_RAW, htons(PROTO));
+    rawsock = socket(AF_PACKET, SOCK_RAW, htons(ARP_ETH_PROTO));
     if(rawsock < 3) {
         perror("There was an error creating the raw soket");
         exit(EXIT_FAILURE);
@@ -40,7 +40,7 @@ int main() {
 
     memcpy(raw_addr.sll_addr, mip_head->if_haddr, ETH_ALEN);
     raw_addr.sll_family = PF_PACKET;
-    raw_addr.sll_protocol = htons(PROTO);
+    raw_addr.sll_protocol = htons(ARP_ETH_PROTO);
     raw_addr.sll_ifindex = mip_head->if_index;
     raw_addr.sll_halen = ETH_ALEN;
     raw_addr.sll_addr[6] = 0;

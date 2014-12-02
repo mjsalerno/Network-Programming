@@ -7,7 +7,8 @@ int handle_tour(void);
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
 static int pgsender; /* PF_PACKET RAW -- sending ping echo requests */
-static int rtsock; /* PF_INET RAW HDR_INCLD -- recv/sending tour messages */
+/* PF_INET RAW HDR_INCLD -- "route traversal" recv/sending tour messages */
+static int rtsock;
 
 static char host_name[128];
 static struct in_addr host_ip;
@@ -80,6 +81,7 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
     int i;
     struct tourhdr *hdrp;   /* base of hdrbuf */
     struct in_addr *curr_ip; /* points into hdrbuf */
+    struct in_addr tmp_ip;
     struct hostent *he;
 
     hdrp = (struct tourhdr*)hdrbuf;
@@ -90,22 +92,28 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
 
     /* get the address of the first ip to store into hdrbuf*/
     curr_ip = TOUR_CURR(hdrp);
+    /* pre-append the list with our own IP */
+    curr_ip->s_addr = htonl(host_ip.s_addr);
+    curr_ip++;
 
     for(i = 0; i < n; i++, curr_ip++) {
-        /* don't check if's a "vmXX", just call gethostbyname() */
+        /* check it's a "vmXX", then call gethostbyname() */
         if(vms[i][0] != 'v' || vms[i][1] != 'm') {
             errno = EINVAL;
             return -1;
         }
         he = gethostbyname(vms[i]);
-        if (he == NULL) {
+        if(he == NULL) {
             herror("ERROR: gethostbyname()");
             errno = EINVAL;
             return -1;
         }
         /* take out the first addr from the h_addr_list */
-        *curr_ip = **((struct in_addr **) (he->h_addr_list));
-        _DEBUG("Tour: %s is %s\n", vms[i], inet_ntoa(*curr_ip));
+        tmp_ip = **((struct in_addr **) (he->h_addr_list));
+        _DEBUG("Tour Stop #%2d: %s at %s\n", i, vms[i], inet_ntoa(*curr_ip));
+
+        /* Store the address into the tourhdr we're building up. */
+        curr_ip->s_addr = htonl(tmp_ip.s_addr);
     }
 
     return 0;
@@ -117,33 +125,53 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
 * initial tour msg. Otherwise it will just return.
 */
 int start_tour(int argc, char *argv[]) {
-    void *hdrbuf = NULL;
+    void *ip_pktbuf; /* |--- ip header ---|--- tour header ---|-- addrs --| */
+    void *trhdrbuf; /* points into ip_pktbuf */
+    size_t trhdrlen, ip_pktlen;
     struct in_addr *next_ip;
     int erri;
+    ssize_t errs;
 
     if(argc <= 1) {
         return 0;
     }
     /* Else we are initiating a new tour. */
 
-    /* We'll have (argc - 1) nodes in the tour */
-    hdrbuf = malloc(sizeof(struct tourhdr) + sizeof(struct in_addr) * (argc - 1));
-    erri = init_tour_msg(hdrbuf, (argv + 1), (argc - 1));
+    /* We'll have (argc - 1) nodes in the tour, +1 for our own ip */
+    trhdrlen = sizeof(struct tourhdr) + sizeof(struct in_addr) * argc;
+    ip_pktlen = sizeof(struct ip) + trhdrlen;
+
+    ip_pktbuf = malloc(ip_pktlen);
+    if(ip_pktbuf == NULL) {
+        _ERROR("%s: %m\n", "malloc failed!");
+        return -1;
+    }
+    trhdrbuf = ((char*)ip_pktbuf) + sizeof(struct ip);
+
+    erri = init_tour_msg(trhdrbuf, (argv + 1), (argc - 1));
     if (erri < 0) {
         _ERROR("%s", "args must be list of: vmXX, vmYY, vmZZ,...\n");
-        free(hdrbuf);
+        goto cleanup;
+    }
+
+
+    /* grab the next destination IP */
+    next_ip = TOUR_NEXT((struct tourhdr*) trhdrbuf);
+    ((struct tourhdr*) trhdrbuf)->index++;
+
+    craft_ip(ip_pktbuf, host_ip, *next_ip, trhdrlen);
+
+    errs = send(rtsock, ip_pktbuf, ip_pktlen, 0);
+    if(errs < 0) {
+        _ERROR("%s: %m\n", "send()");
         return -1;
     }
 
-    /* grab the next destination IP */
-    next_ip = TOUR_NEXT((struct tourhdr*)hdrbuf);
-    next_ip->s_addr++; /* fixme !!!!!*/
-
-    /*craft_ip();*/
-    /* fixme: send the initial tour msg here (hdrbuf). */
-
-    free(hdrbuf);
+    free(ip_pktbuf);
     return 0;
+cleanup:
+    free(ip_pktbuf);
+    return -1;
 }
 
 /**
@@ -182,7 +210,6 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     ssize_t n, tot_n = 0, errs;
     struct sockaddr_un arp_addr;
     socklen_t arp_len;
-    char buf[512];
     fd_set rset;
     struct timeval tm;
 
@@ -211,7 +238,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     }
 
     /* todo: create the request to send to ARP */
-    errs = write_n(unixfd, buf, 512);
+    errs = write_n(unixfd, &((struct sockaddr_in*)IPaddr)->sin_addr, sizeof(struct in_addr));
     if(errs < 0) {
         _ERROR("%s: %m\n", "write()");
         return -1;
