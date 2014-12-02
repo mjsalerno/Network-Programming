@@ -28,9 +28,14 @@ set(HWA_SRC_FILES
     get_hw_addrs.c
     get_hw_addrs.h)
 
+set(ARP_UTIL_SRC_FILES
+    ARP_util.c
+    ARP.h)
+
 add_library(ping_lib OBJECT ${PING_SRC_FILES})
 add_library(common_lib OBJECT ${COMMON_SRC_FILES})
 add_library(hwa_lib OBJECT ${HWA_SRC_FILES})
+add_library(arp_util_lib OBJECT ${ARP_UTIL_SRC_FILES})
 
 add_executable(tour
     ${TOUR_SRC_FILES}
@@ -45,4 +50,5 @@ add_executable(test
 add_executable(ARP
     ${ARP_SRC_FILES}
     $<TARGET_OBJECTS:hwa_lib>
-    $<TARGET_OBJECTS:common_lib>)
+    $<TARGET_OBJECTS:common_lib>
+    $<TARGET_OBJECTS:arp_util_lib>)
