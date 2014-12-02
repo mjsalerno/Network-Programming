@@ -3,6 +3,7 @@
 /* prototypes for private funcs */
 int start_tour(int argc, char *argv[]);
 int handle_tour(void);
+ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -128,7 +129,6 @@ int start_tour(int argc, char *argv[]) {
     void *ip_pktbuf; /* |--- ip header ---|--- tour header ---|-- addrs --| */
     void *trhdrbuf; /* points into ip_pktbuf */
     size_t trhdrlen, ip_pktlen;
-    struct in_addr *next_ip;
     int erri;
     ssize_t errs;
 
@@ -154,17 +154,10 @@ int start_tour(int argc, char *argv[]) {
         goto cleanup;
     }
 
-
-    /* grab the next destination IP */
-    next_ip = TOUR_NEXT((struct tourhdr*) trhdrbuf);
-    ((struct tourhdr*) trhdrbuf)->index++;
-
-    craft_ip(ip_pktbuf, host_ip, *next_ip, trhdrlen);
-
-    errs = send(rtsock, ip_pktbuf, ip_pktlen, 0);
+    errs = send_tourmsg(ip_pktbuf, ip_pktlen);
     if(errs < 0) {
         _ERROR("%s: %m\n", "send()");
-        return -1;
+        goto cleanup;
     }
 
     free(ip_pktbuf);
@@ -172,6 +165,35 @@ int start_tour(int argc, char *argv[]) {
 cleanup:
     free(ip_pktbuf);
     return -1;
+}
+
+/**
+* Increment the index in tourhdr (contained in ip_pktbuf).
+* Send to the next hop.
+*
+* ip_pktbuf is space for:
+* sizeof(struct ip) + sizeof(struct tourhdr) +  (X * 4) bytes
+* |-- struct ip --|-- struct tourhdr --|-- list of X addresses --|
+*
+* RETURNS: number of bytes sent
+*
+*/
+ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
+    ssize_t n;
+    struct in_addr *next_ip;
+    struct tourhdr *tourhdrp;
+
+    /* point to the tourhdr inside the ip_pktbuf */
+    tourhdrp = (struct tourhdr*)(IP4_HDRLEN + ((char*)ip_pktbuf));
+
+    /* grab the next destination IP, and increment the index */
+    next_ip = TOUR_NEXT(tourhdrp);
+    tourhdrp->index++;
+
+    craft_ip(ip_pktbuf, host_ip, *next_ip, (ip_pktlen - IP4_HDRLEN));
+
+    n = send(rtsock, ip_pktbuf, ip_pktlen, 0);
+    return n;
 }
 
 /**

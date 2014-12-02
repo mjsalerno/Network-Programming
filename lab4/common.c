@@ -45,7 +45,7 @@ void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, siz
     ip_pkt->ip_hl = IP4_HDRLEN / sizeof (uint32_t);
     ip_pkt->ip_v = 4;
     ip_pkt->ip_tos = 0;
-    ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + ICMP_HDRLEN + paylen));
+    ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + paylen));
     ip_pkt->ip_id = htons(0);
     ip_pkt->ip_off = IP_DF;
     ip_pkt->ip_ttl = 255;
