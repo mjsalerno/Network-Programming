@@ -46,7 +46,7 @@ void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, siz
     ip_pkt->ip_v = 4;
     ip_pkt->ip_tos = 0;
     ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + paylen));
-    ip_pkt->ip_id = htons(0);
+    ip_pkt->ip_id = htons(TOUR_IP_ID);
     ip_pkt->ip_off = IP_DF;
     ip_pkt->ip_ttl = 255;
     ip_pkt->ip_p = IPPROTO_ICMP;
@@ -59,7 +59,7 @@ void craft_icmp(void* icmp_buf, void* data, size_t data_len) {
 
     struct icmp* icmp_pkt = icmp_buf;
 
-    // ICMP header
+    /* ICMP header */
     icmp_pkt->icmp_type = ICMP_ECHO;
     icmp_pkt->icmp_code = 0;
     icmp_pkt->icmp_id = htons(1000);

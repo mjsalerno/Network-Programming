@@ -30,6 +30,7 @@
 #define ARP_PATH "/tmp/cse533-11_arp"
 #define TOUR_GRP_IP "236.236.236.236"
 #define TOUR_GRP_PORT 2691
+#define TOUR_IP_ID 0x2691
 
 #ifndef MAX
 # define MAX(x,y) ((x)>(y)?(x):(y))

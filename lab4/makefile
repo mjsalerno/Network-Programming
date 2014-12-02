@@ -25,6 +25,10 @@ check: cov
 	genhtml out.info -o coverage
 	gcovr -r . --xml > coverage.xml
 
+# for build .o's that don't have a .h (ARP_util.o)
+%.o: %.c
+	$(CC) $(FLAGS) -c $<
+
 %.o: %.c %.h
 	$(CC) $(FLAGS) -c $<
 

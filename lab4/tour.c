@@ -1,8 +1,9 @@
 #include "tour.h"
 
 /* prototypes for private funcs */
-int start_tour(int argc, char *argv[]);
-int handle_tour(void);
+int initiate_tour(int argc, char *argv[]);
+int process_tour(void);
+int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
 
 /* sockets */
@@ -15,7 +16,7 @@ static char host_name[128];
 static struct in_addr host_ip;
 
 /**
-* Sets up the sockets then calls start_tour() and handle_tour()
+* Sets up the sockets then calls initiate_tour() and process_tour()
 */
 int main(int argc, char *argv[]) {
     const int on = 1;
@@ -48,12 +49,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    erri = start_tour(argc, argv); /* start tour if needed */
+    erri = initiate_tour(argc, argv); /* start tour if needed */
     if(erri < 0) {
         goto cleanup;
     }
 
-    erri = handle_tour(); /* now handle all messages */
+    erri = process_tour(); /* now handle all messages */
     if(erri < 0) {
         goto cleanup;
     }
@@ -75,14 +76,16 @@ cleanup:
 
 /**
 * Takes list of n hostnames, converts hostnames to ips.
-* RETURNS: 0 in success, -1 on failure
+* Stores list (appended with the host IP) into hdrbuf.
+*
+* RETURNS: 0 in success, -1 on failure.
 * NOTE: hdrbuf is assumed to be larger enough to hold the message.
 */
 int init_tour_msg(void *hdrbuf, char *vms[], int n) {
     int i;
     struct tourhdr *hdrp;   /* base of hdrbuf */
     struct in_addr *curr_ip; /* points into hdrbuf */
-    struct in_addr tmp_ip;
+    struct in_addr prev_ip, tmp_ip;
     struct hostent *he;
 
     hdrp = (struct tourhdr*)hdrbuf;
@@ -95,6 +98,7 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
     curr_ip = TOUR_CURR(hdrp);
     /* pre-append the list with our own IP */
     curr_ip->s_addr = htonl(host_ip.s_addr);
+    prev_ip = *curr_ip;
     curr_ip++;
 
     for(i = 0; i < n; i++, curr_ip++) {
@@ -115,6 +119,12 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
 
         /* Store the address into the tourhdr we're building up. */
         curr_ip->s_addr = htonl(tmp_ip.s_addr);
+        if(prev_ip.s_addr == curr_ip->s_addr) {
+            _ERROR("Cannot go from %s to %s, they are the same\n", vms[i], vms[i]);
+            errno = EINVAL;
+            return -1;
+        }
+        prev_ip = *curr_ip;
     }
 
     return 0;
@@ -125,7 +135,7 @@ int init_tour_msg(void *hdrbuf, char *vms[], int n) {
 * If the process was invoked with a list of hostnames then it will send the
 * initial tour msg. Otherwise it will just return.
 */
-int start_tour(int argc, char *argv[]) {
+int initiate_tour(int argc, char *argv[]) {
     void *ip_pktbuf; /* |--- ip header ---|--- tour header ---|-- addrs --| */
     void *trhdrbuf; /* points into ip_pktbuf */
     size_t trhdrlen, ip_pktlen;
@@ -199,7 +209,7 @@ ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
 /**
 * Handles all of the tour processing (except for sending the initial msg).
 */
-int handle_tour(void) {
+int process_tour(void) {
     int err;
     struct hwaddr HWaddr;
     struct sockaddr_in dstaddr;
@@ -215,6 +225,14 @@ int handle_tour(void) {
     _DEBUG("%s", "Got a mac: ");
     print_hwa(HWaddr.sll_addr, HWaddr.sll_halen);
     printf("\n");
+    return 0;
+}
+
+/**
+* Shutdown the tour by sending the multicast message shutdown msg.
+* Call from process_tour(), then return to recv your own message.
+*/
+int shutdown_tour() {
     return 0;
 }
 

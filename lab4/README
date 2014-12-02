@@ -5,7 +5,7 @@ README for Assignment 4
 ===========================================
 
 BUILDING IT!     makefile
--------------------------
+=========================
 For none of our debug printouts and no color, just type:
 $ make
 
@@ -26,7 +26,7 @@ $ less -R fileWithANSIColor
 ==========================================
 
 The tour header format.
------------------------
+=======================
 The struct tourhdr is defined in tour.h as the below:
         struct tourhdr {
             struct in_addr g_ip;
@@ -39,8 +39,24 @@ The struct tourhdr is defined in tour.h as the below:
             /* struct in_addr ip_num_ips */
         }
 
-Notes about tour.
------------------
+Structure of tour.
+==================
+Handling ICMP pinging using threads:
+    * tour spawns one (and only one) thread for recv'ing ping responses (echo
+      replies). These are recv'd on the "pgrecver" PF_INET, SOCK_RAW socket.
+
+    * tour creates multiple (on an as needed basis) threads for sending ping
+      requests (echo requests). These are sent on the "pgsender" PF_PACKET,
+      SOCK_RAW socket (all threads share the one socket).
+
+    * When the main thread wants to shutdown the tour it must go through all
+      of its pthread_id's and issue a cancelation request on each (using
+      pthread_cancel()). Then it must wait to clean up all of its threads
+      (using pthread_join()).
+
+
+Other notes about tour.
+=======================
 The index will also always point to the ip of the current node at the hop.
 The index field is only incremented right before the message is sent to
 the next destination.
