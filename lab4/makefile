@@ -34,8 +34,8 @@ check: cov
 test: test.o common.o
 	$(CC) $(FLAGS) $< common.o -o $@ 
 
-ARP: ARP.o common.o get_hw_addrs.o
-	$(CC) $(FLAGS) $< common.o get_hw_addrs.o -o $@
+ARP: ARP.o common.o get_hw_addrs.o ARP_util.o
+	$(CC) $(FLAGS) $^ -o $@
 
 tour: tour.o common.o
 	$(CC) $(FLAGS) $< common.o -o $@
