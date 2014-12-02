@@ -5,7 +5,7 @@ int initiate_tour(int argc, char *argv[]);
 int process_tour(void);
 int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
-int init_multicast_sock(in_port_t group_port);
+int init_multicast_sock(struct sockaddr_in *mcast_addr);
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -254,25 +254,40 @@ int shutdown_tour() {
 
 /**
 * Called when Tour receives its first tour msg.
+*
 */
-int init_multicast_sock(in_port_t group_port) {
+int init_multicast_sock(struct sockaddr_in *mcast_addr) {
     struct sockaddr_in bindaddr;
+    struct group_req greq;
+    const unsigned char ttl = 1;
     int erri;
 
     memset(&bindaddr, 0, sizeof(bindaddr));
     bindaddr.sin_family = AF_INET;
     bindaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    bindaddr.sin_port = group_port;
+    /* fixme: dub-check should already be in netwrk order here right? */
+    bindaddr.sin_port = mcast_addr->sin_port;
     erri = bind(mcaster, (struct sockaddr*)&bindaddr, sizeof(bindaddr));
     if(erri < 0) {
         return -1;
     }
-    /**
-    *  todo setsockopt(MCAST_JOIN_GROUP)
-    *  todo setsockopt(IP_MULTICAST_IF) eth0
-    *  todo setsockopt(IP_MULTICAST_TTL) 1
-    *  todo setsockopt(IP_MULTICAST_LOOP) on
-    */
+
+    /* let the kernel pick the interface index */
+    /* todo: if needed setsockopt(IP_MULTICAST_IF, eth0) */
+    greq.gr_interface = 0;
+    memcpy(&greq.gr_group, mcast_addr, sizeof(struct sockaddr_in));
+
+    erri = setsockopt(mcaster, IPPROTO_IP, MCAST_JOIN_GROUP, &greq, sizeof(greq));
+    if(erri < 0) {
+        return -1;
+    }
+
+    erri = setsockopt(mcaster, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+    if(erri < 0) {
+        return -1;
+    }
+
+    /* setsockopt(IP_MULTICAST_LOOP) is enabled per RFC 1122 */
     return 0;
 }
 
