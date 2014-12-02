@@ -2,23 +2,18 @@
 #include <net/if.h>
 #include "common.h"
 
-size_t craft_eth(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* data, size_t data_len) {
-    struct ethhdr* et = buff;
-    if(data_len > ETH_DATA_LEN) {
-        _ERROR("%s\n", "ERROR: craft_frame(): data_len too big");
-        exit(EXIT_FAILURE);
-    }
-
+void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], int ifindex) {
+    struct ethhdr* et = eth_buf;
     if(raw_addr != NULL) {
         /*prepare sockaddr_ll*/
         memset(raw_addr, 0, sizeof(struct sockaddr_ll));
 
         /*RAW communication*/
         raw_addr->sll_family = PF_PACKET;
-        raw_addr->sll_protocol = htons(PROTO);
+        raw_addr->sll_protocol = htons(ARP_ETH_PROTO);
 
         /*index of the network device*/
-        raw_addr->sll_ifindex = index;
+        raw_addr->sll_ifindex = ifindex;
 
         /*ARP hardware identifier is ethernet*/
         raw_addr->sll_hatype = 0;
@@ -32,21 +27,17 @@ size_t craft_eth(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned c
         raw_addr->sll_addr[7] = 0;
     }
 
-    et->h_proto = htons(PROTO);
+    et->h_proto = htons(ARP_ETH_PROTO);
     memcpy(et->h_dest, dst_mac, ETH_ALEN);
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
-    /* copy in the data and ethhdr */
-    memcpy(buff + sizeof(struct ethhdr), data, data_len);
-
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
-    return sizeof(struct ethhdr) + data_len;
 }
 
-size_t craft_ip(int index, struct sockaddr_ll* raw_addr, void* buff, in_addr_t src_ip, in_addr_t dst_ip, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* data, size_t data_len) {
-    struct ip* ip_pkt = malloc(sizeof(struct ip) + data_len);
-    if(ip_pkt == NULL) {
-        _ERROR("%s\n", "malloc failed makeing the ip_pkt");
+void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, size_t paylen) {
+    struct ip* ip_pkt = ip_pktbuf;
+    if(ip_pktbuf == NULL) {
+        _ERROR("%s\n", "ip_pktbuf is NULL!");
         exit(EXIT_FAILURE);
     }
 
@@ -54,7 +45,7 @@ size_t craft_ip(int index, struct sockaddr_ll* raw_addr, void* buff, in_addr_t s
     ip_pkt->ip_hl = IP4_HDRLEN / sizeof (uint32_t);
     ip_pkt->ip_v = 4;
     ip_pkt->ip_tos = 0;
-    ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + ICMP_HDRLEN + data_len));
+    ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + ICMP_HDRLEN + paylen));
     ip_pkt->ip_id = htons(0);
     ip_pkt->ip_off = IP_DF;
     ip_pkt->ip_ttl = 255;
@@ -62,20 +53,11 @@ size_t craft_ip(int index, struct sockaddr_ll* raw_addr, void* buff, in_addr_t s
     memcpy(&(ip_pkt->ip_dst.s_addr), &dst_ip, sizeof(in_addr_t));
     memcpy(&(ip_pkt->ip_src.s_addr), &src_ip, sizeof(in_addr_t));
     ip_pkt->ip_sum = 0;
-
-    memcpy(ip_pkt+1, data, data_len);
-
-    return craft_eth(index, raw_addr, buff, src_mac, dst_mac, ip_pkt, data_len + sizeof(struct ip));
-
 }
 
-size_t craft_icmp(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], void* data, size_t data_len) {
+void craft_icmp(void* icmp_buf, void* data, size_t data_len) {
 
-    struct icmp* icmp_pkt = malloc(sizeof(struct icmp) + data_len);
-    if(icmp_pkt == NULL) {
-        _ERROR("%s\n", "malloc failed for icmp");
-        exit(EXIT_FAILURE);
-    }
+    struct icmp* icmp_pkt = icmp_buf;
 
     // ICMP header
     icmp_pkt->icmp_type = ICMP_ECHO;
@@ -85,9 +67,6 @@ size_t craft_icmp(int index, struct sockaddr_ll* raw_addr, void* buff, unsigned 
     icmp_pkt->icmp_cksum = 0;
     memcpy(icmp_pkt + 1, data, data_len);
     icmp_pkt->icmp_cksum = csum(icmp_pkt, sizeof(struct icmp) + data_len);
-
-    return craft_eth(index, raw_addr, buff, src_mac, dst_mac, icmp_pkt, sizeof(struct icmp) + data_len);
-
 }
 
 /*calculates the checksum everything*/
@@ -135,7 +114,7 @@ uint16_t csum(void*data, size_t len) {
 * Write "n" bytes to a descriptor.
 * RETURN: "n", the of bytes written or -1 on error
 **/
-ssize_t write_n(int fd, char *buf, size_t n) {
+ssize_t write_n(int fd, void *buf, size_t n) {
     ssize_t curr_n = 0;
     size_t tot_n = 0;
 
@@ -150,7 +129,7 @@ ssize_t write_n(int fd, char *buf, size_t n) {
         else{
             n -= curr_n;
             tot_n += curr_n;
-            buf += curr_n;
+            buf = ((char*)buf) + curr_n;
         }
     }
     return tot_n;
