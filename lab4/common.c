@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <net/if.h>
-#include <net/if_arp.h>
 #include "common.h"
 
 void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], int ifindex) {
@@ -64,9 +63,9 @@ void craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int
     char* ptr;
     size_t add_len = 0;
 
-    /*unsigned short int ar_hrd;		/* Format of hardware address.
-    unsigned short int ar_pro;		/* Format of protocol address.
-    unsigned short int ar_op;		/* ARP opcode (command).  */
+    /*unsigned short int ar_hrd;	Format of hardware address.
+    unsigned short int ar_pro;		 Format of protocol address.
+    unsigned short int ar_op;		 ARP opcode (command).  */
 
     arp->ar_pln = sizeof(uint32_t);
     arp->ar_hrd = ar_hrd; /*ARPHRD_ETHER*/
@@ -87,10 +86,10 @@ void craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int
         exit(EXIT_FAILURE);
     }
 
-    /*unsigned char __ar_sha[ETH_ALEN];	/* Sender hardware address.
-    unsigned char __ar_sip[4];		/* Sender IP address.
-    unsigned char __ar_tha[ETH_ALEN];	/* Target hardware address.
-    unsigned char __ar_tip[4];		/* Target IP address.*/
+    /*unsigned char __ar_sha[ETH_ALEN];	 Sender hardware address.
+    unsigned char __ar_sip[4];		 Sender IP address.
+    unsigned char __ar_tha[ETH_ALEN];	 Target hardware address.
+    unsigned char __ar_tip[4];		 Target IP address.*/
     ptr = (char*)arp+1;
     memcpy(ptr, ar_sha, arp->ar_hln);
     ptr += arp->ar_hln;

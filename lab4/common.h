@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <net/if_arp.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <linux/if_ether.h>
