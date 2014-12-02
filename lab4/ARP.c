@@ -11,6 +11,7 @@ int main() {
     int rawsock, unixsock, max_fd, listening_unix_sock;
     socklen_t raw_len, unix_len;
     struct arp_cache* tmp_arp;
+    struct in_addr tmp_ip;
     int erri;
     ssize_t errs;
 
@@ -96,6 +97,7 @@ int main() {
                 exit(EXIT_FAILURE);
             }
             _DEBUG("%s\n", "Got something on the raw socket");
+
         }
 
         if(FD_ISSET(unixsock, &fdset)) {
@@ -112,10 +114,9 @@ int main() {
                 perror("arp.recv(unix)");
                 exit(EXIT_FAILURE);
             }
-            uint32_t host_ip = ntohl((uint32_t)*buf);
-            memcpy(buf, &host_ip, 4);
-            _DEBUG("Got something on the unix socket %d : %s\n", (int)errs, buf);
-            _DEBUG("got areq for IP: %s\n", inet_ntoa(((struct sockaddr_in*)buf)->sin_addr));
+            _DEBUG("Got something on the unix socket, bytes:%d\n", (int)errs);
+            memcpy(&tmp_ip.s_addr, buf, sizeof(uint32_t));
+            _DEBUG("got areq for IP: %s\n", inet_ntoa(tmp_ip));
 
             tmp_arp = has_arp(arp_lst, (in_addr_t)*buf);
 
