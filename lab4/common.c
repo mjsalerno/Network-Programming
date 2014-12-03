@@ -44,15 +44,17 @@ void craft_ip(void* ip_pktbuf, uint8_t proto, u_short ip_id, struct in_addr src_
 
     /*IPv4 header*/
     ip_pkt->ip_hl = IP4_HDRLEN / sizeof (uint32_t);
-    ip_pkt->ip_v = 4;
+    ip_pkt->ip_v = IPVERSION;
     ip_pkt->ip_tos = 0;
     ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + paylen));
     ip_pkt->ip_id = htons(ip_id);
     ip_pkt->ip_off = IP_DF;
-    ip_pkt->ip_ttl = 255;
-    ip_pkt->ip_p = proto; /* fixme: args!!!! */
-    memcpy(&(ip_pkt->ip_dst.s_addr), &dst_ip, sizeof(in_addr_t));
-    memcpy(&(ip_pkt->ip_src.s_addr), &src_ip, sizeof(in_addr_t));
+    ip_pkt->ip_ttl = 25;
+    ip_pkt->ip_p = proto;
+    ip_pkt->ip_dst.s_addr = dst_ip.s_addr;
+    ip_pkt->ip_src.s_addr = src_ip.s_addr;
+    /*memcpy(&(ip_pkt->ip_dst.s_addr), &dst_ip.s_addr, sizeof(in_addr_t));
+    memcpy(&(ip_pkt->ip_src.s_addr), &src_ip.s_addr, sizeof(in_addr_t));*/
     ip_pkt->ip_sum = 0;
 }
 
@@ -199,22 +201,20 @@ void print_hwa(unsigned char* mac, char mac_len) {
     }
 }
 
-char *getvmname(struct in_addr *vmaddr) {
+char *getvmname(struct in_addr vmaddr) {
     struct hostent *he;
     char *name;
-    int i = 0;
-    if(vmaddr == NULL) {
-        return NULL;
-    }
-    if(NULL == (he = gethostbyaddr(vmaddr, 4, AF_INET))) {
+    /*int i = 0;*/
+    if(NULL == (he = gethostbyaddr(&vmaddr, 4, AF_INET))) {
         herror("ERROR gethostbyaddr()");
+        _ERROR("Target ip for lookup was: %s\n", inet_ntoa(vmaddr));
         exit(EXIT_FAILURE);
     }
     name = he->h_name;
-    while(name != NULL && name[0] != 'v' && name[1] != 'm') {
+    /*while(name != NULL && name[0] != 'v' && name[1] != 'm') {
         name = he->h_aliases[i];
         i++;
-    }
+    }*/
     return name;
 }
 

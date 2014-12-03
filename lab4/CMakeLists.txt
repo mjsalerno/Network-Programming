@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(lab4)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Werror -Wextra")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Werror -Wextra -DDEBUG")
 
 set(TOUR_SRC_FILES
     tour.c

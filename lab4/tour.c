@@ -8,6 +8,7 @@ int initiate_shutdown();
 int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
 int init_multicast_sock(struct tourhdr *firstmsg);
+void print_tourhdr(struct tourhdr *trhdrp);
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -73,9 +74,9 @@ int main(int argc, char *argv[]) {
         close(rtsock);
         exit(EXIT_FAILURE);
     }
-    pgrecver = socket(AF_INET, SOCK_RAW, IPPROTO_TOUR);
+    pgrecver = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if(pgrecver < 0) {
-        _ERROR("%s: %m\n", "socket(AF_INET, SOCK_RAW, IPPROTO_TOUR)");
+        _ERROR("%s: %m\n", "socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)");
         close(rtsock);
         close(pgsender);
         exit(EXIT_FAILURE);
@@ -148,29 +149,30 @@ cleanup:
 int initial_tour_msg(void *tourhdrbuf, char *vms[], int n) {
     int i;
     struct tourhdr *hdrp;   /* base of tourhdrbuf */
-    struct in_addr *curr_ip; /* points into tourhdrbuf */
+    struct in_addr *curr_ipp; /* points into tourhdrbuf */
     struct in_addr prev_ip, tmp_ip;
     struct hostent *he;
 
     hdrp = (struct tourhdr*) tourhdrbuf;
     inet_pton(AF_INET, TOUR_GRP_IP, &hdrp->g_ip);
-    hdrp->g_port = TOUR_GRP_PORT;
-    hdrp->index = 0;
-    hdrp->num_ips = (uint32_t)n;
+    hdrp->g_ip.s_addr = hdrp->g_ip.s_addr;
+    hdrp->g_port = htons(TOUR_GRP_PORT);
+    hdrp->index = htons(0);
+    hdrp->num_ips = htonl((uint32_t)n);
 
     /* get the address of the first ip to store into tourhdrbuf*/
-    curr_ip = TOUR_CURR(hdrp);
+    curr_ipp = TOUR_CURR(hdrp);
     /* pre-append the list with our own IP */
-    curr_ip->s_addr = htonl(host_ip.s_addr);
-    prev_ip = *curr_ip;
-    curr_ip++;
+    curr_ipp->s_addr = host_ip.s_addr;
+    prev_ip = *curr_ipp;
+    curr_ipp++;
 
-    for(i = 0; i < n; i++, curr_ip++) {
+    for(i = 0; i < n; i++, curr_ipp++) {
         /* check it's a "vmXX", then call gethostbyname() */
-        if(vms[i][0] != 'v' || vms[i][1] != 'm') {
+        /*if(vms[i][0] != 'v' || vms[i][1] != 'm') {
             errno = EINVAL;
             return -1;
-        }
+        }*/
         he = gethostbyname(vms[i]);
         if(he == NULL) {
             herror("ERROR: gethostbyname()");
@@ -182,15 +184,15 @@ int initial_tour_msg(void *tourhdrbuf, char *vms[], int n) {
         _DEBUG("Tour Stop #%2d: %s at %s\n", i, vms[i], inet_ntoa(tmp_ip));
 
         /* Store the address into the tourhdr we're building up. */
-        curr_ip->s_addr = htonl(tmp_ip.s_addr);
-        if(prev_ip.s_addr == curr_ip->s_addr) {
+        curr_ipp->s_addr = tmp_ip.s_addr;
+        if(prev_ip.s_addr == curr_ipp->s_addr) {
             _ERROR("Cannot go from %s to %s, they are the same\n", vms[i], vms[i]);
             errno = EINVAL;
             return -1;
         }
-        prev_ip = *curr_ip;
+        prev_ip = *curr_ipp;
     }
-
+    print_tourhdr(hdrp);
     return 0;
 }
 
@@ -219,7 +221,7 @@ int initiate_tour(int argc, char *argv[]) {
         _ERROR("%s: %m\n", "malloc failed!");
         return -1;
     }
-    tourhdrp = ((char*)ip_pktbuf) + IP4_HDRLEN;
+    tourhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
 
     erri = initial_tour_msg(tourhdrp, (argv + 1), (argc - 1));
     if (erri < 0) {
@@ -261,17 +263,20 @@ ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
     struct tourhdr *tourhdrp;
 
     memset(&nextaddr, 0, sizeof(nextaddr));
-    _DEBUG("%s\n", "Sending a tour msg.");
     /* point to the tourhdr inside the ip_pktbuf */
-    tourhdrp = (struct tourhdr*)(IP4_HDRLEN + ((char*)ip_pktbuf));
+    tourhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
 
     /* grab the next destination IP, and increment the index */
     nextaddr.sin_addr.s_addr = TOUR_NEXT(tourhdrp)->s_addr;
-    tourhdrp->index++;
+    tourhdrp->index = htons( (uint16_t)1 + ntohs(tourhdrp->index) );
 
-    craft_ip(ip_pktbuf, IPPROTO_TOUR, TOUR_IP_ID,host_ip, nextaddr.sin_addr, (ip_pktlen - IP4_HDRLEN));
+    _DEBUG("Sending a tour msg to: %s of length %ld\n", getvmname(nextaddr.sin_addr), (u_long)ip_pktlen);
+    print_tourhdr(tourhdrp);
+
+    craft_ip(ip_pktbuf, IPPROTO_TOUR, TOUR_IP_ID, host_ip, nextaddr.sin_addr, (ip_pktlen - IP4_HDRLEN));
 
     nextaddr.sin_family = AF_INET;
+    nextaddr.sin_port = 0;
     n = sendto(rtsock, ip_pktbuf, ip_pktlen, 0, (struct sockaddr*)&nextaddr, sizeof(nextaddr));
     return n;
 }
@@ -355,7 +360,7 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen, int isvalid) {
 
         FD_SET(rtsock, &rset);
         FD_SET(mcaster, &rset);
-        _DEBUG("%s\n", "Waiting to recv the a tour msg...");
+        _DEBUG("%s\n", "Waiting to recv tour or multicast msgs...");
         erri = select(maxfpd1, &rset, NULL, NULL, NULL);
         _DEBUG("select() returned: %d, fd of rtsock is: %d\n", erri, rtsock);
         if(erri < 0) {
@@ -441,8 +446,9 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
 
     /* let the kernel pick the interface index */
     /* todo: if needed setsockopt(IP_MULTICAST_IF, eth0) */
+    memset(&greq, 0, sizeof(greq));
     greq.gr_interface = 0;
-    memcpy(&greq.gr_group, &mcast_addr, sizeof(struct sockaddr_in));
+    memcpy(&greq.gr_group, &mcast_addr, sizeof(mcast_addr));
     _DEBUG("%s\n", "Joining the mcast group...");
     erri = setsockopt(mcaster, IPPROTO_IP, MCAST_JOIN_GROUP, &greq, sizeof(greq));
     if(erri < 0) {
@@ -469,9 +475,9 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
         _DEBUG("%s\n", "msg too small. Ignoring....");
         return -1;
     }
-    if(ip_pktp->ip_id != TOUR_IP_ID) {
+    if(ntohs(ip_pktp->ip_id) != TOUR_IP_ID) {
         _DEBUG("msg ip ID: %hhu, TOUR_IP_ID: %hhu. Don't match, ignoring....",
-                ip_pktp->ip_id, TOUR_IP_ID);
+                ntohs(ip_pktp->ip_id), TOUR_IP_ID);
         return -1;
     }
     /* point past the ip header to the tour message */
@@ -481,12 +487,12 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
         _DEBUG("%s\n", "Prev ip in msg != src ip of msg. Ignoring....");
         return -1;
     }
-    if(TOUR_CURR(trhdrp)->s_addr != htonl(host_ip.s_addr)) {
+    if(TOUR_CURR(trhdrp)->s_addr != host_ip.s_addr) {
         _DEBUG("%s\n", "Curr ip in msg != host ip. Ignoring....");
         return -1;
     }
     tm = time(NULL);
-    printf("%.24s received source routing packet from %s.\n", ctime(&tm), getvmname(&prev_ip));
+    printf("%.24s received source routing packet from %s.\n", ctime(&tm), getvmname(prev_ip));
 
     return 0;
 }
@@ -497,4 +503,23 @@ int validate_mcast() {
 
 int validate_icmp() {
     return 0;
+}
+
+void print_tourhdr(struct tourhdr *trhdrp) {
+#ifdef DEBUG
+    struct in_addr *ipp = TOUR_FIRST(trhdrp);
+
+    printf("=========== Tour Hdr ============\n");
+    printf(" Mcast IP     : %16s\n", inet_ntoa(trhdrp->g_ip));
+    printf(" Mcast port   : %16hu\n", ntohs(trhdrp->g_port));
+    printf(" Index(hop)   : %16hu\n", ntohs(trhdrp->index));
+    printf(" Num IPs(hops): %16hu\n", ntohl(trhdrp->num_ips));
+    for(; ipp < (TOUR_FIRST(trhdrp) + 1 + ntohl(trhdrp->num_ips)); ipp++) {
+        printf(" Host         : %16s", getvmname(*ipp));
+        printf("%s", (ipp == TOUR_CURR(trhdrp)) ? " <--\n" : "\n");
+    }
+    printf("=================================\n");
+#else
+    trhdrp++; /* for -Wall -Wextra -Werror */
+#endif
 }

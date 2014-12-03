@@ -53,8 +53,7 @@ ssize_t write_n(int fd, void *buf, size_t n);
 void print_hwa(unsigned char* mac, char mac_len);
 
 /* Convert an IP to host name */
-char *getvmname(struct in_addr *vmaddr);
-
-        int gethostname_ip(char *host_name, struct in_addr *host_ip);
+char *getvmname(struct in_addr vmaddr);
+int gethostname_ip(char *host_name, struct in_addr *host_ip);
 
 #endif /*COMMON_H*/
