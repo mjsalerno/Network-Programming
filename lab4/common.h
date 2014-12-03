@@ -41,6 +41,7 @@
 
 void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], int ifindex);
 void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, size_t paylen);
+unsigned char* extract_target_addy(struct arphdr* arp);
 void craft_icmp(void* icmp_buf, void* data, size_t data_len);
 size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int ar_pro, unsigned short int ar_hrd, unsigned char ar_sha[ETH_ALEN], unsigned char ar_sip[4], unsigned char ar_tha[ETH_ALEN], unsigned char ar_tip[4]);
 uint16_t csum(void* data, size_t len);

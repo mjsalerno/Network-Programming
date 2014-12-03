@@ -31,6 +31,12 @@ void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_ma
     memcpy(et->h_dest, dst_mac, ETH_ALEN);
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
+    printf("dst mac: ");
+    print_hwa(et->h_dest, ETH_ALEN);
+    printf("\nsrc mac: ");
+    print_hwa(et->h_source, ETH_ALEN);
+    printf("\n");
+
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
 }
 
@@ -90,7 +96,7 @@ size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short i
     unsigned char __ar_sip[4];		 Sender IP address.
     unsigned char __ar_tha[ETH_ALEN];	 Target hardware address.
     unsigned char __ar_tip[4];		 Target IP address.*/
-    ptr = (char*)arp+1;
+    ptr = (char*)(arp+1);
     memcpy(ptr, ar_sha, arp->ar_hln);
     ptr += arp->ar_hln;
     memcpy(ptr, ar_sip, add_len);
@@ -105,6 +111,25 @@ size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short i
 
     return (size_t)((long)ptr - (long)arp);
 
+}
+
+unsigned char* extract_target_addy(struct arphdr* arp) {
+
+    unsigned char* ptr = (unsigned char*)arp+1;
+    size_t add_len = 0;
+
+    if(arp->ar_pro == ETHERTYPE_IP && arp->ar_op == ARPOP_REQUEST) {
+        add_len = sizeof(uint32_t);
+        ptr += arp->ar_hln;
+        ptr += add_len;
+        ptr += add_len;
+    } else {
+        _ERROR("only know ar_pro %d, not: %d\n", ETHERTYPE_IP, arp->ar_pro);
+        _ERROR("can't get target ip if not a request, want: %d, got: %d\n", ARPOP_REQUEST, arp->ar_op);
+        exit(EXIT_FAILURE);
+    }
+
+    return ptr;
 }
 
 void craft_icmp(void* icmp_buf, void* data, size_t data_len) {
