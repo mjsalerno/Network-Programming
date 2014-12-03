@@ -39,3 +39,19 @@ struct arp_cache* has_arp(struct arp_cache* arp_head, in_addr_t ip) {
     for(; ptr != NULL && ( ptr->ip == ip); ptr = ptr->next);
     return ptr;
 }
+
+struct hwa_ip* is_my_ip(struct hwa_ip* head, struct sockaddr_in* ip ) {
+    struct hwa_ip* ptr = head;
+
+    _DEBUG("looking for: %s\n", inet_ntoa(ip->sin_addr));
+
+    for(; ptr != NULL; ptr = ptr->next) {
+        if(head->ip_addr->sin_addr.s_addr == ip->sin_addr.s_addr) {
+            return ptr;
+        } else {
+            _DEBUG("not a match: %s\n", inet_ntoa(head->ip_addr->sin_addr));
+        }
+    }
+
+    return ptr;
+}
