@@ -55,6 +55,52 @@ void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, siz
     ip_pkt->ip_sum = 0;
 }
 
+/**
+* makes an arp packet, you need to malloc it and make sure there is enough room
+* for the ip addresses and stuff
+*/
+void craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int ar_pro, unsigned short int ar_hrd, unsigned char ar_sha[ETH_ALEN], unsigned char ar_sip[4], unsigned char ar_tha[ETH_ALEN], unsigned char ar_tip[4]) {
+    char* ptr;
+    size_t add_len = 0;
+
+    /*unsigned short int ar_hrd;	Format of hardware address.
+    unsigned short int ar_pro;		 Format of protocol address.
+    unsigned short int ar_op;		 ARP opcode (command).  */
+
+    arp->ar_pln = sizeof(uint32_t);
+    arp->ar_hrd = ar_hrd; /*ARPHRD_ETHER*/
+    arp->ar_pro = ar_pro; /*ETHERTYPE_IP*/
+    arp->ar_op = ar_op;
+
+    if(ar_hrd == ARPHRD_ETHER) {
+        arp->ar_hln = ETH_ALEN;
+    } else {
+        _ERROR("Do not know ar_hrd: %d\n", ar_hrd);
+        exit(EXIT_FAILURE);
+    }
+
+    if(ar_pro == ETHERTYPE_IP) {
+        add_len = sizeof(uint32_t);
+    } else {
+        _ERROR("Do not know ar_pro: %d\n", ar_pro);
+        exit(EXIT_FAILURE);
+    }
+
+    /*unsigned char __ar_sha[ETH_ALEN];	 Sender hardware address.
+    unsigned char __ar_sip[4];		 Sender IP address.
+    unsigned char __ar_tha[ETH_ALEN];	 Target hardware address.
+    unsigned char __ar_tip[4];		 Target IP address.*/
+    ptr = (char*)arp+1;
+    memcpy(ptr, ar_sha, arp->ar_hln);
+    ptr += arp->ar_hln;
+    memcpy(ptr, ar_sip, add_len);
+    ptr += add_len;
+    memcpy(ptr, ar_tha, arp->ar_hln);
+    ptr += add_len;
+    memcpy(ptr, ar_tip, add_len);
+
+}
+
 void craft_icmp(void* icmp_buf, void* data, size_t data_len) {
 
     struct icmp* icmp_pkt = icmp_buf;
