@@ -1,5 +1,4 @@
 #include "ping.h"
-#include "tour.h"
 
 /**
 * The argument sock is a int* to a socket.
