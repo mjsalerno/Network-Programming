@@ -151,7 +151,7 @@ int initial_tour_msg(void *tourhdrbuf, char *vms[], int n) {
         }
         /* take out the first addr from the h_addr_list */
         tmp_ip = **((struct in_addr **) (he->h_addr_list));
-        _DEBUG("Tour Stop #%2d: %s at %s\n", i, vms[i], inet_ntoa(*curr_ip));
+        _DEBUG("Tour Stop #%2d: %s at %s\n", i, vms[i], inet_ntoa(tmp_ip));
 
         /* Store the address into the tourhdr we're building up. */
         curr_ip->s_addr = htonl(tmp_ip.s_addr);
@@ -205,7 +205,7 @@ int initiate_tour(int argc, char *argv[]) {
 
     errs = send_tourmsg(ip_pktbuf, ip_pktlen);
     if(errs < 0) {
-        _ERROR("%s: %m\n", "send()");
+        _ERROR("%s: %m\n", "send_tourmsg()");
         goto cleanup;
     }
 
@@ -229,20 +229,22 @@ cleanup:
 */
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
     ssize_t n;
-    struct in_addr *next_ip;
+    struct sockaddr_in nextaddr;
     struct tourhdr *tourhdrp;
 
+    memset(&nextaddr, 0, sizeof(nextaddr));
     _DEBUG("%s\n", "Sending a tour msg.");
     /* point to the tourhdr inside the ip_pktbuf */
     tourhdrp = (struct tourhdr*)(IP4_HDRLEN + ((char*)ip_pktbuf));
 
     /* grab the next destination IP, and increment the index */
-    next_ip = TOUR_NEXT(tourhdrp);
+    nextaddr.sin_addr.s_addr = TOUR_NEXT(tourhdrp)->s_addr;
     tourhdrp->index++;
 
-    craft_ip(ip_pktbuf, host_ip, *next_ip, (ip_pktlen - IP4_HDRLEN));
+    craft_ip(ip_pktbuf, host_ip, nextaddr.sin_addr, (ip_pktlen - IP4_HDRLEN));
 
-    n = send(rtsock, ip_pktbuf, ip_pktlen, 0);
+    nextaddr.sin_family = AF_INET;
+    n = sendto(rtsock, ip_pktbuf, ip_pktlen, 0, (struct sockaddr*)&nextaddr, sizeof(nextaddr));
     return n;
 }
 
@@ -335,7 +337,7 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen, int isvalid) {
             return -1;
         }
         if(FD_ISSET(rtsock, &rset)) {
-            _DEBUG("%s\n", "Recv'ing on rtsock the first tour msg...");
+            _DEBUG("%s\n", "Recv'ing on rtsock...");
             errs = recvfrom(rtsock, ip_pktbuf, ip_pktlen, 0, (struct sockaddr*)&srcaddr, &slen);
             if(errs < 0) {
                 _ERROR("%s: %m\n", "recvfrom()");
@@ -344,17 +346,15 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen, int isvalid) {
             if((validate_ip_tour(ip_pktbuf, (size_t)errs, &srcaddr)) < 0) {
                 continue; /* ignore invalid packets */
             }
-            trhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
-            erri = init_multicast_sock(trhdrp);
-            if(erri < 0) {
-                return -1;
-            }
             errs = send_tourmsg(ip_pktbuf, (size_t)errs);
             if(errs < 0) {
                 _ERROR("%s: %m\n", "send_tourmsg()");
                 return -1;
             }
             return 0;
+        }
+        if(FD_ISSET(mcaster, &rset)) {
+            _DEBUG("%s\n", "Recv'ing on multicast socket...");
         }
         return -1; /* should never be reached */
     }
