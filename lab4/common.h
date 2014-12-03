@@ -37,14 +37,6 @@
 # define MAX(x,y) ((x)>(y)?(x):(y))
 #endif
 
-struct hwaddr {
-    int             sll_ifindex;	 /* Interface number */
-    unsigned short  sll_hatype;	     /* Hardware type */
-    unsigned char   sll_halen;		 /* Length of address */
-    unsigned char   sll_addr[8];	 /* Physical layer address */
-};
-
-
 void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], int ifindex);
 void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, size_t paylen);
 void craft_icmp(void* icmp_buf, void* data, size_t data_len);

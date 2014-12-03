@@ -2,6 +2,7 @@
 #define ARP_H
 
 #include "common.h"
+#include "api.h"
 #include "get_hw_addrs.h"
 
 struct arp_cache {

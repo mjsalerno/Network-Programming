@@ -38,10 +38,10 @@ check: cov
 test: test.o common.o
 	$(CC) $(FLAGS) $< common.o -o $@ 
 
-ARP: ARP.o common.o get_hw_addrs.o ARP_util.o
+ARP: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
 	$(CC) $(FLAGS) $^ -o $@
 
-tour: tour.o common.o
+tour: tour.o common.o api.o
 	$(CC) $(FLAGS) $< common.o -o $@
 
 clean:
