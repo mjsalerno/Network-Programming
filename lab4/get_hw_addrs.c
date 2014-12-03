@@ -186,6 +186,7 @@ void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sock
 	}
 
 	curr->if_index = index;
+	curr->next = NULL;
 	memcpy(curr->if_haddr, if_haddr, 6);
 	memcpy(curr->ip_addr, ip_addr, sizeof(struct sockaddr_in));
 
@@ -225,3 +226,4 @@ void print_hwa_ip(struct hwa_ip* node) {
 	print_hwa((unsigned char*)node->if_haddr, 6);
 	printf("\n");
 }
+

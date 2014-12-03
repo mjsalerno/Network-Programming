@@ -14,10 +14,13 @@ int main() {
     struct in_addr tmp_ip;
     int erri;
     ssize_t errs;
+    size_t arp_size;
 
     fd_set fdset;
 
     char buf[BUFSIZE];
+    char arp_buf[BUFSIZE];
+    unsigned char bcast_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
     hw_list = get_hw_addrs();
     keep_eth0(&hw_list, &mip_head);
@@ -98,6 +101,8 @@ int main() {
             }
             _DEBUG("%s\n", "Got something on the raw socket");
 
+
+
         }
 
         if(FD_ISSET(unixsock, &fdset)) {
@@ -121,9 +126,34 @@ int main() {
             tmp_arp = has_arp(arp_lst, (in_addr_t)*buf);
 
             if(tmp_arp != NULL) {
-                _DEBUG("%s\n", "found a matching ip, need to ask");
+                _DEBUG("%s\n", "found a matching ip");
             } else {
                 _DEBUG("%s\n", "did not find a matching ip, need to ask");
+                memset(buf, 0, sizeof(buf));
+                memset(arp_buf, 0, sizeof(arp_buf));
+                arp_size = craft_arp((struct arphdr*)arp_buf, ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr->sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
+                craft_eth(buf, &raw_addr, mip_head->if_haddr, bcast_mac, mip_head->if_index);
+                memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
+
+                printf("Sending on mac: ");
+                print_hwa(raw_addr.sll_addr, 6);
+                printf("\n");
+                printf("Sending on index: %d\n\n", raw_addr.sll_ifindex);
+
+                printf("eth to mac: ");
+                print_hwa(((struct ethhdr*)buf)->h_dest, 6);
+                printf("\n");
+                printf("eth from mac: ");
+                print_hwa(((struct ethhdr*)buf)->h_source, 6);
+                printf("\n");
+
+                raw_len = sizeof(raw_addr);
+                errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size, 0, (struct sockaddr const *)&raw_addr, raw_len);
+                if(errs < 0) {
+                    perror("sendto(arpr)");
+                    exit(EXIT_FAILURE);
+                }
+
             }
 
         }

@@ -18,7 +18,8 @@
 /* IFHWADDRLEN in <net/if.h> */
 
 #define	IP_ALIAS  	 1	        /* hwa_addr is an alias */
-#define IFACE_TO_KEEP "wlp1s0"
+//#define IFACE_TO_KEEP "wlp1s0"
+#define IFACE_TO_KEEP "eth0"
 
 struct hwa_info {
   char    if_name[IFNAMSIZ];	/* interface name, null terminated */
@@ -30,7 +31,7 @@ struct hwa_info {
 };
 
 struct hwa_ip {
-  char    if_haddr[IFHWADDRLEN];/* hardware address */
+  unsigned char    if_haddr[IFHWADDRLEN];/* hardware address */
   struct  sockaddr_in  *ip_addr;	/* IP address */
   int if_index;
   struct hwa_ip * next;
