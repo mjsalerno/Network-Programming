@@ -1,10 +1,17 @@
 #ifndef TOUR_H
 #define TOUR_H
 
+#include <pthread.h>
+
 #include "common.h"
 #include "debug.h"
 
+
 #define IPPROTO_TOUR 176
+#define TOURHDR_MIN (sizeof(struct tourhdr) + 4)
+
+/* Extract the tourhdr pointer from an ip header pointer */
+#define EXTRACT_TOURHDRP(ip_pktp) ((struct tourhdr*)(IP4_HDRLEN + ((char*)(ip_pktp))))
 
 /* The tour has ended. */
 #define TOUR_IS_OVER(hdr) ((hdr)->index >= (hdr)->num_ips)
@@ -26,8 +33,8 @@ struct tourhdr {
     /* struct in_addr a_num_ips */
 };
 
-int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr);
-
-
+int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
+int validate_mcast();
+int validate_icmp();
 
 #endif

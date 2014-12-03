@@ -1,8 +1,8 @@
-README for Assignment 4
-===========================================
-|  Scott Harvey     cse533-11  108272691  |
-|  Michael Salerno  cse533-8   108512298  |
-===========================================
+||||      README for Assignment 4        ||||
+=============================================
+ || Scott Harvey     cse533-11  108272691 ||
+ || Michael Salerno  cse533-8   108512298 ||
+=============================================
 
 BUILDING IT!     makefile
 =========================
@@ -75,5 +75,5 @@ The macros in tour.h : TOUR_PREV, TOUR_CURR, and TOUR_NEXT return a pointer
 ==========================================
 ======= API (the areq function) ==========
 ==========================================
-Defined in tour.c
+Defined in api.c and api.h
 Nothing fancy about it, follows the write up to the letter.
