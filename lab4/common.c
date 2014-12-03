@@ -59,7 +59,7 @@ void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, siz
 * makes an arp packet, you need to malloc it and make sure there is enough room
 * for the ip addresses and stuff
 */
-void craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int ar_pro, unsigned short int ar_hrd, unsigned char ar_sha[ETH_ALEN], unsigned char ar_sip[4], unsigned char ar_tha[ETH_ALEN], unsigned char ar_tip[4]) {
+size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int ar_pro, unsigned short int ar_hrd, unsigned char ar_sha[ETH_ALEN], unsigned char ar_sip[4], unsigned char ar_tha[ETH_ALEN], unsigned char ar_tip[4]) {
     char* ptr;
     size_t add_len = 0;
 
@@ -95,9 +95,15 @@ void craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int
     ptr += arp->ar_hln;
     memcpy(ptr, ar_sip, add_len);
     ptr += add_len;
-    memcpy(ptr, ar_tha, arp->ar_hln);
+    if(ar_op != ARPOP_REQUEST)
+        memcpy(ptr, ar_tha, arp->ar_hln);
     ptr += add_len;
     memcpy(ptr, ar_tip, add_len);
+    ptr += add_len;
+
+    _DEBUG("crafted an arp pkt of size: %d\n", (int)((long)ptr - (long)arp));
+
+    return (size_t)((long)ptr - (long)arp);
 
 }
 
