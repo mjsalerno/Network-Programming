@@ -18,8 +18,11 @@
 /* IFHWADDRLEN in <net/if.h> */
 
 #define	IP_ALIAS  	 1	        /* hwa_addr is an alias */
+
+#ifndef IFACE_TO_KEEP
 //#define IFACE_TO_KEEP "wlp1s0"
 #define IFACE_TO_KEEP "eth0"
+#endif /*IFACE_TO_KEEP*/
 
 struct hwa_info {
   char    if_name[IFNAMSIZ];	/* interface name, null terminated */
