@@ -18,7 +18,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     struct timeval tm;
 
     if(sockaddrlen != sizeof(struct sockaddr_in)) { /* we only support AF_INET */
-        _ERROR("Only AF_INET(%d) addresses are supported, not: %d\n", AF_INET, IPaddr->sa_family);
+        _ERROR("Only AF_INET (%d) addresses are supported, not: %d\n", AF_INET, IPaddr->sa_family);
         return -1;
     }
     printf("areq for IP: %s\n", inet_ntoa(((struct sockaddr_in*)IPaddr)->sin_addr));

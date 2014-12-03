@@ -16,11 +16,12 @@
 /* The tour has ended. */
 #define TOUR_IS_OVER(hdr) ((hdr)->index >= (hdr)->num_ips)
 
-/* These return a pointer to a stuct in_addr: */
+/* These return a pointer to a struct in_addr, hdr is in NETWORK ORDER */
 /* CURR should always be your IP */
-#define TOUR_PREV(hdr) (((struct in_addr*)(hdr)) + (hdr)->index + 3 - 1)
-#define TOUR_CURR(hdr) (((struct in_addr*)(hdr)) + (hdr)->index + 3)
-#define TOUR_NEXT(hdr) (((struct in_addr*)(hdr)) + (hdr)->index + 3 + 1)
+#define TOUR_FIRST(hdr) (((struct in_addr*)(hdr)) + 3)
+#define TOUR_PREV(hdr) (((struct in_addr*)(hdr)) + ntohs((hdr)->index) + 3 - 1)
+#define TOUR_CURR(hdr) (((struct in_addr*)(hdr)) + ntohs((hdr)->index) + 3)
+#define TOUR_NEXT(hdr) (((struct in_addr*)(hdr)) + ntohs((hdr)->index) + 3 + 1)
 
 struct tourhdr {
     struct in_addr g_ip;
