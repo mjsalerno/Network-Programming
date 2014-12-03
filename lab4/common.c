@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <net/if.h>
 #include "common.h"
+#include "tour.h"
 
 void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], int ifindex) {
     struct ethhdr* et = eth_buf;
@@ -34,7 +35,7 @@ void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_ma
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
 }
 
-void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, size_t paylen) {
+void craft_ip(void* ip_pktbuf, uint8_t proto, u_short ip_id, struct in_addr src_ip, struct in_addr dst_ip, size_t paylen) {
     struct ip* ip_pkt = ip_pktbuf;
     if(ip_pktbuf == NULL) {
         _ERROR("%s\n", "ip_pktbuf is NULL!");
@@ -46,10 +47,10 @@ void craft_ip(void* ip_pktbuf, struct in_addr src_ip, struct in_addr dst_ip, siz
     ip_pkt->ip_v = 4;
     ip_pkt->ip_tos = 0;
     ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + paylen));
-    ip_pkt->ip_id = htons(TOUR_IP_ID);
+    ip_pkt->ip_id = htons(ip_id);
     ip_pkt->ip_off = IP_DF;
     ip_pkt->ip_ttl = 255;
-    ip_pkt->ip_p = IPPROTO_ICMP;
+    ip_pkt->ip_p = proto; /* fixme: args!!!! */
     memcpy(&(ip_pkt->ip_dst.s_addr), &dst_ip, sizeof(in_addr_t));
     memcpy(&(ip_pkt->ip_src.s_addr), &src_ip, sizeof(in_addr_t));
     ip_pkt->ip_sum = 0;
@@ -198,20 +199,14 @@ void print_hwa(unsigned char* mac, char mac_len) {
     }
 }
 
-char *getvmname(char ip[INET_ADDRSTRLEN]) {
-    struct in_addr vmaddr = {0};
+char *getvmname(struct in_addr *vmaddr) {
     struct hostent *he;
     char *name;
     int i = 0;
-    if(ip[0] == '\0') {
+    if(vmaddr == NULL) {
         return NULL;
     }
-    if(0 == inet_aton(ip, &vmaddr)) {
-        _ERROR("inet_aton(): bad ip %s\n", ip);
-        exit(EXIT_FAILURE);
-    }
-
-    if(NULL == (he = gethostbyaddr(&vmaddr, 4, AF_INET))) {
+    if(NULL == (he = gethostbyaddr(vmaddr, 4, AF_INET))) {
         herror("ERROR gethostbyaddr()");
         exit(EXIT_FAILURE);
     }
@@ -220,7 +215,6 @@ char *getvmname(char ip[INET_ADDRSTRLEN]) {
         name = he->h_aliases[i];
         i++;
     }
-
     return name;
 }
 

@@ -21,6 +21,21 @@ static struct sockaddr_in mcast_addr;
 static char host_name[128];
 static struct in_addr host_ip;
 
+void handle_sigint(int sign) {
+    /**
+    * From signal(7):
+    * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
+    * to guarantee that the following functions can be safely called inside a signal handler:
+    * ... _Exit() ... close() ... unlink() ...
+    */
+    sign++; /* for -Wall -Wextra -Werror */
+    close(rtsock);
+    close(pgsender);
+    close(pgrecver);
+    close(mcaster);
+    _Exit(EXIT_FAILURE);
+}
+
 /**
 * Sets up the sockets then calls initiate_tour() and handle_first_msg()
 */
@@ -29,6 +44,7 @@ int main(int argc, char *argv[]) {
     int erri;
     int send_initial_msg = 0;
     char ipbuf[IP_MAXPACKET]; /* fixme: too big or just right? */
+    struct sigaction sigact;
 
     if(argc > 1) {
         /* invoked with args so we should send the first msg. */
@@ -74,6 +90,16 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    /* set up the signal handler for SIGINT ^C */
+    sigact.sa_handler = &handle_sigint;
+    sigemptyset(&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    erri = sigaction(SIGINT, &sigact, NULL);
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "sigaction(SIGINT)");
+        exit(EXIT_FAILURE);
+    }
+
     if(send_initial_msg) {
         erri = initiate_tour(argc, argv);
         if (erri < 0) {
@@ -99,6 +125,7 @@ int main(int argc, char *argv[]) {
     close(rtsock);
     close(pgsender);
     close(pgrecver);
+    close(mcaster);
     exit(EXIT_SUCCESS);
 
 cleanup:
@@ -106,6 +133,7 @@ cleanup:
     close(rtsock);
     close(pgsender);
     close(pgrecver);
+    close(mcaster);
     exit(EXIT_FAILURE);
 }
 
@@ -241,7 +269,7 @@ ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
     nextaddr.sin_addr.s_addr = TOUR_NEXT(tourhdrp)->s_addr;
     tourhdrp->index++;
 
-    craft_ip(ip_pktbuf, host_ip, nextaddr.sin_addr, (ip_pktlen - IP4_HDRLEN));
+    craft_ip(ip_pktbuf, IPPROTO_TOUR, TOUR_IP_ID,host_ip, nextaddr.sin_addr, (ip_pktlen - IP4_HDRLEN));
 
     nextaddr.sin_family = AF_INET;
     n = sendto(rtsock, ip_pktbuf, ip_pktlen, 0, (struct sockaddr*)&nextaddr, sizeof(nextaddr));
@@ -435,6 +463,8 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
 /* Returns -1 if invalid or 0 if valid. */
 int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) {
     struct tourhdr *trhdrp;
+    struct in_addr prev_ip;
+    time_t tm;
     if(n < TOURHDR_MIN) {
         _DEBUG("%s\n", "msg too small. Ignoring....");
         return -1;
@@ -446,7 +476,8 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
     }
     /* point past the ip header to the tour message */
     trhdrp = EXTRACT_TOURHDRP(ip_pktp);
-    if(TOUR_PREV(trhdrp)->s_addr != srcaddr->sin_addr.s_addr) {
+    prev_ip = *(TOUR_PREV(trhdrp));
+    if(prev_ip.s_addr != srcaddr->sin_addr.s_addr) {
         _DEBUG("%s\n", "Prev ip in msg != src ip of msg. Ignoring....");
         return -1;
     }
@@ -454,6 +485,9 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
         _DEBUG("%s\n", "Curr ip in msg != host ip. Ignoring....");
         return -1;
     }
+    tm = time(NULL);
+    printf("%.24s received source routing packet from %s.\n", ctime(&tm), getvmname(&prev_ip));
+
     return 0;
 }
 

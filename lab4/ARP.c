@@ -1,5 +1,17 @@
 #include "ARP.h"
 
+void handle_sigint(int sign) {
+    /**
+    * From signal(7):
+    * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
+    * to guarantee that the following functions can be safely called inside a signal handler:
+    * ... _Exit() ... unlink() ...
+    */
+    sign++; /* for -Wall -Wextra -Werror */
+    unlink(ARP_PATH);
+    _Exit(EXIT_FAILURE);
+}
+
 int main() {
     struct hwa_info* hw_list = NULL;
     struct hwa_ip * mip_head = NULL;
@@ -17,6 +29,8 @@ int main() {
     size_t arp_size;
 
     fd_set fdset;
+
+    struct sigaction sigact;
 
     char buf[BUFSIZE];
     char arp_buf[BUFSIZE];
@@ -69,6 +83,16 @@ int main() {
     if(erri != 0) {
         perror("arp.bind(unix)");
         close(unixsock);
+        exit(EXIT_FAILURE);
+    }
+
+    /* set up the signal handler for SIGINT ^C */
+    sigact.sa_handler = &handle_sigint;
+    sigemptyset(&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    erri = sigaction(SIGINT, &sigact, NULL);
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "sigaction(SIGINT)");
         exit(EXIT_FAILURE);
     }
 
