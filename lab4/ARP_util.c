@@ -11,18 +11,25 @@ void add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigne
 
     for(; ptr != NULL; prev = ptr, ptr = ptr->next);
 
-    prev->next = malloc(sizeof(struct arp_cache));
-    ptr = prev->next;
+    if(prev == NULL) {
+        ptr = malloc(sizeof(struct arp_cache));
+        *arp_head = ptr;
+    } else {
+        prev->next = malloc(sizeof(struct arp_cache));
+        ptr = prev->next;
+    }
     if(ptr == NULL) {
         _ERROR("%s\n", "malloc failed: add_arp");
         exit(EXIT_FAILURE);
     }
 
+    memset(ptr, 0, sizeof(struct arp_cache));
+
     ptr->next = NULL;
-    memcpy(ptr->hw->sll_addr, sll_addr, 8);
-    memcpy(&ptr->hw->sll_halen, &sll_halen, 1);
-    ptr->hw->sll_hatype = sll_hatype;
-    ptr->hw->sll_ifindex = sll_ifindex;
+    memcpy(ptr->hw.sll_addr, sll_addr, 8);
+    memcpy(&ptr->hw.sll_halen, &sll_halen, 1);
+    ptr->hw.sll_hatype = sll_hatype;
+    ptr->hw.sll_ifindex = sll_ifindex;
     memcpy(&ptr->ip, &ip, sizeof(in_addr_t));
 
 }
