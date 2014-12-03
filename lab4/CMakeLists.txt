@@ -57,6 +57,7 @@ add_executable(test
     ${TEST_SRC_FILES}
     $<TARGET_OBJECTS:ping_lib>
     $<TARGET_OBJECTS:common_lib>
+    $<TARGET_OBJECTS:arp_util_lib>
     $<TARGET_OBJECTS:api_lib>)
 
 add_executable(ARP
