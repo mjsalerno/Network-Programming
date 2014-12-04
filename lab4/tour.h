@@ -34,8 +34,4 @@ struct tourhdr {
     /* struct in_addr a_num_ips */
 };
 
-int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
-int validate_mcast();
-int validate_icmp();
-
 #endif

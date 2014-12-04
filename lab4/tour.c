@@ -9,6 +9,9 @@ int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
 int init_multicast_sock(struct tourhdr *firstmsg);
 void print_tourhdr(struct tourhdr *trhdrp);
+int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
+int validate_mcast(struct sockaddr_in *srcaddr);
+int validate_icmp();
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -365,6 +368,7 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen/*, int isvalid*/) {
     socklen_t slen;
     struct sockaddr_in srcaddr;
     fd_set rset;
+    char buf[BUFSIZE];
 
     slen = sizeof(srcaddr);
     memset(&srcaddr, 0, slen);
@@ -395,7 +399,11 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen/*, int isvalid*/) {
             /* fixme: start pinging prev ip*/
 
             if(TOUR_IS_OVER(trhdrp)) {
-                initiate_shutdown();
+                erri = initiate_shutdown();
+                if(erri < 0) {
+                    return -1;
+                }
+                break; /* we're done with this socket */
             }
 
             errs = send_tourmsg(ip_pktbuf, (size_t)errs);
@@ -407,7 +415,14 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen/*, int isvalid*/) {
         }
         if(FD_ISSET(mcaster, &rset)) {
             _DEBUG("%s\n", "Recv'ing on multicast socket...");
-
+            errs = recvfrom(mcaster, buf, BUFSIZE, 0, (struct sockaddr*)&srcaddr, &slen);
+            if(errs < 0) {
+                _ERROR("%s: %m\n", "recvfrom()");
+                return -1;
+            }
+            if((validate_mcast(&srcaddr)) < 0) {
+                continue; /* ignore invalid packets */
+            }
             continue;
         }
         return -1; /* should never be reached */
@@ -416,17 +431,39 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen/*, int isvalid*/) {
     return 0;
 }
 
+/**
+* We are the last stop on the route,initiate Tour shutdown.
+* Waits 5 seconds then sends the shutdown multicast.
+* RETURNS: 0 if ok, -1 if failure
+*/
 int initiate_shutdown() {
-    /*struct timeval tm;
+    int erri;
+    struct timeval tm;
+    char *fmt = "<<<<< This is node %s. Tour has ended. Group members please identify yourselves. >>>>>";
+    char msg[BUFSIZE];
     tm.tv_sec = 5;
     tm.tv_usec = 200000;
-    */
-    _NOTE("%s\n", "FIXME: shutdown the tour.");
 
-    /* We are the last stop on the route */
-    /* initiate Tour shutdown by sending on multicast socket */
-    /* fixme: send on mcaster, make function initiate_shutdown()*/
-    /*erri = select();*/
+    _NOTE("%s\n", "Initiating tour shutdown.");
+
+    erri = select(1, NULL, NULL, NULL, &tm); /* just for timeout*/
+    if(erri != 0) {
+        _ERROR("%s: %m\n", "select(for 5.2s timeout)");
+        return -1;
+    }
+    erri = snprintf(msg, BUFSIZE, fmt, host_name);
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "snprintf()");
+        return -1;
+    }
+
+    printf("Node %s. Sending: %s\n", host_name, msg);
+
+    erri = (int)sendto(mcaster, msg, (size_t)erri, 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "sendto(multicast)");
+        return -1;
+    }
     return 0;
 }
 
@@ -520,7 +557,11 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
     return 0;
 }
 
-int validate_mcast() {
+int validate_mcast(struct sockaddr_in *srcaddr) {
+    if(srcaddr->sin_addr.s_addr != mcast_addr.sin_addr.s_addr) {
+        _DEBUG("%s\n", "msg not from the multicast address. Ignoring....");
+        return -1;
+    }
     return 0;
 }
 
