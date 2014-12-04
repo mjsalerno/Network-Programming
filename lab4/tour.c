@@ -1,4 +1,5 @@
 #include "tour.h"
+#include "ping.h"
 
 /* prototypes for private funcs */
 int initiate_tour(int argc, char *argv[]);
@@ -11,6 +12,7 @@ int init_multicast_sock(struct tourhdr *firstmsg);
 void print_tourhdr(struct tourhdr *trhdrp);
 int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
 int validate_mcast(struct sockaddr_in *srcaddr);
+int create_ping_recver(void);
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -24,7 +26,7 @@ static struct sockaddr_in mcast_addr;
 
 static char host_name[128];
 struct in_addr host_ip;
-static struct tidhead tidheap;
+static struct tidhead tidhead;
 
 void handle_sigint(int sign) {
     /**
@@ -50,8 +52,6 @@ int main(int argc, char *argv[]) {
     int send_initial_msg = 0;
     char ipbuf[IP_MAXPACKET]; /* fixme: too big or just right? */
     struct sigaction sigact;
-
-    LIST_INIT(&tidheap); /* init the thread id list */
 
     if(argc > 1) {
         /* invoked with args so we should send the first msg. */
@@ -107,6 +107,13 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    LIST_INIT(&tidhead); /* init the thread id list */
+
+    erri = create_ping_recver();
+    if(erri < 0) {
+        goto cleanup;
+    }
+
     if(send_initial_msg) {
         erri = initiate_tour(argc, argv);
         if (erri < 0) {
@@ -114,7 +121,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    erri = process_tour((struct ip *) ipbuf, sizeof(ipbuf), send_initial_msg);
+    erri = process_tour((struct ip *)ipbuf, sizeof(ipbuf), send_initial_msg);
     if(erri < 0) {
         _ERROR("%s: %m\n", "process_tour()");
         goto cleanup;
@@ -553,4 +560,29 @@ void print_tourhdr(struct tourhdr *trhdrp) {
 #else
     trhdrp++; /* for -Wall -Wextra -Werror */
 #endif
+}
+
+/**
+* Create thread for ping replies and add it to the
+*/
+int create_ping_recver(void) {
+    int erri;
+    struct tident *tidentp;
+
+    tidentp = malloc(sizeof(struct tident));
+    if(tidentp == NULL) {
+        _ERROR("%s: %m\n", "malloc()");
+        return -1;
+    }
+    /* Create the thread dor recving pings replies */
+    erri = pthread_create(&tidentp->tid, NULL, &ping_recver, &pgrecver);
+    if (0 > erri) {
+        errno = erri;
+        _ERROR("%s: %m\n", "pthread_create(ping_recver)");
+        return -1;
+    }
+
+    LIST_INSERT_HEAD(&tidhead, tidentp, entries);
+
+    return 0;
 }
