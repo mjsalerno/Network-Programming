@@ -24,6 +24,8 @@ int main() {
     socklen_t raw_len, unix_len;
     struct arp_cache* tmp_arp;
     struct in_addr tmp_ip;
+    struct hwa_ip* tmp_hwa_ip;
+    struct arphdr* arp_hdr_ptr;
     int erri;
     ssize_t errs;
     size_t arp_size;
@@ -117,7 +119,8 @@ int main() {
             break;
         }
 
-        if(FD_ISSET(rawsock, &fdset)) {
+        if(FD_ISSET(rawsock, &fdset)) {                                                 /* RAW sock */
+            raw_len = sizeof(struct sockaddr_ll);
             errs = recvfrom(rawsock, buf, sizeof(buf), 0, (struct sockaddr *)&raw_addr, &raw_len);
             if(errs < 0) {
                 perror("arp.recvfrom(raw)");
@@ -125,11 +128,18 @@ int main() {
             }
             _DEBUG("%s\n", "Got something on the raw socket");
 
+            arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr));
 
+           tmp_hwa_ip = is_my_ip(mip_head, (struct sockaddr_in*)extract_target_addy(arp_hdr_ptr));
+            if(tmp_hwa_ip != NULL) {
+                _DEBUG("%s\n", "somone is asking for my mac");
+            } else {
+                _DEBUG("%s\n", "not my mac");
+            }
 
         }
 
-        if(FD_ISSET(unixsock, &fdset)) {
+        if(FD_ISSET(unixsock, &fdset)) {                                                 /* UNIX sock */
 
             listening_unix_sock = accept(unixsock, (struct sockaddr*)&unix_addr, &unix_len);
             if(listening_unix_sock < 0) {

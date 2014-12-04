@@ -31,14 +31,14 @@ check: cov
 %: %.o
 	$(CC) $(CFLAGS) $< -o $@
 
-test: test.o common.o
-	$(CC) $(CFLAGS) $< common.o -o $@ 
+test: test.o common.o ARP_util.o
+	$(CC) $(CFLAGS) $< common.o ARP_util.o -o $@ 
 
 ARP: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
 	$(CC) $(CFLAGS) $^ -o $@
 
-tour: tour.o common.o api.o
-	$(CC) $(CFLAGS) $< common.o -o $@
+tour: tour.o common.o api.o ping.o api.o
+	$(CC) $(CFLAGS) $< ping.o api.o common.o -o $@
 
 clean:
 	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage
