@@ -11,11 +11,10 @@ int init_multicast_sock(struct tourhdr *firstmsg);
 void print_tourhdr(struct tourhdr *trhdrp);
 int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
 int validate_mcast(struct sockaddr_in *srcaddr);
-int validate_icmp();
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
-static int pgsender; /* PF_PACKET RAW -- sending ping echo requests */
+static int pgsender; /* PF_PACKET RAW -- sending ping_sender echo requests */
 /* PF_INET RAW HDR_INCLD -- "route traversal" recv/sending tour messages */
 static int rtsock;
 static int mcaster; /* multicast -- recv/sending group messages */
@@ -25,6 +24,7 @@ static struct sockaddr_in mcast_addr;
 
 static char host_name[128];
 static struct in_addr host_ip;
+static struct tidhead tidheap;
 
 void handle_sigint(int sign) {
     /**
@@ -51,6 +51,8 @@ int main(int argc, char *argv[]) {
     char ipbuf[IP_MAXPACKET]; /* fixme: too big or just right? */
     struct sigaction sigact;
 
+    LIST_INIT(&tidheap); /* init the thread id list */
+
     if(argc > 1) {
         /* invoked with args so we should send the first msg. */
         send_initial_msg = 1;
@@ -61,7 +63,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* create the two ping sockets and the tour (rt) socket */
+    /* create the two ping_sender sockets and the tour (rt) socket */
     rtsock = socket(AF_INET, SOCK_RAW, IPPROTO_TOUR);
     if(rtsock < 0) {
         _ERROR("%s: %m\n", "socket(AF_INET, SOCK_RAW, IPPROTO_TOUR)");
@@ -118,7 +120,7 @@ int main(int argc, char *argv[]) {
         goto cleanup;
     }
 
-    printf("Shutting down successfully...");
+    _INFO("%s\n", "Shutting down successfully...");
     close(rtsock);
     close(pgsender);
     close(pgrecver);
@@ -388,7 +390,6 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
         }
         return -1; /* should never be reached */
     }
-
     return 0;
 }
 
@@ -434,8 +435,6 @@ int send_mcast(char *msg, size_t msglen) {
 }
 
 /**
-* Shutdown the tour by sending the multicast message shutdown msg.
-* Call from handle_first_msg(), then return to recv your own message.
 */
 int shutdown_tour(void) {
     return 0;
@@ -536,9 +535,6 @@ int validate_mcast(struct sockaddr_in *srcaddr) {
     return 0;
 }
 
-int validate_icmp() {
-    return 0;
-}
 
 void print_tourhdr(struct tourhdr *trhdrp) {
 #ifdef DEBUG
