@@ -23,7 +23,7 @@ static int mcaster; /* multicast -- recv/sending group messages */
 static struct sockaddr_in mcast_addr;
 
 static char host_name[128];
-static struct in_addr host_ip;
+struct in_addr host_ip;
 static struct tidhead tidheap;
 
 void handle_sigint(int sign) {

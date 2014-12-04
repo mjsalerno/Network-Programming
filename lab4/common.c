@@ -125,20 +125,6 @@ unsigned char* extract_target_addy(struct arphdr* arp) {
     return ptr;
 }
 
-void craft_icmp(void* icmp_buf, void* data, size_t data_len) {
-
-    struct icmp* icmp_pkt = icmp_buf;
-
-    /* ICMP header */
-    icmp_pkt->icmp_type = ICMP_ECHO;
-    icmp_pkt->icmp_code = 0;
-    icmp_pkt->icmp_id = htons(1000);
-    icmp_pkt->icmp_seq = htons(0);
-    icmp_pkt->icmp_cksum = 0;
-    memcpy(icmp_pkt + 1, data, data_len);
-    icmp_pkt->icmp_cksum = csum(icmp_pkt, sizeof(struct icmp) + data_len);
-}
-
 /*calculates the checksum everything*/
 uint16_t csum(void*data, size_t len) {
     uint32_t sum = 0;
