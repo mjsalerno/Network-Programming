@@ -48,7 +48,7 @@ void craft_ip(void* ip_pktbuf, uint8_t proto, u_short ip_id, struct in_addr src_
     ip_pkt->ip_tos = 0;
     ip_pkt->ip_len = htons((uint16_t)(IP4_HDRLEN + paylen));
     ip_pkt->ip_id = htons(ip_id);
-    ip_pkt->ip_off = IP_DF;
+    ip_pkt->ip_off = htons(IP_DF);
     ip_pkt->ip_ttl = 25;
     ip_pkt->ip_p = proto;
     ip_pkt->ip_dst.s_addr = dst_ip.s_addr;

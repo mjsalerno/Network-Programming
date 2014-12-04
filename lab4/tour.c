@@ -16,6 +16,7 @@ static int pgsender; /* PF_PACKET RAW -- sending ping echo requests */
 /* PF_INET RAW HDR_INCLD -- "route traversal" recv/sending tour messages */
 static int rtsock;
 static int mcaster; /* multicast -- recv/sending group messages */
+/* fixme: no INADDR_ANY !!!! , need 2 mcast sockets */
 
 static struct sockaddr_in mcast_addr;
 
@@ -447,7 +448,7 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
     /* let the kernel pick the interface index */
     /* todo: if needed setsockopt(IP_MULTICAST_IF, eth0) */
     memset(&greq, 0, sizeof(greq));
-    greq.gr_interface = 0;
+    greq.gr_interface = 0; /* fixme: not zero */
     memcpy(&greq.gr_group, &mcast_addr, sizeof(mcast_addr));
     _DEBUG("%s\n", "Joining the mcast group...");
     erri = setsockopt(mcaster, IPPROTO_IP, MCAST_JOIN_GROUP, &greq, sizeof(greq));
