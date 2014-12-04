@@ -2,6 +2,7 @@
 #define TOUR_H
 
 #include <pthread.h>
+#include <sys/queue.h>
 
 #include "common.h"
 #include "debug.h"
@@ -32,6 +33,14 @@ struct tourhdr {
     /* struct in_addr a_2 */
     /* ... */
     /* struct in_addr a_num_ips */
+};
+
+/* list of thread ids */
+LIST_HEAD(tidhead, tident);
+
+struct tident {
+    pthread_t tid;
+    LIST_ENTRY(tident) entries;
 };
 
 #endif

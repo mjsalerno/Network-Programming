@@ -5,18 +5,18 @@ CC = gcc
 
 BINS = ARP tour test
 
-CFLAGS = -g -Wall -Wextra -Werror -DDEBUG
-CFLAGS = -g -Wall -Wextra -Werror -DDEBUG
+CFLAGS = -g -pthread -Wall -Wextra -Werror -DDEBUG
+CFLAGS = -g -pthread -Wall -Wextra -Werror -DDEBUG
 
 all: $(BINS)
 
 %: %.c
 
-debug: CFLAGS=-g -Wall -Werror -Wextra -DDEBUG
+debug: CFLAGS=-g -pthread -Wall -Werror -Wextra -DDEBUG
 debug: all
 
 # targets for code coverage using GNU gcovr
-cov: CFLAGS=-g -Wall -Werror -Wextra --coverage -DDEBUG
+cov: CFLAGS=-g -pthread -Wall -Werror -Wextra --coverage -DDEBUG
 cov: all
 
 check: cov

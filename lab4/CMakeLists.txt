@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(lab4)
+find_package(Threads)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Werror -Wextra -DDEBUG")
 
@@ -65,3 +66,6 @@ add_executable(ARP
     $<TARGET_OBJECTS:hwa_lib>
     $<TARGET_OBJECTS:common_lib>
     $<TARGET_OBJECTS:arp_util_lib>)
+
+target_link_libraries(test ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(tour ${CMAKE_THREAD_LIBS_INIT})
