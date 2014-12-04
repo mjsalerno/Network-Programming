@@ -10,7 +10,6 @@
 
 #define EXTRACT_ICMPHDRP(ip_pktp) ((struct icmp*)(IP4_HDRLEN + ((char*)(ip_pktp))))
 
-void *ping(void);
 void *ping_sender(void /* *addr */);
 void *ping_recver(void *pgrecverp);
 int filter_ip_icmp(struct ip *ip_pktp, size_t n);

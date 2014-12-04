@@ -137,8 +137,11 @@ int main() {
                 tmp_hwa_ip = is_my_ip(mip_head, *((in_addr_t *) extract_target_pa(arp_hdr_ptr)));
                 if (tmp_hwa_ip != NULL) {
                     _DEBUG("%s\n", "somone is asking for my mac");
+
                     /*saving the senders mac*/
                     memcpy(tmp_mac, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+                    memcpy(&tmp_ip, extract_sender_pa(arp_hdr_ptr), arp_hdr_ptr->ar_pln);
+
                     memset(buf, 0, sizeof(buf));
                     memset(arp_buf, 0, sizeof(arp_buf));
                     arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REPLY, ETHERTYPE_IP, ARPHRD_ETHER,
@@ -153,7 +156,6 @@ int main() {
 
                     raw_len = sizeof(raw_addr);
                     errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
-                    //errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len)
                     if(errs < 0) {
                         perror("sendto(arpr)");
                         exit(EXIT_FAILURE);

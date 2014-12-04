@@ -167,6 +167,18 @@ unsigned char* extract_sender_hwa(struct arphdr* arp) {
     return ptr;
 }
 
+unsigned char* extract_sender_pa(struct arphdr* arp) {
+    unsigned char* ptr = (unsigned char*)(arp+1);
+    ptr += arp->ar_hln;
+
+    /*unsigned char __ar_sha[ETH_ALEN];	 Sender hardware address.
+    unsigned char __ar_sip[4];		 Sender IP address.
+    unsigned char __ar_tha[ETH_ALEN];	 Target hardware address.
+    unsigned char __ar_tip[4];		 Target IP address.*/
+
+    return ptr;
+}
+
 void craft_icmp(void* icmp_buf, void* data, size_t data_len) {
 
     struct icmp* icmp_pkt = icmp_buf;
