@@ -8,6 +8,8 @@ void testrawip();
 void test_csum ();
 void test_add_arp();
 
+struct in_addr host_ip;
+
 int main() {
     //testrawip();
     test_csum();
