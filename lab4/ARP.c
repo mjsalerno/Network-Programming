@@ -24,6 +24,7 @@ int main() {
     socklen_t raw_len, unix_len;
     struct arp_cache* tmp_arp;
     struct in_addr tmp_ip;
+    unsigned char tmp_mac[ETH_ALEN];
     struct hwa_ip* tmp_hwa_ip;
     struct arphdr* arp_hdr_ptr;
     int erri;
@@ -129,15 +130,43 @@ int main() {
             _DEBUG("%s\n", "Got something on the raw socket");
 
             arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
-            struct in_addr ip_struc;
-            ip_struc.s_addr = *(in_addr_t*)extract_target_addy(arp_hdr_ptr);
-            printf("\nwill look for this ip: %s\n", inet_ntoa(ip_struc));
+            printf("got arp\n");
+            print_arp(arp_hdr_ptr);
 
-           tmp_hwa_ip = is_my_ip(mip_head, *((in_addr_t*)extract_target_addy(arp_hdr_ptr)));
-            if(tmp_hwa_ip != NULL) {
-                _DEBUG("%s\n", "somone is asking for my mac");
+            if(arp_hdr_ptr->ar_op == ARPOP_REQUEST) {
+                tmp_hwa_ip = is_my_ip(mip_head, *((in_addr_t *) extract_target_pa(arp_hdr_ptr)));
+                if (tmp_hwa_ip != NULL) {
+                    _DEBUG("%s\n", "somone is asking for my mac");
+                    /*saving the senders mac*/
+                    memcpy(tmp_mac, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+                    memset(buf, 0, sizeof(buf));
+                    memset(arp_buf, 0, sizeof(arp_buf));
+                    arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REPLY, ETHERTYPE_IP, ARPHRD_ETHER,
+                            tmp_hwa_ip->if_haddr, (unsigned char *) &tmp_hwa_ip->ip_addr.sin_addr.s_addr, tmp_mac,
+                            (unsigned char *) &tmp_ip);
+
+                    craft_eth(buf, &raw_addr, tmp_hwa_ip->if_haddr, tmp_mac, tmp_hwa_ip->if_index);
+                    memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
+
+                    printf("sending arp\n");
+                    print_arp((struct arphdr*)(arp_buf+2));
+
+                    raw_len = sizeof(raw_addr);
+                    errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
+                    //errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len)
+                    if(errs < 0) {
+                        perror("sendto(arpr)");
+                        exit(EXIT_FAILURE);
+                    }
+
+                } else {
+                    _DEBUG("%s\n", "not my mac");
+                }
+            } else if(arp_hdr_ptr->ar_op == ARPOP_REPLY) {
+                /*todo: handle reply*/
+
             } else {
-                _DEBUG("%s\n", "not my mac");
+                _ERROR("Not sure what to do with arp_op: %d\n", arp_hdr_ptr->ar_op);
             }
 
         }
@@ -174,8 +203,8 @@ int main() {
 
                 arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
                 struct in_addr ip_struc;
-                ip_struc.s_addr = *(in_addr_t*)extract_target_addy(arp_hdr_ptr);
-                printf("\nwill look for this ip: %s\n", inet_ntoa(ip_struc));
+                ip_struc.s_addr = *(in_addr_t*) extract_target_pa(arp_hdr_ptr);
+                printf("\nwill ask for this ip: %s\n", inet_ntoa(ip_struc));
 
                 printf("Sending on mac: ");
                 print_hwa(raw_addr.sll_addr, 6);
@@ -189,8 +218,11 @@ int main() {
                 print_hwa(((struct ethhdr*)buf)->h_source, 6);
                 printf("\n");
 
+                printf("sending arp\n");
+                print_arp((struct arphdr*)(arp_buf+2));
+
                 raw_len = sizeof(raw_addr);
-                errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size, 0, (struct sockaddr const *)&raw_addr, raw_len);
+                errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
                 if(errs < 0) {
                     perror("sendto(arpr)");
                     exit(EXIT_FAILURE);
