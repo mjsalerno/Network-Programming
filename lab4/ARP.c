@@ -128,9 +128,12 @@ int main() {
             }
             _DEBUG("%s\n", "Got something on the raw socket");
 
-            arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr));
+            arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+            struct in_addr ip_struc;
+            ip_struc.s_addr = *(in_addr_t*)extract_target_addy(arp_hdr_ptr);
+            printf("\nwill look for this ip: %s\n", inet_ntoa(ip_struc));
 
-           tmp_hwa_ip = is_my_ip(mip_head, (struct sockaddr_in*)extract_target_addy(arp_hdr_ptr));
+           tmp_hwa_ip = is_my_ip(mip_head, *((in_addr_t*)extract_target_addy(arp_hdr_ptr)));
             if(tmp_hwa_ip != NULL) {
                 _DEBUG("%s\n", "somone is asking for my mac");
             } else {
@@ -165,9 +168,14 @@ int main() {
                 _DEBUG("%s\n", "did not find a matching ip, need to ask");
                 memset(buf, 0, sizeof(buf));
                 memset(arp_buf, 0, sizeof(arp_buf));
-                arp_size = craft_arp((struct arphdr*)arp_buf, ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr->sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
+                arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr.sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
                 craft_eth(buf, &raw_addr, mip_head->if_haddr, bcast_mac, mip_head->if_index);
                 memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
+
+                arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+                struct in_addr ip_struc;
+                ip_struc.s_addr = *(in_addr_t*)extract_target_addy(arp_hdr_ptr);
+                printf("\nwill look for this ip: %s\n", inet_ntoa(ip_struc));
 
                 printf("Sending on mac: ");
                 print_hwa(raw_addr.sll_addr, 6);

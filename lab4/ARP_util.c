@@ -40,16 +40,19 @@ struct arp_cache* has_arp(struct arp_cache* arp_head, in_addr_t ip) {
     return ptr;
 }
 
-struct hwa_ip* is_my_ip(struct hwa_ip* head, struct sockaddr_in* ip ) {
+struct hwa_ip* is_my_ip(struct hwa_ip* head, in_addr_t ip) {
     struct hwa_ip* ptr = head;
+    struct in_addr ip_struc;
 
-    _DEBUG("looking for: %s\n", inet_ntoa(ip->sin_addr));
+    ip_struc.s_addr = ip;
+    _DEBUG("looking for: %s\n", inet_ntoa(ip_struc));
 
     for(; ptr != NULL; ptr = ptr->next) {
-        if(head->ip_addr->sin_addr.s_addr == ip->sin_addr.s_addr) {
+        if(head->ip_addr.sin_addr.s_addr == ip) {
+
             return ptr;
         } else {
-            _DEBUG("not a match: %s\n", inet_ntoa(head->ip_addr->sin_addr));
+            _DEBUG("not a match: %s\n", inet_ntoa(head->ip_addr.sin_addr));
         }
     }
 

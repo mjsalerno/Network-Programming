@@ -185,10 +185,11 @@ void add_mips(struct hwa_ip ** mip_head, char if_haddr[IFHWADDRLEN], struct sock
 		curr = prev->next;
 	}
 
+	memset(curr, 0, sizeof(struct hwa_ip));
 	curr->if_index = index;
 	curr->next = NULL;
-	memcpy(curr->if_haddr, if_haddr, 6);
-	memcpy(curr->ip_addr, ip_addr, sizeof(struct sockaddr_in));
+	memcpy(curr->if_haddr, if_haddr, IFHWADDRLEN);
+	memcpy(&curr->ip_addr, ip_addr, sizeof(struct sockaddr_in));
 
 }
 
@@ -222,7 +223,7 @@ void print_hwa_list(struct hwa_ip* head) {
 }
 
 void print_hwa_ip(struct hwa_ip* node) {
-	printf("IP: %s\nMAC: ", inet_ntoa(node->ip_addr->sin_addr));
+	printf("IP: %s\nMAC: ", inet_ntoa(node->ip_addr.sin_addr));
 	print_hwa((unsigned char*)node->if_haddr, 6);
 	printf("\n");
 }

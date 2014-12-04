@@ -64,19 +64,52 @@ void craft_ip(void* ip_pktbuf, uint8_t proto, u_short ip_id, struct in_addr src_
     ip_pkt->ip_sum = 0;
 }
 
+/*void print_ip(struct ip* ip_pkt) {
+    printf("scr ip: %s\n", inet_ntoa(ip_pkt->ip_src));
+    printf("dst ip: %s\n", inet_ntoa(ip_pkt->ip_dst));
+
+   printf("ip_hl: %u\n", ip_pkt->ip_hl);
+   printf("ip_v: %i\n", ip_pkt->ip_v);
+   printf("ip_tos: ", ip_pkt->ip_tos);
+   printf(ip_pkt->ip_len);
+   printf(ip_pkt->ip_id);
+   printf(ip_pkt->ip_off);
+   printf(ip_pkt->ip_ttl);
+   printf(ip_pkt->ip_p);
+   printf(ip_pkt->ip_dst.s_addr);
+   printf(ip_pkt->ip_src.s_addr);
+
+}*/
+
 /**
 * makes an arp packet, you need to malloc it and make sure there is enough room
 * for the ip addresses and stuff
 */
-size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short int ar_pro, unsigned short int ar_hrd, unsigned char ar_sha[ETH_ALEN], unsigned char ar_sip[4], unsigned char ar_tha[ETH_ALEN], unsigned char ar_tip[4]) {
+size_t craft_arp(char* buf, uint16_t id, unsigned short int ar_op,  unsigned short int ar_pro, unsigned short int ar_hrd, unsigned char ar_sha[ETH_ALEN], unsigned char ar_sip[4], unsigned char ar_tha[ETH_ALEN], unsigned char ar_tip[4]) {
     char* ptr;
+    struct arphdr* arp;
     size_t add_len = 0;
+
+    if(ar_op == ARPOP_REQUEST) {
+        _INFO("crafting an arp for ip: %s\n", inet_ntoa(*(struct in_addr*)ar_tip));
+    }
 
     /*unsigned short int ar_hrd;	Format of hardware address.
     unsigned short int ar_pro;		 Format of protocol address.
     unsigned short int ar_op;		 ARP opcode (command).  */
 
-    arp->ar_pln = sizeof(uint32_t);
+    memcpy(buf, &id, sizeof(uint16_t));
+    buf += sizeof(uint16_t);
+
+    if(ar_pro == ETHERTYPE_IP) {
+        add_len = sizeof(uint32_t);
+    } else {
+        _ERROR("Do not know ar_pro: %d\n", ar_pro);
+        exit(EXIT_FAILURE);
+    }
+
+    arp = (struct arphdr*)buf;
+    arp->ar_pln = (unsigned char)(0xFF & add_len);
     arp->ar_hrd = ar_hrd; /*ARPHRD_ETHER*/
     arp->ar_pro = ar_pro; /*ETHERTYPE_IP*/
     arp->ar_op = ar_op;
@@ -85,13 +118,6 @@ size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short i
         arp->ar_hln = ETH_ALEN;
     } else {
         _ERROR("Do not know ar_hrd: %d\n", ar_hrd);
-        exit(EXIT_FAILURE);
-    }
-
-    if(ar_pro == ETHERTYPE_IP) {
-        add_len = sizeof(uint32_t);
-    } else {
-        _ERROR("Do not know ar_pro: %d\n", ar_pro);
         exit(EXIT_FAILURE);
     }
 
@@ -106,22 +132,22 @@ size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short i
     ptr += add_len;
     if(ar_op != ARPOP_REQUEST)
         memcpy(ptr, ar_tha, arp->ar_hln);
-    ptr += add_len;
+    ptr += arp->ar_hln;
     memcpy(ptr, ar_tip, add_len);
     ptr += add_len;
 
-    _DEBUG("crafted an arp pkt of size: %d\n", (int)((long)ptr - (long)arp));
+    _DEBUG("crafted an arp pkt of size: %d\n", ((int)((long)ptr - (long)buf) + 2));
 
-    return (size_t)((long)ptr - (long)arp);
+    return (size_t)(((long)ptr - (long)buf) + 2);
 
 }
 
 unsigned char* extract_target_addy(struct arphdr* arp) {
     unsigned char* ptr = (unsigned char*)(arp + 1); /* point to end of hdr */
-
+    ptr += 2;
     ptr += arp->ar_hln; /* skip over sender hardware addr */
     ptr += arp->ar_pln; /* skip over sender protocol addr */
-    ptr += arp->ar_hln; /* skip over target hardware addr */
+    ptr += arp->ar_pln; /* skip over target hardware addr */
     return ptr;
 }
 

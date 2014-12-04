@@ -5,5 +5,6 @@
 #include "api.h"
 #include "debug.h"
 
+void *ping(void);
 
 #endif
