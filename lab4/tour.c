@@ -2,13 +2,16 @@
 
 /* prototypes for private funcs */
 int initiate_tour(int argc, char *argv[]);
-int handle_first_msg(struct ip *ip_pktbuf, size_t ip_pktlen);
-int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen, int isvalid);
+int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled);
 int initiate_shutdown();
 int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
+int send_mcast(char *msg, size_t msglen);
 int init_multicast_sock(struct tourhdr *firstmsg);
 void print_tourhdr(struct tourhdr *trhdrp);
+int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
+int validate_mcast(struct sockaddr_in *srcaddr);
+int validate_icmp();
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -109,21 +112,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if(!send_initial_msg) {
-        erri = handle_first_msg((struct ip*)ipbuf, sizeof(ipbuf));
-        if (erri < 0) {
-            _ERROR("%s: %m\n", "handle_first_msg()");
-            goto cleanup;
-        }
-    }
-
-    erri = handle_other_msgs((struct ip*)ipbuf, sizeof(ipbuf), !send_initial_msg);
+    erri = process_tour((struct ip *) ipbuf, sizeof(ipbuf), send_initial_msg);
     if(erri < 0) {
-        _ERROR("%s: %m\n", "handle_other_msgs()");
+        _ERROR("%s: %m\n", "process_tour()");
         goto cleanup;
     }
 
-    _DEBUG("%s\n", "Shutting down successfully...");
+    printf("Shutting down successfully...");
     close(rtsock);
     close(pgsender);
     close(pgrecver);
@@ -272,7 +267,6 @@ ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
     tourhdrp->index = htons( (uint16_t)1 + ntohs(tourhdrp->index) );
 
     _DEBUG("Sending a tour msg to: %s of length %ld\n", getvmname(nextaddr.sin_addr), (u_long)ip_pktlen);
-    print_tourhdr(tourhdrp);
 
     craft_ip(ip_pktbuf, IPPROTO_TOUR, TOUR_IP_ID, host_ip, nextaddr.sin_addr, (ip_pktlen - IP4_HDRLEN));
 
@@ -283,92 +277,48 @@ ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen) {
 }
 
 /**
-* Monitors only the rtsock for the first msg.
-* Joins the multicast group.
-* Sends the tour msg to the next node.
-*/
-int handle_first_msg(struct ip *ip_pktbuf, size_t ip_pktlen) {
-    int erri;
-    ssize_t errs;
-    struct tourhdr *trhdrp;
-    socklen_t slen;
-    struct sockaddr_in srcaddr;
-    fd_set rset;
-
-    slen = sizeof(srcaddr);
-    memset(&srcaddr, 0, slen);
-    FD_ZERO(&rset);
-    for(EVER) {
-        FD_SET(rtsock, &rset);
-        _DEBUG("%s\n", "Waiting to recv the first tour msg...");
-        erri = select((rtsock + 1), &rset, NULL, NULL, NULL);
-        _DEBUG("select() returned: %d, fd of rtsock is: %d\n", erri, rtsock);
-        if(erri < 0) {
-            if(errno == EINTR){
-                continue;
-            }
-            return -1;
-        }
-        if(FD_ISSET(rtsock, &rset)) {
-            _DEBUG("%s\n", "Recv'ing on rtsock the first tour msg...");
-            errs = recvfrom(rtsock, ip_pktbuf, ip_pktlen, 0, (struct sockaddr*)&srcaddr, &slen);
-            if(errs < 0) {
-                _ERROR("%s: %m\n", "recvfrom()");
-                return -1;
-            }
-            if((validate_ip_tour(ip_pktbuf, (size_t)errs, &srcaddr)) < 0) {
-                continue; /* ignore invalid packets */
-            }
-            trhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
-            erri = init_multicast_sock(trhdrp);
-            if(erri < 0) {
-                return -1;
-            }
-            /* fixme: start pinging prev ip*/
-            errs = send_tourmsg(ip_pktbuf, (size_t)errs);
-            if(errs < 0) {
-                _ERROR("%s: %m\n", "send_tourmsg()");
-                return -1;
-            }
-            return 0;
-        }
-        return -1; /* should never be reached */
-    }
-}
-
-/**
 * Monitors the rtsock and the multicast socket.
 *
-* ip_pktbuf of size ip_pktlen. It has been filled in (from a call to
-* handle_first_msg) only if isvald is 1.
+* ip_pktbuf of size ip_pktlen -- buffer for ip recving
+* mcast_is_enabled -- 1 if we sent the initial tour msg, implying that
+*                   our multicast socket has been set up.
+*                   0 otherwise.
+*
 */
-int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen, int isvalid) {
-    struct tourhdr *trhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
-    int erri, maxfpd1;
+int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
+    struct tourhdr *trhdrp;
+    int erri, maxfpd1, is_first_tourmsg = 1, is_first_mcast = 1;
     ssize_t errs;
     socklen_t slen;
     struct sockaddr_in srcaddr;
     fd_set rset;
+    struct timeval tval;
+    struct timeval *tvalp = NULL;
+    char *fmt = "<<<<< Node %s. I am a member of the group. >>>>>";
+    char buf[BUFSIZE];
 
     slen = sizeof(srcaddr);
     memset(&srcaddr, 0, slen);
+    tval.tv_sec = 5;
+    tval.tv_usec = 0;
     FD_ZERO(&rset);
     maxfpd1 = MAX(rtsock, mcaster) + 1;
     for(EVER) {
-        if(isvalid && TOUR_IS_OVER(trhdrp)) {
-            initiate_shutdown();
-        }
-
         FD_SET(rtsock, &rset);
         FD_SET(mcaster, &rset);
         _DEBUG("%s\n", "Waiting to recv tour or multicast msgs...");
-        erri = select(maxfpd1, &rset, NULL, NULL, NULL);
-        _DEBUG("select() returned: %d, fd of rtsock is: %d\n", erri, rtsock);
+        erri = select(maxfpd1, &rset, NULL, NULL, tvalp);
+        _DEBUG("select() returned: %d\n", erri);
         if(erri < 0) {
             if(errno == EINTR){
                 continue;
             }
             return -1;
+        }
+        if(erri == 0) {
+            /* Timeout was reached (tvalp changed when recv'ing mcast msgs)*/
+            printf("Waited for all nodes to report. Ending the tour....\n");
+            return 0;
         }
         if(FD_ISSET(rtsock, &rset)) {
             _DEBUG("%s\n", "Recv'ing on rtsock...");
@@ -380,15 +330,61 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen, int isvalid) {
             if((validate_ip_tour(ip_pktbuf, (size_t)errs, &srcaddr)) < 0) {
                 continue; /* ignore invalid packets */
             }
+            trhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
+            print_tourhdr(trhdrp);
+            if(is_first_tourmsg && !mcast_is_enabled) {
+                /* only init the mulitcast socket once */
+                erri = init_multicast_sock(trhdrp);
+                if(erri < 0) {
+                    return -1;
+                }
+            }
+            is_first_tourmsg = 0;
+            /* fixme: start pinging prev ip*/
+
+            if(TOUR_IS_OVER(trhdrp)) {
+                erri = initiate_shutdown();
+                if(erri < 0) {
+                    return -1;
+                }
+                continue; /* we're done with this socket */
+            }
+
             errs = send_tourmsg(ip_pktbuf, (size_t)errs);
             if(errs < 0) {
                 _ERROR("%s: %m\n", "send_tourmsg()");
                 return -1;
             }
-            return 0;
+            continue;
         }
         if(FD_ISSET(mcaster, &rset)) {
             _DEBUG("%s\n", "Recv'ing on multicast socket...");
+            errs = recvfrom(mcaster, buf, sizeof(buf), 0, (struct sockaddr*)&srcaddr, &slen);
+            if(errs < 0) {
+                _ERROR("%s: %m\n", "recvfrom()");
+                return -1;
+            }
+            if((validate_mcast(&srcaddr)) < 0) {
+                continue; /* ignore invalid packets */
+            }
+            printf("Node %s. Received: %s\n", host_name, buf);
+
+            if(is_first_mcast) {
+                /* fixme: immediately stop pinging */
+                erri = snprintf(buf,  sizeof(buf), fmt, host_name);
+                if(erri < 0) {
+                    _ERROR("%s: %m\n", "snprintf()");
+                    return -1;
+                }
+                erri = send_mcast(buf, sizeof(buf));
+                if(erri < 0) {
+                    return -1;
+                }
+            }
+            is_first_mcast = 0;
+            tvalp = &tval; /* set the select's timeout! */
+
+            continue;
         }
         return -1; /* should never be reached */
     }
@@ -396,16 +392,44 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen, int isvalid) {
     return 0;
 }
 
+/**
+* We are the last stop on the route,initiate Tour shutdown.
+* Waits 5 seconds then sends the shutdown multicast.
+* RETURNS: 0 if ok, -1 if failure
+*/
 int initiate_shutdown() {
-    /*struct timeval tm;
+    int erri;
+    struct timeval tm;
+    char *fmt = "<<<<< This is node %s. Tour has ended. Group members please identify yourselves. >>>>>";
+    char msg[BUFSIZE];
     tm.tv_sec = 5;
     tm.tv_usec = 200000;
-    */
 
-    /* We are the last stop on the route */
-    /* initiate Tour shutdown by sending on multicast socket */
-    /* fixme: send on mcaster, make function initiate_shutdown()*/
-    /*erri = select();*/
+    _NOTE("%s\n", "Initiating tour shutdown.");
+
+    erri = select(1, NULL, NULL, NULL, &tm); /* just for timeout*/
+    if(erri != 0) {
+        _ERROR("%s: %m\n", "select(for 5.2s timeout)");
+        return -1;
+    }
+    erri = snprintf(msg, BUFSIZE, fmt, host_name);
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "snprintf()");
+        return -1;
+    }
+
+    return (send_mcast(msg, (size_t)erri));
+}
+
+int send_mcast(char *msg, size_t msglen) {
+    int erri;
+    printf("Node %s. Sending: %s\n", host_name, msg);
+
+    erri = (int)sendto(mcaster, msg, msglen, 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "sendto(multicast)");
+        return -1;
+    }
     return 0;
 }
 
@@ -467,7 +491,10 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
     return 0;
 }
 
-/* Returns -1 if invalid or 0 if valid. */
+/**
+* Prints recv'd timestamp if valid.
+* RETURN: -1 if invalid or 0 if valid.
+*/
 int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) {
     struct tourhdr *trhdrp;
     struct in_addr prev_ip;
@@ -489,8 +516,9 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
         return -1;
     }
     if(TOUR_CURR(trhdrp)->s_addr != host_ip.s_addr) {
-        _DEBUG("%s\n", "Curr ip in msg != host ip. Ignoring....");
-        return -1;
+        _ERROR("CURR hostname from msg (%s) != ", getvmname(*TOUR_CURR(trhdrp)));
+        printf("MY name (%s). Ignoring....\n", getvmname(host_ip));
+        exit(EXIT_FAILURE);
     }
     tm = time(NULL);
     printf("%.24s received source routing packet from %s.\n", ctime(&tm), getvmname(prev_ip));
@@ -498,7 +526,13 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
     return 0;
 }
 
-int validate_mcast() {
+int validate_mcast(struct sockaddr_in *srcaddr) {
+    /*if(srcaddr->sin_addr.s_addr != mcast_addr.sin_addr.s_addr) {
+        _DEBUG("%s\n", "msg not from the multicast address. Ignoring....");
+        return -1;
+    }*/
+    /* fixme: use two socks? To ensure only mcast addr dst addresses are delivered? */
+    srcaddr++;
     return 0;
 }
 

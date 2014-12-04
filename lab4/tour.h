@@ -14,7 +14,7 @@
 #define EXTRACT_TOURHDRP(ip_pktp) ((struct tourhdr*)(IP4_HDRLEN + ((char*)(ip_pktp))))
 
 /* The tour has ended. */
-#define TOUR_IS_OVER(hdr) ((hdr)->index >= (hdr)->num_ips)
+#define TOUR_IS_OVER(hdr) (ntohs((hdr)->index) >= ntohl((hdr)->num_ips))
 
 /* These return a pointer to a struct in_addr, hdr is in NETWORK ORDER */
 /* CURR should always be your IP */
@@ -33,9 +33,5 @@ struct tourhdr {
     /* ... */
     /* struct in_addr a_num_ips */
 };
-
-int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
-int validate_mcast();
-int validate_icmp();
 
 #endif
