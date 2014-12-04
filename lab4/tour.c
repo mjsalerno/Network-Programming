@@ -1,3 +1,4 @@
+#include <ldap.h>
 #include "tour.h"
 
 /* prototypes for private funcs */
@@ -7,6 +8,7 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen);
 int initiate_shutdown();
 int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
+int send_mcast(char *msg, size_t msglen);
 int init_multicast_sock(struct tourhdr *firstmsg);
 void print_tourhdr(struct tourhdr *trhdrp);
 int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
@@ -363,28 +365,38 @@ int handle_first_msg(struct ip *ip_pktbuf, size_t ip_pktlen) {
 */
 int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen/*, int isvalid*/) {
     struct tourhdr *trhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
-    int erri, maxfpd1;
+    int erri, maxfpd1, is_first_mcast = 1;
     ssize_t errs;
     socklen_t slen;
     struct sockaddr_in srcaddr;
     fd_set rset;
+    struct timeval tval;
+    struct timeval *tvalp = NULL;
+    char *fmt = "<<<<< Node %s. I am a member of the group. >>>>>";
     char buf[BUFSIZE];
 
     slen = sizeof(srcaddr);
     memset(&srcaddr, 0, slen);
+    tval.tv_sec = 5;
+    tval.tv_usec = 0;
     FD_ZERO(&rset);
     maxfpd1 = MAX(rtsock, mcaster) + 1;
     for(EVER) {
         FD_SET(rtsock, &rset);
         FD_SET(mcaster, &rset);
         _DEBUG("%s\n", "Waiting to recv tour or multicast msgs...");
-        erri = select(maxfpd1, &rset, NULL, NULL, NULL);
+        erri = select(maxfpd1, &rset, NULL, NULL, tvalp);
         _DEBUG("select() returned: %d\n", erri);
         if(erri < 0) {
             if(errno == EINTR){
                 continue;
             }
             return -1;
+        }
+        if(erri == 0) {
+            /* Timeout was reached (tvalp changed when recv'ing mcast msgs)*/
+            printf("Waited for all nodes to report. Ending the tour....");
+            return 0;
         }
         if(FD_ISSET(rtsock, &rset)) {
             _DEBUG("%s\n", "Recv'ing on rtsock...");
@@ -415,7 +427,7 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen/*, int isvalid*/) {
         }
         if(FD_ISSET(mcaster, &rset)) {
             _DEBUG("%s\n", "Recv'ing on multicast socket...");
-            errs = recvfrom(mcaster, buf, BUFSIZE, 0, (struct sockaddr*)&srcaddr, &slen);
+            errs = recvfrom(mcaster, buf, sizeof(buf), 0, (struct sockaddr*)&srcaddr, &slen);
             if(errs < 0) {
                 _ERROR("%s: %m\n", "recvfrom()");
                 return -1;
@@ -423,6 +435,23 @@ int handle_other_msgs(struct ip *ip_pktbuf, size_t ip_pktlen/*, int isvalid*/) {
             if((validate_mcast(&srcaddr)) < 0) {
                 continue; /* ignore invalid packets */
             }
+            printf("Node %s. Received: %s\n", host_name, buf);
+
+            if(is_first_mcast) {
+                /* fixme: immediately stop pinging */
+                erri = snprintf(buf,  sizeof(buf), fmt, host_name);
+                if(erri < 0) {
+                    _ERROR("%s: %m\n", "snprintf()");
+                    return -1;
+                }
+                erri = send_mcast(buf, sizeof(buf));
+                if(erri < 0) {
+                    return -1;
+                }
+            }
+            is_first_mcast = 0;
+            tvalp = &tval; /* set the select's timeout! */
+
             continue;
         }
         return -1; /* should never be reached */
@@ -457,9 +486,14 @@ int initiate_shutdown() {
         return -1;
     }
 
+    return (send_mcast(msg, (size_t)erri));
+}
+
+int send_mcast(char *msg, size_t msglen) {
+    int erri;
     printf("Node %s. Sending: %s\n", host_name, msg);
 
-    erri = (int)sendto(mcaster, msg, (size_t)erri, 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
+    erri = (int)sendto(mcaster, msg, msglen, 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
     if(erri < 0) {
         _ERROR("%s: %m\n", "sendto(multicast)");
         return -1;
