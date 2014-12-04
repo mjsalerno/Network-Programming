@@ -1,4 +1,3 @@
-#include <ldap.h>
 #include "tour.h"
 
 /* prototypes for private funcs */
