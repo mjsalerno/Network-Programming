@@ -117,21 +117,11 @@ size_t craft_arp(struct arphdr* arp, unsigned short int ar_op,  unsigned short i
 }
 
 unsigned char* extract_target_addy(struct arphdr* arp) {
+    unsigned char* ptr = (unsigned char*)(arp + 1); /* point to end of hdr */
 
-    unsigned char* ptr = (unsigned char*)arp+1;
-    size_t add_len = 0;
-
-    if(arp->ar_pro == ETHERTYPE_IP && arp->ar_op == ARPOP_REQUEST) {
-        add_len = sizeof(uint32_t);
-        ptr += arp->ar_hln;
-        ptr += add_len;
-        ptr += add_len;
-    } else {
-        _ERROR("only know ar_pro %d, not: %d\n", ETHERTYPE_IP, arp->ar_pro);
-        _ERROR("can't get target ip if not a request, want: %d, got: %d\n", ARPOP_REQUEST, arp->ar_op);
-        exit(EXIT_FAILURE);
-    }
-
+    ptr += arp->ar_hln; /* skip over sender hardware addr */
+    ptr += arp->ar_pln; /* skip over sender protocol addr */
+    ptr += arp->ar_hln; /* skip over target hardware addr */
     return ptr;
 }
 
