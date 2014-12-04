@@ -32,11 +32,13 @@ void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_ma
     memcpy(et->h_dest, dst_mac, ETH_ALEN);
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
-    printf("dst mac: ");
+    #ifdef DEBUG
+    printf("craft_eth dst mac: ");
     print_hwa(et->h_dest, ETH_ALEN);
-    printf("\nsrc mac: ");
+    printf("\ncraft_eth src mac: ");
     print_hwa(et->h_source, ETH_ALEN);
     printf("\n");
+    #endif /*DEBUG*/
 
     _DEBUG("crafted frame with proto: %d\n", et->h_proto);
 }
@@ -130,8 +132,11 @@ size_t craft_arp(char* buf, uint16_t id, unsigned short int ar_op,  unsigned sho
     ptr += arp->ar_hln;
     memcpy(ptr, ar_sip, add_len);
     ptr += add_len;
-    if(ar_op != ARPOP_REQUEST)
+    if(ar_tha != NULL) {
         memcpy(ptr, ar_tha, arp->ar_hln);
+    } else {
+        _INFO("%s\n", "the ar_tha was null, skipping");
+    }
     ptr += arp->ar_hln;
     memcpy(ptr, ar_tip, add_len);
     ptr += add_len;
@@ -142,12 +147,23 @@ size_t craft_arp(char* buf, uint16_t id, unsigned short int ar_op,  unsigned sho
 
 }
 
-unsigned char* extract_target_addy(struct arphdr* arp) {
+unsigned char*extract_target_pa(struct arphdr *arp) {
     unsigned char* ptr = (unsigned char*)(arp + 1); /* point to end of hdr */
     ptr += 2;
     ptr += arp->ar_hln; /* skip over sender hardware addr */
     ptr += arp->ar_pln; /* skip over sender protocol addr */
     ptr += arp->ar_pln; /* skip over target hardware addr */
+    return ptr;
+}
+
+unsigned char* extract_sender_hwa(struct arphdr* arp) {
+    unsigned char* ptr = (unsigned char*)(arp+1);
+
+    /*unsigned char __ar_sha[ETH_ALEN];	 Sender hardware address.
+    unsigned char __ar_sip[4];		 Sender IP address.
+    unsigned char __ar_tha[ETH_ALEN];	 Target hardware address.
+    unsigned char __ar_tip[4];		 Target IP address.*/
+
     return ptr;
 }
 

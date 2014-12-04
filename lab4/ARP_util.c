@@ -1,4 +1,5 @@
 #include "ARP.h"
+#include <inttypes.h>
 
 int             sll_ifindex;	 /* Interface number */
 unsigned short  sll_hatype;	     /* Hardware type */
@@ -57,4 +58,36 @@ struct hwa_ip* is_my_ip(struct hwa_ip* head, in_addr_t ip) {
     }
 
     return ptr;
+}
+
+void print_arp(struct arphdr* arp) {
+    unsigned char* ptr = (unsigned char*)(arp+1);
+    struct in_addr ip;
+
+    /*unsigned char __ar_sha[ETH_ALEN];	 Sender hardware address.
+    unsigned char __ar_sip[4];		 Sender IP address.
+    unsigned char __ar_tha[ETH_ALEN];	 Target hardware address.
+    unsigned char __ar_tip[4];		 Target IP address.*/
+
+    printf("============ARP============\n");
+
+    printf("sender hwa: ");
+    print_hwa(ptr, ETH_ALEN);
+    printf("\n");
+
+    ptr += arp->ar_hln;
+    ip.s_addr = *(uint32_t*)(ptr);
+    printf("sender ip: %s\n", inet_ntoa(ip));
+
+    ptr += arp->ar_pln;
+    printf("target hwa: ");
+    print_hwa(ptr, ETH_ALEN);
+    printf("\n");
+
+    ptr += arp->ar_hln;
+    ip.s_addr = *(uint32_t*)(ptr);
+    printf("target ip: %s\n", inet_ntoa(ip));
+
+    printf("===========================\n");
+
 }
