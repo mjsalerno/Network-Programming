@@ -29,8 +29,9 @@ void add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigne
     ptr->hw.src_ifindex = sll_ifindex;
     ptr->fd = fd;
 
-    if(iface != NULL)
-        memcpy(ptr->hw.src_addr, iface->if_haddr, 6);
+    if(iface != NULL) {
+        memcpy(ptr->hw.src_addr, iface->if_haddr, ETH_ALEN);
+    }
 
     ptr->hw.src_halen = 6;
     ptr->hw.src_hatype = sll_hatype;

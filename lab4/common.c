@@ -157,6 +157,13 @@ unsigned char*extract_target_pa(struct arphdr *arp) {
     return ptr;
 }
 
+unsigned char*extract_target_hwa(struct arphdr *arp) {
+    unsigned char* ptr = (unsigned char*)(arp + 1); /* point to end of hdr */
+    ptr += arp->ar_hln; /* skip over sender hardware addr */
+    ptr += arp->ar_pln; /* skip over sender protocol addr */
+    return ptr;
+}
+
 unsigned char* extract_sender_hwa(struct arphdr* arp) {
     unsigned char* ptr = (unsigned char*)(arp+1);
 

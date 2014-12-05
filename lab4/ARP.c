@@ -251,6 +251,11 @@ void handle_rep(char* buf) {
 
     /*ans tour*/
     memcpy(&answer, &arp_c->hw, sizeof(struct hwaddr));
+    answer.dst_halen = ETH_ALEN;
+    answer.src_halen = ETH_ALEN;
+    memcpy(answer.src_addr, mip_head->if_haddr, ETH_ALEN);
+    memcpy(answer.dst_addr, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+    answer.src_ifindex = mip_head->if_index;
     print_hwaddr(&answer);
 
     errs = send(arp_c->fd, &answer, sizeof(struct hwaddr), 0);
