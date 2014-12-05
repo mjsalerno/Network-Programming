@@ -2,7 +2,7 @@
 
 void handle_rep(char* buf);
 void handle_req(int rawsock, char* buf);
-void ans_tour(int sock, struct arp_cache* entry, struct arphdr* arp_hdr_ptr);
+void ans_tour(int sock, struct arp_cache* entry);
 void handle_sigint(int sign);
 
 static struct hwa_info* hw_list = NULL;
@@ -175,7 +175,7 @@ int main() {
                 _DEBUG("%s\n", "found a matching ip");
                 /*ans tour*/
                 arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
-                ans_tour(accepted_unix_sock, tmp_arp, arp_hdr_ptr);
+                ans_tour(accepted_unix_sock, tmp_arp);
             } else {
                 _DEBUG("%s\n", "did not find a matching ip, need to ask");
 
@@ -247,7 +247,7 @@ void handle_rep(char* buf) {
     memcpy(arp_c->hw.dst_addr, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
 
     /*ans tour*/
-    ans_tour(-1, arp_c, arp_hdr_ptr);
+    ans_tour(-1, arp_c);
 
 }
 
@@ -297,7 +297,7 @@ void handle_req(int rawsock, char* buf) {
     }
 }
 
-void ans_tour(int sock, struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
+void ans_tour(int sock, struct arp_cache* entry) {
     struct hwaddr answer;
     ssize_t errs;
 
@@ -306,7 +306,6 @@ void ans_tour(int sock, struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
 
     #ifdef DEBUG
     _DEBUGY("sock: %d\n", sock);
-    print_arp(arp_hdr_ptr);
     print_hwaddr(&entry->hw);
     _DEBUGY("%s\n", "END");
     #endif

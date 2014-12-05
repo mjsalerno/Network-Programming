@@ -5,8 +5,7 @@ CC = gcc
 
 BINS = ARP tour test
 
-CFLAGS = -g -pthread -Wall -Wextra -Werror -DDEBUG
-CFLAGS = -g -pthread -Wall -Wextra -Werror -DDEBUG
+CFLAGS = -g -pthread -Wall -Wextra -Werror  -DHANDIN
 
 all: $(BINS)
 
@@ -14,6 +13,9 @@ all: $(BINS)
 
 debug: CFLAGS=-g -pthread -Wall -Werror -Wextra -DDEBUG
 debug: all
+
+color: FLAGS=-g -Wall -Werror -Wextra
+color: all
 
 # targets for code coverage using GNU gcovr
 cov: CFLAGS=-g -pthread -Wall -Werror -Wextra --coverage -DDEBUG
