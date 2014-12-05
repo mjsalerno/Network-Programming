@@ -3,7 +3,7 @@
 CC = clang
 CC = gcc
 
-BINS = ARP tour test
+BINS = ARP_cse533-11 tour_cse533-11
 
 CFLAGS = -g -pthread -Wall -Wextra -Werror  -DHANDIN
 
@@ -39,11 +39,11 @@ common.o: common.c common.h api.o
 test: test.o common.o ARP_util.o api.o
 	$(CC) $(CFLAGS) $< api.o common.o ARP_util.o -o $@
 
-ARP: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
-	$(CC) $(CFLAGS) $^ -o $@_cse533-11
+ARP_cse533-11: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
+	$(CC) $(CFLAGS) $^ -o $@
 
-tour: tour.o common.o api.o ping.o api.o
-	$(CC) $(CFLAGS) $< ping.o api.o common.o -o $@_cse533-11
+tour_cse533-11: tour.o common.o api.o ping.o api.o
+	$(CC) $(CFLAGS) $< ping.o api.o common.o -o $@
 
 clean:
 	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage *_cse533-11
