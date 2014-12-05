@@ -101,16 +101,16 @@ void print_hwaddr(struct hwaddr* addr) {
     unsigned char  src_sll_addr[8];	  Physical layer address
     */
 #ifdef DEBUG
-    printf("======= hwaddr from arp =======\n");
-    printf("index     : %8d\n", addr->src_sll_ifindex);
-    printf("dst_hatype: %8hu\n", addr->dst_sll_hatype);
-    printf("dst_halen : %8d\n", addr->dst_sll_halen);
-    printf("dst_addr  : ");
+    printf("========= hwaddr from arp =========\n");
+    printf("index     : %2d\n", addr->src_sll_ifindex);
+    printf("dst_hatype: %2hu\n", addr->dst_sll_hatype);
+    printf("dst_halen : %2hhu\n", addr->dst_sll_halen);
+    printf("dst_addr  :  ");
     print_hwa(addr->dst_sll_addr, addr->dst_sll_halen);
-    printf("\nsrc_hatype: %8hu\n", addr->src_sll_hatype);
-    printf("src_halen : %8d\n", addr->src_sll_halen);
-    printf("src_addr  : ");
+    printf("\nsrc_hatype: %2hu\n", addr->src_sll_hatype);
+    printf("src_halen : %2hhu\n", addr->src_sll_halen);
+    printf("src_addr  :  ");
     print_hwa(addr->dst_sll_addr, addr->dst_sll_halen);
-    printf("\n===========================\n");
+    printf("\n===================================\n");
 #endif
 }
