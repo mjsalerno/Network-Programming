@@ -11,7 +11,8 @@
 */
 int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) {
     int unixfd, erri;
-    ssize_t n, tot_n = 0, errs;
+    ssize_t n, errs;
+    size_t tot_n = 0;
     struct sockaddr_un arp_addr;
     socklen_t arp_len;
     fd_set rset;
@@ -65,7 +66,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     }
     do {
         /* todo: maybe need to change the read? */
-        n = read(unixfd, (tot_n + &HWaddr), (sizeof(struct hwaddr) - tot_n));
+        n = read(unixfd, (tot_n + HWaddr), (sizeof(struct hwaddr) - tot_n));
         if(n < 0) {
             if(errno == EINTR)
                 continue;
@@ -77,10 +78,10 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
             return -1;
         }
         tot_n += n;
-    } while (n > 0);
-
-    printf("areq found: ");
-    print_hwa(HWaddr->dst_sll_addr, 6);
+    } while (n > 0 && tot_n < sizeof(struct hwaddr));
+    _DEBUG("ARP sent me %d bytes.\n", (int)tot_n);
+    printf("areq found dst mac: ");
+    print_hwa(HWaddr->dst_sll_addr, HWaddr->dst_sll_halen);
     printf("\n");
 
     close(unixfd);
