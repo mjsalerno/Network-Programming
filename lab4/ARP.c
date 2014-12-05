@@ -137,8 +137,8 @@ int main() {
             }
             _DEBUG("%s\n", "Got something on the raw socket");
 
-            if(htons(*(uint16_t*)(buf + sizeof(struct ethhdr))) != ARP_ETH_PROTO) {
-                _SPEC("%s\n", "got someone elses ARP, skipping");
+            if(ntohs(*(uint16_t*)(buf + sizeof(struct ethhdr))) != ARP_ETH_PROTO) {
+                _SPEC("got someone elses ARP, proto: %hu , wanted: %hu, skipping\n", ntohs(*(uint16_t*)(buf + sizeof(struct ethhdr))), ARP_ETH_PROTO);
                 continue;
             }
 
@@ -193,7 +193,7 @@ int main() {
 
                 memset(buf, 0, BUFSIZE);
                 memset(arp_buf, 0, sizeof(arp_buf));
-                arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr.sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
+                arp_size = craft_arp(arp_buf, htons(ARP_ETH_PROTO), ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr.sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
                 craft_eth(buf, &raw_addr, mip_head->if_haddr, bcast_mac, mip_head->if_index);
                 memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
 
@@ -303,7 +303,7 @@ void handle_req(int rawsock, char* buf) {
 
         memset(buf, 0, BUFSIZE);
         memset(arp_buf, 0, sizeof(arp_buf));
-        arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REPLY, ETHERTYPE_IP, ARPHRD_ETHER,
+        arp_size = craft_arp(arp_buf, htons(ARP_ETH_PROTO), ARPOP_REPLY, ETHERTYPE_IP, ARPHRD_ETHER,
                 tmp_hwa_ip->if_haddr, (unsigned char *) &tmp_hwa_ip->ip_addr.sin_addr.s_addr, tmp_mac,
                 (unsigned char *) &tmp_ip);
 
