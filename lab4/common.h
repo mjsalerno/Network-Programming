@@ -58,5 +58,6 @@ void print_hwa(unsigned char* mac, char mac_len);
 /* Convert an IP to host name */
 char *getvmname(struct in_addr vmaddr);
 int gethostname_ip(char *host_name, struct in_addr *host_ip);
+void print_hwaddr(struct hwaddr* addr);
 
 #endif /*COMMON_H*/
