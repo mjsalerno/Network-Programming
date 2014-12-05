@@ -170,7 +170,7 @@ int main(void) {
     _DEBUG("%s\n", "creating pthread for consumer...");
 
     err = pthread_create(&consumer_tid, NULL, &consumer_main, fname);
-    if(0 > err){
+    if(err > 0){
         errno = (int)err;
         perror("ERROR: consumer pthread_create()");
         close(serv_fd);
