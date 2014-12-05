@@ -169,8 +169,7 @@ int main() {
             memcpy(&tmp_ip.s_addr, buf, sizeof(uint32_t));
             _DEBUG("got areq for IP: %s\n", inet_ntoa(tmp_ip));
 
-            /*todo: has_arp == get_arp*/
-            tmp_arp = has_arp(arp_lst, (in_addr_t)*buf);
+            tmp_arp = get_arp(arp_lst, *(in_addr_t*)buf);
 
             if(tmp_arp != NULL) {
                 _DEBUG("%s\n", "found a matching ip");

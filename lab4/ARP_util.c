@@ -47,7 +47,7 @@ void add_part_arp(struct arp_cache** arp_head, in_addr_t ip, int fd) {
     ip_struc.s_addr = ip;
     _DEBUG("adding for ip: %s\n", inet_ntoa(ip_struc));
 
-    add_arp(arp_head, ip, -1, 0, 0, NULL, NULL, fd);
+    add_arp(arp_head, ip, -1, 0, 6, NULL, NULL, fd);
 }
 
 struct arp_cache* get_arp(struct arp_cache* arp_head, in_addr_t ip) {
@@ -66,12 +66,6 @@ struct arp_cache* get_arp(struct arp_cache* arp_head, in_addr_t ip) {
         _DEBUG("not a match ip: %s\n", inet_ntoa(ip_struc));
     }
 
-    return ptr;
-}
-
-struct arp_cache* has_arp(struct arp_cache* arp_head, in_addr_t ip) {
-    struct arp_cache* ptr = arp_head;
-    for(; ptr != NULL && ( ptr->ip == ip); ptr = ptr->next);
     return ptr;
 }
 
