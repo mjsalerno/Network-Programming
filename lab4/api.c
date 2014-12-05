@@ -42,7 +42,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     }
 
     /* todo: create the request to send to ARP */
-    errs = write_n(unixfd, &((struct sockaddr_in*)IPaddr)->sin_addr, sizeof(struct in_addr));
+    errs = send(unixfd, &((struct sockaddr_in*)IPaddr)->sin_addr, sizeof(struct in_addr), 0);
     if(errs < 0) {
         _ERROR("%s: %m\n", "write()");
         return -1;
@@ -80,7 +80,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     } while (n > 0);
 
     printf("areq found: ");
-    print_hwa(HWaddr->sll_addr, 6);
+    print_hwa(HWaddr->dst_sll_addr, 6);
     printf("\n");
 
     close(unixfd);

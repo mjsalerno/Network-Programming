@@ -87,6 +87,7 @@ void test_add_arp() {
     int err;
     struct arp_cache* arp_head = NULL;
     struct in_addr sin_addr;
+    struct hwa_ip hwaip;
 
     unsigned char mac1[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00};
 
@@ -94,10 +95,10 @@ void test_add_arp() {
     assert(err != 0);
 
     assert(arp_head == NULL);
-    add_arp(&arp_head, sin_addr.s_addr, 1, 0xF, 6, mac1);
+    add_arp(&arp_head, sin_addr.s_addr, 1, 0XF, 6, mac1, &hwaip, 0);
     assert(arp_head != NULL);
     assert(arp_head->next == NULL);
 
-    add_arp(&arp_head, sin_addr.s_addr, 1, 0xF, 6, mac1);
+    add_arp(&arp_head, sin_addr.s_addr, 1, 0XF, 6, mac1, &hwaip, 0);
     assert(arp_head->next->next == NULL);
 }

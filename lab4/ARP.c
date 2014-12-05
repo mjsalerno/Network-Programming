@@ -12,10 +12,14 @@ void handle_sigint(int sign) {
     _Exit(EXIT_FAILURE);
 }
 
+void handle_rep(char* buf);
+void handle_req(int rawsock, char* buf);
+
+static struct hwa_info* hw_list = NULL;
+static struct hwa_ip * mip_head = NULL;
+static struct arp_cache* arp_lst = NULL;
+
 int main() {
-    struct hwa_info* hw_list = NULL;
-    struct hwa_ip * mip_head = NULL;
-    struct arp_cache* arp_lst = NULL;
 
     struct sockaddr_un unix_addr;
     struct sockaddr_ll raw_addr;
@@ -24,7 +28,6 @@ int main() {
     socklen_t raw_len, unix_len;
     struct arp_cache* tmp_arp;
     struct in_addr tmp_ip;
-    struct hwa_ip* tmp_hwa_ip;
     struct arphdr* arp_hdr_ptr;
     int erri;
     ssize_t errs;
@@ -34,7 +37,7 @@ int main() {
 
     struct sigaction sigact;
 
-    char buf[BUFSIZE];
+    char* buf;
     char arp_buf[BUFSIZE];
     unsigned char bcast_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
@@ -44,8 +47,14 @@ int main() {
     free_hwa_info(hw_list);
     print_hwa_list(mip_head);
 
+    buf = malloc(BUFSIZE);
+    if(buf == NULL) {
+        _ERROR("%s\n", "malloc for buf failed");
+        exit(EXIT_FAILURE);
+    }
+
     if(mip_head == NULL) {
-        _ERROR("%s\n", "eth0 not found\n");
+        _ERROR("%s\n", IFACE_TO_KEEP" not found\n");
         exit(EXIT_FAILURE);
     }
 
@@ -121,20 +130,28 @@ int main() {
 
         if(FD_ISSET(rawsock, &fdset)) {                                                 /* RAW sock */
             raw_len = sizeof(struct sockaddr_ll);
-            errs = recvfrom(rawsock, buf, sizeof(buf), 0, (struct sockaddr *)&raw_addr, &raw_len);
+            errs = recvfrom(rawsock, buf, BUFSIZE, 0, (struct sockaddr *)&raw_addr, &raw_len);
             if(errs < 0) {
                 perror("arp.recvfrom(raw)");
                 exit(EXIT_FAILURE);
             }
             _DEBUG("%s\n", "Got something on the raw socket");
 
-            arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr));
+            arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+            printf("got arp\n");
+            print_arp(arp_hdr_ptr);
 
-           tmp_hwa_ip = is_my_ip(mip_head, (struct sockaddr_in*)extract_target_addy(arp_hdr_ptr));
-            if(tmp_hwa_ip != NULL) {
-                _DEBUG("%s\n", "somone is asking for my mac");
+            if(arp_hdr_ptr->ar_op == ARPOP_REQUEST) {
+                _INFO("%s\n", "got a request");
+                handle_req(rawsock, buf);
+
+            } else if(arp_hdr_ptr->ar_op == ARPOP_REPLY) {
+                /*todo: handle reply*/
+                _INFO("%s\n", "got a reply");
+                handle_rep(buf);
+
             } else {
-                _DEBUG("%s\n", "not my mac");
+                _ERROR("Not sure what to do with arp_op: %d\n", arp_hdr_ptr->ar_op);
             }
 
         }
@@ -148,7 +165,7 @@ int main() {
                 exit(EXIT_FAILURE);
             }
 
-            errs = recv(listening_unix_sock, buf, sizeof(buf), 0);
+            errs = recv(listening_unix_sock, buf, BUFSIZE, 0);
             if(errs < 0) {
                 perror("arp.recv(unix)");
                 exit(EXIT_FAILURE);
@@ -161,13 +178,24 @@ int main() {
 
             if(tmp_arp != NULL) {
                 _DEBUG("%s\n", "found a matching ip");
+                /*todo: give them the answer*/
+                _ERROR("%s\n", "TODO!!");
             } else {
                 _DEBUG("%s\n", "did not find a matching ip, need to ask");
-                memset(buf, 0, sizeof(buf));
+
+                /*make partial entry*/
+                add_part_arp(&arp_lst, tmp_ip.s_addr, listening_unix_sock);
+
+                memset(buf, 0, BUFSIZE);
                 memset(arp_buf, 0, sizeof(arp_buf));
-                arp_size = craft_arp((struct arphdr*)arp_buf, ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr->sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
+                arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr.sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
                 craft_eth(buf, &raw_addr, mip_head->if_haddr, bcast_mac, mip_head->if_index);
                 memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
+
+                arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+                struct in_addr ip_struc;
+                ip_struc.s_addr = *(in_addr_t*) extract_target_pa(arp_hdr_ptr);
+                printf("\nwill ask for this ip: %s\n", inet_ntoa(ip_struc));
 
                 printf("Sending on mac: ");
                 print_hwa(raw_addr.sll_addr, 6);
@@ -181,8 +209,11 @@ int main() {
                 print_hwa(((struct ethhdr*)buf)->h_source, 6);
                 printf("\n");
 
+                printf("sending arp\n");
+                print_arp((struct arphdr*)(arp_buf+2));
+
                 raw_len = sizeof(raw_addr);
-                errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size, 0, (struct sockaddr const *)&raw_addr, raw_len);
+                errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
                 if(errs < 0) {
                     perror("sendto(arpr)");
                     exit(EXIT_FAILURE);
@@ -196,4 +227,89 @@ int main() {
 
     return 1;
 
+}
+
+
+void handle_rep(char* buf) {
+    struct arphdr* arp_hdr_ptr;
+    struct arp_cache* arp_c;
+    struct hwaddr answer;
+    ssize_t errs;
+
+    arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+
+    arp_c = get_arp(arp_lst, *(in_addr_t*)extract_sender_pa(arp_hdr_ptr));
+    if(arp_c == NULL || arp_c->fd < 0) {
+        _ERROR("%s\n", "got a reply for somthing I never asked for");
+        if(arp_c == NULL) {
+            _ERROR("%s\n", "arp_c was NULL");
+        } else {
+            _ERROR("fd: %d\n", arp_c->fd);
+        }
+        exit(EXIT_FAILURE);
+    }
+
+    /*ans tour*/
+    memcpy(&answer, &arp_c->hw, sizeof(struct hwaddr));
+
+    errs = send(arp_c->fd, &answer, sizeof(struct hwaddr), 0);
+    if(errs < 0) {
+        _ERROR("%s %m\n", "send:");
+    }
+
+    if( close(arp_c->fd) ) {
+        _ERROR("%s %m\n", "close:");
+        exit(EXIT_FAILURE);
+    }
+
+    _DEBUG("%s\n", "sent the answer to tour");
+
+    arp_c->fd = -1;
+
+}
+
+void handle_req(int rawsock, char* buf) {
+
+    struct sockaddr_ll raw_addr;
+    struct in_addr tmp_ip;
+    unsigned char tmp_mac[ETH_ALEN];
+    struct hwa_ip* tmp_hwa_ip;
+    struct arphdr* arp_hdr_ptr;
+    socklen_t raw_len;
+    char arp_buf[BUFSIZE];
+    ssize_t errs;
+    size_t arp_size;
+
+    arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+
+    tmp_hwa_ip = is_my_ip(mip_head, *((in_addr_t *) extract_target_pa(arp_hdr_ptr)));
+    if (tmp_hwa_ip != NULL) {
+        _DEBUG("%s\n", "somone is asking for my mac");
+
+        /*saving the senders mac*/
+        memcpy(tmp_mac, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+        memcpy(&tmp_ip, extract_sender_pa(arp_hdr_ptr), arp_hdr_ptr->ar_pln);
+
+        memset(buf, 0, BUFSIZE);
+        memset(arp_buf, 0, sizeof(arp_buf));
+        arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REPLY, ETHERTYPE_IP, ARPHRD_ETHER,
+                tmp_hwa_ip->if_haddr, (unsigned char *) &tmp_hwa_ip->ip_addr.sin_addr.s_addr, tmp_mac,
+                (unsigned char *) &tmp_ip);
+
+        craft_eth(buf, &raw_addr, tmp_hwa_ip->if_haddr, tmp_mac, tmp_hwa_ip->if_index);
+        memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
+
+        printf("sending arp\n");
+        print_arp((struct arphdr*)(arp_buf+2));
+
+        raw_len = sizeof(raw_addr);
+        errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
+        if(errs < 0) {
+            perror("sendto(arpr)");
+            exit(EXIT_FAILURE);
+        }
+
+    } else {
+        _DEBUG("%s\n", "not my mac");
+    }
 }
