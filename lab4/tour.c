@@ -601,6 +601,7 @@ int create_ping_recver(void) {
     }
 
     tidentp->dstaddr.s_addr = host_ip.s_addr;
+    tidentp->is_sender = 0;
     LIST_INSERT_HEAD(&tidhead, tidentp, entries);
 
     return 0;
@@ -633,6 +634,7 @@ int create_ping_sender(struct sockaddr_in *addr) {
 
     /* the node we're pinging */
     tidentp->dstaddr.s_addr = addr->sin_addr.s_addr;
+    tidentp->is_sender = 1;
 
     /* Create the thread for sending pings requests */
     erri = pthread_create(&tidentp->tid, NULL, &ping_sender, fd_addrp);
@@ -674,8 +676,6 @@ int stop_pinging(void) {
     LIST_FOREACH(tidentp, &tidhead, entries) {
         erri = pthread_join(tidentp->tid, &retval);
         if(erri > 0) {
-            if(erri == ECANCELED)
-                continue;
             errno = erri;
             _ERROR("%s: %m\n", "pthread_join()");
             return -1;
@@ -689,6 +689,9 @@ int stop_pinging(void) {
     _DEBUG("%s\n", "Freeing the pthread id list....");
     while(tidhead.lh_first != NULL) {
         tidentp = tidhead.lh_first;
+        if(tidentp->is_sender) {
+            _DEBUG("I was pinging: %s\n", getvmname(tidentp->dstaddr));
+        }
         LIST_REMOVE(tidentp, entries);
         free(tidentp);
     }
@@ -703,7 +706,7 @@ int is_pinging(struct in_addr ipaddr) {
 
     _DEBUG("%s\n", "Searching if already prev node....");
     LIST_FOREACH(tidentp, &tidhead, entries) {
-        if(tidentp->dstaddr.s_addr == ipaddr.s_addr) {
+        if(tidentp->is_sender && tidentp->dstaddr.s_addr == ipaddr.s_addr) {
             return 1;
         }
     }

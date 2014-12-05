@@ -100,7 +100,7 @@ void *ping_recver(void *pgrecverp) {
         icmpp = EXTRACT_ICMPHDRP(ip_pktp);
         printf("%d bytes from %s: id=0x%x seq=%hu, ttl=%d\n", (int)errs,
                 getvmname(srcaddr.sin_addr), ntohs(icmpp->icmp_id), ntohs(icmpp->icmp_seq), ip_pktp->ip_ttl);
-        printf("echo reply data: %s\n", ((char*)icmpp) + ICMP_MINLEN);
+        printf("echo reply data from %s: %s\n", getvmname(srcaddr.sin_addr), ((char*)icmpp) + ICMP_MINLEN);
 
     }
 }

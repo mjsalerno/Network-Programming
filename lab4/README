@@ -1,11 +1,12 @@
-||||      README for Assignment 4        ||||
-=============================================
- || Scott Harvey     cse533-11  108272691 ||
- || Michael Salerno  cse533-8   108512298 ||
-=============================================
+              _____________________________________________
+              ||||      README for Assignment 4        ||||
+              =============================================
+               || Scott Harvey     cse533-11  108272691 ||
+               || Michael Salerno  cse533-8   108512298 ||
+              =============================================
 
 BUILDING IT!     makefile
-=========================
+==============================================================================
 For none of our debug printouts and no color, just type:
 $ make
 
@@ -23,26 +24,37 @@ To look at ANSI color output that has been re-directed to a file:
 $ less -R fileWithANSIColor
 
 
-==========================================
-================== TOUR ==================
-==========================================
+==============================================================================
+==================================== TOUR ====================================
+==============================================================================
 
-The tour header format.
-=======================
+       The tour header structure
+==========================================
 The struct tourhdr is defined in tour.h as the below:
-        struct tourhdr {
-            struct in_addr g_ip;
-            in_port_t g_port;
-            uint16_t index;    /* (struct in_addr)trhdr + trhdr->index + 3 */
-            uint32_t num_ips;
-            /* struct in_addr ip_1 */
-            /* struct in_addr ip_2 */
-            /* ... */
-            /* struct in_addr ip_num_ips */
-        }
+struct tourhdr {
+    struct in_addr g_ip;
+    in_port_t g_port;
+    uint16_t index;    /* (struct in_addr*)trhdr + trhdr->index + 3 */
+    uint32_t num_ips;
+#ifdef 0
+    /* This is what a real tour message would look like. */
+    /* NOT actually part of the struct. */
+    struct in_addr ip_1;
+    struct in_addr ip_2;
+    /* ... */
+    struct in_addr ip_num_ips;
+#endif
+}
 
-Structure of tour.
-==================
+        Structure/Design of tour
+==========================================
+1. Tour main thread spawns a thread fro recv'ing ICMP echo replies.
+2. Tour main thread monitors the route traversal socket and the multicast
+   sockets.
+3. Tour main thread spawns a thread for each host it wants to ping. These
+   ping sender threads all use the same socket to send the echo requests.
+
+
 Handling ICMP pinging using threads:
     * tour spawns one (and only one) thread for recv'ing ping responses (echo
       replies). These are recv'd on the "pgrecver" PF_INET, SOCK_RAW socket.
@@ -56,9 +68,21 @@ Handling ICMP pinging using threads:
       pthread_cancel()). Then it must wait to clean up all of its threads
       (using pthread_join()).
 
+Handling Multicast UDP messages:
+    * tour has one UDP socket for multicasting. Since it is bound to
+      INADDR_ANY, recv'd messages must be validate to see if they truly
+      came from the multicast address that tour gets from the tour message.
 
-Other notes about tour.
-=======================
+    * When tour gets the first tour message (or initiates the first message)
+      it joins the multicast group and performs other setup (see the
+      init_multicast_sock() func in tour.c).
+
+    * We use the recv_msg() and msg struct to obtain the original destination
+      address of the UDP datagram.
+
+
+          Misc. notes about tour
+===========================================
 The index will also always point to the ip of the current node at the hop.
 The index field is only incremented right before the message is sent to
 the next destination.
@@ -67,13 +91,15 @@ The macros in tour.h : TOUR_PREV, TOUR_CURR, and TOUR_NEXT return a pointer
 (into the tourhdr message) to the corresponding struct in_addr.
 
 
-==========================================
-================== ARP ===================
-==========================================
+==============================================================================
+==================================== ARP =====================================
+==============================================================================
 
 
-==========================================
-======= API (the areq function) ==========
-==========================================
+==============================================================================
+========================= API (the areq function) ============================
+==============================================================================
 Defined in api.c and api.h
-Nothing fancy about it, follows the write up to the letter.
+Nothing fancy about it, follows the write up with the addtition of sending
+your source hardware address, type and length back to the api. Not just
+the destination hardware address, type and length.
