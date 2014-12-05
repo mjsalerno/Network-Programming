@@ -14,6 +14,7 @@ void handle_sigint(int sign) {
 
 void handle_rep(char* buf);
 void handle_req(int rawsock, char* buf);
+void ans_tour(struct arp_cache* entry, struct arphdr* arp_hdr_ptr);
 
 static struct hwa_info* hw_list = NULL;
 static struct hwa_ip * mip_head = NULL;
@@ -179,12 +180,16 @@ int main() {
             memcpy(&tmp_ip.s_addr, buf, sizeof(uint32_t));
             _DEBUG("got areq for IP: %s\n", inet_ntoa(tmp_ip));
 
+            /*todo: has_arp == get_arp*/
             tmp_arp = has_arp(arp_lst, (in_addr_t)*buf);
 
             if(tmp_arp != NULL) {
                 _DEBUG("%s\n", "found a matching ip");
                 /*todo: give them the answer*/
-                _ERROR("%s\n", "TODO!!");
+                //_ERROR("%s\n", "TODO!!");
+                /*ans tour*/
+                arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+                ans_tour(tmp_arp, arp_hdr_ptr);
             } else {
                 _DEBUG("%s\n", "did not find a matching ip, need to ask");
 
@@ -238,8 +243,6 @@ int main() {
 void handle_rep(char* buf) {
     struct arphdr* arp_hdr_ptr;
     struct arp_cache* arp_c;
-    struct hwaddr answer;
-    ssize_t errs;
 
     arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
 
@@ -255,27 +258,7 @@ void handle_rep(char* buf) {
     }
 
     /*ans tour*/
-    memcpy(&answer, &arp_c->hw, sizeof(struct hwaddr));
-    answer.dst_halen = ETH_ALEN;
-    answer.src_halen = ETH_ALEN;
-    memcpy(answer.src_addr, mip_head->if_haddr, ETH_ALEN);
-    memcpy(answer.dst_addr, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
-    answer.src_ifindex = mip_head->if_index;
-    print_hwaddr(&answer);
-
-    errs = send(arp_c->fd, &answer, sizeof(struct hwaddr), 0);
-    if(errs < 0) {
-        _ERROR("%s %m\n", "send:");
-    }
-
-    if( close(arp_c->fd) ) {
-        _ERROR("%s %m\n", "close:");
-        exit(EXIT_FAILURE);
-    }
-
-    _DEBUG("%s\n", "sent the answer to tour");
-
-    arp_c->fd = -1;
+    ans_tour(arp_c, arp_hdr_ptr);
 
 }
 
@@ -323,4 +306,32 @@ void handle_req(int rawsock, char* buf) {
     } else {
         _DEBUG("%s\n", "not my mac");
     }
+}
+
+void ans_tour(struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
+    struct hwaddr answer;
+    ssize_t errs;
+
+    /*ans tour*/
+    memcpy(&answer, &entry->hw, sizeof(struct hwaddr));
+    answer.dst_halen = ETH_ALEN;
+    answer.src_halen = ETH_ALEN;
+    memcpy(answer.src_addr, mip_head->if_haddr, ETH_ALEN);
+    memcpy(answer.dst_addr, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+    answer.src_ifindex = mip_head->if_index;
+    print_hwaddr(&answer);
+
+    errs = send(entry->fd, &answer, sizeof(struct hwaddr), 0);
+    if(errs < 0) {
+        _ERROR("%s %m\n", "send:");
+    }
+
+    if( close(entry->fd) ) {
+        _ERROR("%s %m\n", "close:");
+        exit(EXIT_FAILURE);
+    }
+
+    _DEBUG("%s\n", "sent the answer to tour");
+
+    entry->fd = -1;
 }
