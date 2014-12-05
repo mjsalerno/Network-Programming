@@ -137,6 +137,11 @@ int main() {
             }
             _DEBUG("%s\n", "Got something on the raw socket");
 
+            if(htons(*(uint16_t*)(buf + sizeof(struct ethhdr))) != ARP_ETH_PROTO) {
+                _SPEC("%s\n", "got someone elses ARP, skipping");
+                continue;
+            }
+
             arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
             printf("got arp\n");
             print_arp(arp_hdr_ptr);
