@@ -32,15 +32,15 @@ check: cov
 	$(CC) $(CFLAGS) $< -o $@
 
 test: test.o common.o ARP_util.o
-	$(CC) $(CFLAGS) $< common.o ARP_util.o -o $@ 
+	$(CC) $(CFLAGS) $< common.o ARP_util.o -o $@
 
 ARP: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@_cse533-11
 
 tour: tour.o common.o api.o ping.o api.o
-	$(CC) $(CFLAGS) $< ping.o api.o common.o -o $@
+	$(CC) $(CFLAGS) $< ping.o api.o common.o -o $@_cse533-11
 
 clean:
-	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage
+	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage *_cse533-11
 
 .PHONY: all clean debug cov check

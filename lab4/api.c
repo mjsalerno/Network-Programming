@@ -66,7 +66,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     }
     do {
         /* todo: maybe need to change the read? */
-        n = read(unixfd, (tot_n + &HWaddr), (sizeof(struct hwaddr) - tot_n));
+        n = read(unixfd, (tot_n + HWaddr), (sizeof(struct hwaddr) - tot_n));
         if(n < 0) {
             if(errno == EINTR)
                 continue;
