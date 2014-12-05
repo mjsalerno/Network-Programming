@@ -8,7 +8,7 @@
 
 #define PING_ICMP_ID 0x2691
 
-#define EXTRACT_ICMPHDRP(ip_pktp) ((struct icmp*)(IP4_HDRLEN + ((char*)(ip_pktp))))
+#define EXTRACT_ICMPHDRP(ip_pktp) ((struct icmp*)((ip_pktp->ip_hl << 2) + ((char*)(ip_pktp))))
 
 void *ping_sender(void *fd_addrp);
 void *ping_recver(void *pgrecverp);

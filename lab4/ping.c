@@ -20,28 +20,18 @@ void *ping_sender(void *fd_addrp) {
     char pingdata[] = "533 Grading TAs are cool!";
     size_t ip_paylen;
     struct ip *ip_pktp = (struct ip*)(ethbuf + sizeof(struct ethhdr));
-    /* fixme: ip->hl << 2 */
-    struct icmp *icmpp = (struct icmp*)(ethbuf + sizeof(struct ethhdr) + sizeof(struct ip));
+    struct icmp *icmpp = (struct icmp*)(ethbuf + sizeof(struct ethhdr) + IP4_HDRLEN);
 
     memset(ethbuf, 0, sizeof(ethbuf));
 
     /* copy out the socket fd and the dst addr from the malloc'd arg space */
     pgsender = fdaddr->sockfd;
     memcpy(&dstaddr, &fdaddr->addr, sizeof(dstaddr));
-    free(fdaddr);
-
-    /*int pgrecver = *((int*)sock);*/
-    /*char buf[sizeof(struct ip) + sizeof(struct icmp)];*/
-    /*struct ip *iphdrp = (struct ip*)buf;*/
-    /*struct icmp *icmphdrp = (struct icmp*)(buf + sizeof(struct ip));*/
-    /*struct hwaddr dsthwaddr;*/
+    free(fdaddr); /* the argument was malloc'd */
 
     printf("PING %s (%s): %u bytes of data.\n", getvmname(dstaddr.sin_addr),
             inet_ntoa(dstaddr.sin_addr), (u_int)sizeof(pingdata));
     for(EVER) {
-        /* hard-coded srcmac */
-        //unsigned char srcmac[6] = {0x00, 0x0c, 0x29, 0xe1, 0x54, 0xd1}; /* vm8: 00:0c:29:e1:54:d1 */
-        //unsigned char dstmac[6] = {0x00, 0x0c, 0x29, 0xa3, 0x1f, 0x19}; /* vm3: 00:0c:29:a3:1f:19 */
         slen = sizeof(dstaddr);
         erri = areq((struct sockaddr *) &dstaddr, slen, &HWaddr);
         if (erri < 0) {
@@ -52,17 +42,15 @@ void *ping_sender(void *fd_addrp) {
         ip_paylen = ICMP_MINLEN + sizeof(pingdata);
         craft_ip(ip_pktp, IPPROTO_ICMP, PING_ICMP_ID, host_ip, dstaddr.sin_addr, ip_paylen);
         craft_eth(ethbuf, ETH_P_IP, &dstaddrll, HWaddr.src_addr, HWaddr.dst_addr, HWaddr.src_ifindex);
-        /*craft_eth(ethbuf, &dstaddrll, srcmac, dstmac, 2);*/
+
         _DEBUGY("Sending an icmp ping, ip_paylen: %u, total len: %u\n", (u_int)ip_paylen, (u_int)(sizeof(struct ethhdr) + IP4_HDRLEN + ip_paylen));
         errs = sendto(pgsender, ethbuf, (sizeof(struct ethhdr) + IP4_HDRLEN + ip_paylen), 0, (struct sockaddr*)&dstaddrll, sizeof(dstaddrll));
         if(errs < 0) {
             _ERROR("%s: %m\n", "sendto()");
             pthread_exit((void*)EXIT_FAILURE);
         }
-
-        sleep(1);
+        sleep(1); /* sleep for a second  before sending another ping */
     }
-    /* todo: send_on_iface(); */
 }
 
 /**
@@ -80,7 +68,7 @@ void *ping_recver(void *pgrecverp) {
     char buf[IP_MAXPACKET];
     struct ip *ip_pktp = (struct ip*)buf;
     struct icmp *icmpp;
-
+    /* fixme: ip->hl << 2 */
 
     for(EVER) {
         slen = sizeof(srcaddr);
