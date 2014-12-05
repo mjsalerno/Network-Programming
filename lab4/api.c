@@ -102,11 +102,11 @@ void print_hwaddr(struct hwaddr* addr) {
 
     printf("===========================\n");
     printf("index: %d\n", addr->src_sll_ifindex);
-    printf("dst_hatype: %hu", addr->dst_sll_hatype);
+    printf("dst_hatype: %hu\n", addr->dst_sll_hatype);
     printf("dst_halen: %d\n", addr->dst_sll_halen);
     printf("dst_addr: ");
     print_hwa(addr->dst_sll_addr, addr->dst_sll_halen);
-    printf("\nsrc_hatype: %hu", addr->src_sll_hatype);
+    printf("\nsrc_hatype: %hu\n", addr->src_sll_hatype);
     printf("src_halen: %d\n", addr->src_sll_halen);
     printf("src_addr: ");
     print_hwa(addr->dst_sll_addr, addr->dst_sll_halen);
