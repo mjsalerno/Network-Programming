@@ -49,5 +49,6 @@ void print_hw_addrs(struct hwa_info	*hwahead);
 void keep_eth0(struct hwa_info	**hwahead, struct hwa_ip ** mip_head);
 void print_hwa_list(struct hwa_ip* head);
 void print_hwa_ip(struct hwa_ip* node);
+void free_hwa_ip(struct hwa_ip* node);
 
 #endif /* GET_HW_ADDRS_H */

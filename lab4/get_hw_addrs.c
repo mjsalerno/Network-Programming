@@ -228,3 +228,21 @@ void print_hwa_ip(struct hwa_ip* node) {
 	printf("\n");
 }
 
+void free_hwa_ip(struct hwa_ip* node) {
+	struct hwa_ip* prev = node;
+
+	if(node != NULL)
+		node = node->next;
+	else
+		return;
+
+	if(node == NULL) {
+		free(prev);
+		return;
+	}
+
+	for(;node != NULL; prev = node, node = node->next) {
+		free(prev);
+	}
+}
+
