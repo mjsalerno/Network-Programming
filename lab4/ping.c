@@ -36,7 +36,8 @@ void *ping_sender(void *fd_addrp) {
     /*struct icmp *icmphdrp = (struct icmp*)(buf + sizeof(struct ip));*/
     /*struct hwaddr dsthwaddr;*/
 
-    printf("PING\n"); /* pg 748 */
+    printf("PING %s (%s): %u bytes of data.\n", getvmname(dstaddr.sin_addr),
+            inet_ntoa(dstaddr.sin_addr), (u_int)sizeof(pingdata));
     for(EVER) {
         /* hard-coded srcmac */
         //unsigned char srcmac[6] = {0x00, 0x0c, 0x29, 0xe1, 0x54, 0xd1}; /* vm8: 00:0c:29:e1:54:d1 */
@@ -90,7 +91,7 @@ void *ping_recver(void *pgrecverp) {
             pthread_exit((void*)EXIT_FAILURE);
         }
         buf[errs] = 0;
-        _SPEC("%s\n", "Got stuff from ping recv'er....");
+        _DEBUGY("%s\n", "Got stuff from ping recv'er....");
         if((filter_ip_icmp(ip_pktp, (size_t)errs)) < 0 ) {
             continue;
         }
