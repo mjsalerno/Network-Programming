@@ -1,31 +1,21 @@
 #include "ARP.h"
 
-void handle_sigint(int sign) {
-    /**
-    * From signal(7):
-    * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
-    * to guarantee that the following functions can be safely called inside a signal handler:
-    * ... _Exit() ... unlink() ...
-    */
-    sign++; /* for -Wall -Wextra -Werror */
-    unlink(ARP_PATH);
-    _Exit(EXIT_FAILURE);
-}
-
 void handle_rep(char* buf);
 void handle_req(int rawsock, char* buf);
-void ans_tour(struct arp_cache* entry, struct arphdr* arp_hdr_ptr);
+void ans_tour(int sock, struct arp_cache* entry, struct arphdr* arp_hdr_ptr);
+void handle_sigint(int sign);
 
 static struct hwa_info* hw_list = NULL;
 static struct hwa_ip * mip_head = NULL;
 static struct arp_cache* arp_lst = NULL;
+static char* buf;
 
 int main() {
 
     struct sockaddr_un unix_addr;
     struct sockaddr_ll raw_addr;
 
-    int rawsock, unixsock, max_fd, listening_unix_sock;
+    int rawsock, unixsock, max_fd, accepted_unix_sock;
     socklen_t raw_len, unix_len;
     struct arp_cache* tmp_arp;
     struct in_addr tmp_ip;
@@ -38,7 +28,6 @@ int main() {
 
     struct sigaction sigact;
 
-    char* buf;
     char arp_buf[BUFSIZE];
     unsigned char bcast_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
@@ -164,14 +153,14 @@ int main() {
 
         if(FD_ISSET(unixsock, &fdset)) {                                                 /* UNIX sock */
 
-            listening_unix_sock = accept(unixsock, (struct sockaddr*)&unix_addr, &unix_len);
-            if(listening_unix_sock < 0) {
+            accepted_unix_sock = accept(unixsock, (struct sockaddr*)&unix_addr, &unix_len);
+            if(accepted_unix_sock < 0) {
                 perror("arp.connect(unixsock)");
                 close(unixsock);
                 exit(EXIT_FAILURE);
             }
 
-            errs = recv(listening_unix_sock, buf, BUFSIZE, 0);
+            errs = recv(accepted_unix_sock, buf, BUFSIZE, 0);
             if(errs < 0) {
                 perror("arp.recv(unix)");
                 exit(EXIT_FAILURE);
@@ -189,12 +178,12 @@ int main() {
                 //_ERROR("%s\n", "TODO!!");
                 /*ans tour*/
                 arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
-                ans_tour(tmp_arp, arp_hdr_ptr);
+                ans_tour(accepted_unix_sock, tmp_arp, arp_hdr_ptr);
             } else {
                 _DEBUG("%s\n", "did not find a matching ip, need to ask");
 
                 /*make partial entry*/
-                add_part_arp(&arp_lst, tmp_ip.s_addr, listening_unix_sock);
+                add_part_arp(&arp_lst, tmp_ip.s_addr, accepted_unix_sock);
 
                 memset(buf, 0, BUFSIZE);
                 memset(arp_buf, 0, sizeof(arp_buf));
@@ -258,7 +247,7 @@ void handle_rep(char* buf) {
     }
 
     /*ans tour*/
-    ans_tour(arp_c, arp_hdr_ptr);
+    ans_tour(-1, arp_c, arp_hdr_ptr);
 
 }
 
@@ -308,9 +297,12 @@ void handle_req(int rawsock, char* buf) {
     }
 }
 
-void ans_tour(struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
+void ans_tour(int sock, struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
     struct hwaddr answer;
     ssize_t errs;
+
+    if(sock < 0)
+        sock = entry->fd;
 
     /*ans tour*/
     memcpy(&answer, &entry->hw, sizeof(struct hwaddr));
@@ -321,12 +313,12 @@ void ans_tour(struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
     answer.src_ifindex = mip_head->if_index;
     print_hwaddr(&answer);
 
-    errs = send(entry->fd, &answer, sizeof(struct hwaddr), 0);
+    errs = send(sock, &answer, sizeof(struct hwaddr), 0);
     if(errs < 0) {
         _ERROR("%s %m\n", "send:");
     }
 
-    if( close(entry->fd) ) {
+    if( close(sock) ) {
         _ERROR("%s %m\n", "close:");
         exit(EXIT_FAILURE);
     }
@@ -334,4 +326,19 @@ void ans_tour(struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
     _DEBUG("%s\n", "sent the answer to tour");
 
     entry->fd = -1;
+}
+
+void handle_sigint(int sign) {
+    /**
+    * From signal(7):
+    * POSIX.1-2004 (also known as POSIX.1-2001 Technical Corrigendum 2) requires an  implementation
+    * to guarantee that the following functions can be safely called inside a signal handler:
+    * ... _Exit() ... unlink() ...
+    */
+    sign++; /* for -Wall -Wextra -Werror */
+    free(buf);
+    free_hwa_ip(mip_head);
+    free_arp_cache(arp_lst);
+    unlink(ARP_PATH);
+    _Exit(EXIT_FAILURE);
 }

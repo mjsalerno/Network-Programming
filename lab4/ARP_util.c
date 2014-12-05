@@ -125,3 +125,23 @@ void print_arp(struct arphdr* arp) {
     printf("===========================\n");
 
 }
+
+void free_arp_cache(struct arp_cache* node) {
+
+    struct arp_cache* prev = node;
+
+    if(node != NULL)
+        node = node->next;
+    else
+        return;
+
+    if(node == NULL) {
+        free(prev);
+        return;
+    }
+
+    for(;node != NULL; prev = node, node = node->next) {
+        free(prev);
+    }
+
+}
