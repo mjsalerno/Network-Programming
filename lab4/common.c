@@ -4,7 +4,7 @@
 #include "tour.h"
 #include "api.h"
 
-void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char *src_mac, unsigned char *dst_mac, int ifindex) {
+void craft_eth(void* eth_buf, uint16_t ethproto, struct sockaddr_ll* raw_addr, unsigned char *src_mac, unsigned char *dst_mac, int ifindex) {
     struct ethhdr* et = eth_buf;
     if(raw_addr != NULL) {
         /*prepare sockaddr_ll*/
@@ -12,7 +12,7 @@ void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char *src_m
 
         /*RAW communication*/
         raw_addr->sll_family = PF_PACKET;
-        raw_addr->sll_protocol = htons(ARP_ETH_PROTO);
+        raw_addr->sll_protocol = htons(ethproto);
 
         /*index of the network device*/
         raw_addr->sll_ifindex = ifindex;
@@ -29,7 +29,7 @@ void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char *src_m
         raw_addr->sll_addr[7] = 0;
     }
 
-    et->h_proto = htons(ARP_ETH_PROTO);
+    et->h_proto = htons(ethproto);
     memcpy(et->h_dest, dst_mac, ETH_ALEN);
     memcpy(et->h_source, src_mac, ETH_ALEN);
 
@@ -41,7 +41,7 @@ void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char *src_m
     printf("\n");
     #endif /*DEBUG*/
 
-    _DEBUG("crafted frame with proto: %d\n", et->h_proto);
+    _DEBUG("crafted frame with proto: 0x%x\n", ethproto);
 }
 
 void craft_ip(void* ip_pktbuf, uint8_t proto, u_short ip_id, struct in_addr src_ip, struct in_addr dst_ip, size_t paylen) {
@@ -122,9 +122,9 @@ size_t craft_arp(char* buf, uint16_t id, unsigned short int ar_op,  unsigned sho
 
     arp = (struct arphdr*)buf;
     arp->ar_pln = (unsigned char)(0xFF & add_len);
-    arp->ar_hrd = ar_hrd; /*ARPHRD_ETHER*/
-    arp->ar_pro = ar_pro; /*ETHERTYPE_IP*/
-    arp->ar_op = ar_op;
+    arp->ar_hrd = htons(ar_hrd); /*ARPHRD_ETHER*/
+    arp->ar_pro = htons(ar_pro); /*ETHERTYPE_IP*/
+    arp->ar_op = htons(ar_op);
 
     if(ar_hrd == ARPHRD_ETHER) {
         arp->ar_hln = ETH_ALEN;
@@ -159,10 +159,10 @@ size_t craft_arp(char* buf, uint16_t id, unsigned short int ar_op,  unsigned sho
 
 unsigned char*extract_target_pa(struct arphdr *arp) {
     unsigned char* ptr = (unsigned char*)(arp + 1); /* point to end of hdr */
-    ptr += 2;
+
     ptr += arp->ar_hln; /* skip over sender hardware addr */
     ptr += arp->ar_pln; /* skip over sender protocol addr */
-    ptr += arp->ar_pln; /* skip over target hardware addr */
+    ptr += arp->ar_hln; /* skip over target hardware addr */
     return ptr;
 }
 

@@ -41,7 +41,7 @@
 
 
 
-void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char *src_mac, unsigned char *dst_mac, int ifindex);
+void craft_eth(void* eth_buf, uint16_t ethproto, struct sockaddr_ll* raw_addr, unsigned char *src_mac, unsigned char *dst_mac, int ifindex);
 void craft_ip(void* ip_pktbuf, uint8_t proto, u_short ip_id, struct in_addr src_ip, struct in_addr dst_ip, size_t paylen);
 void print_ip(struct ip* ip_pkt);
 unsigned char*extract_target_pa(struct arphdr *arp);

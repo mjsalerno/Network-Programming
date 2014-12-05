@@ -138,7 +138,7 @@ int main() {
             _DEBUG("%s\n", "Got something on the raw socket");
 
             if(ntohs(*(uint16_t*)(buf + sizeof(struct ethhdr))) != ARP_ETH_PROTO) {
-                _SPEC("got someone elses ARP, proto: %hu , wanted: %hu, skipping\n", ntohs(*(uint16_t*)(buf + sizeof(struct ethhdr))), ARP_ETH_PROTO);
+                _SPEC("got someone elses ARP, proto: 0x%x , wanted: 0x%x, skipping\n", ntohs(*(uint16_t*)(buf + sizeof(struct ethhdr))), ARP_ETH_PROTO);
                 continue;
             }
 
@@ -146,17 +146,17 @@ int main() {
             printf("got arp\n");
             print_arp(arp_hdr_ptr);
 
-            if(arp_hdr_ptr->ar_op == ARPOP_REQUEST) {
+            if(ntohs(arp_hdr_ptr->ar_op) == ARPOP_REQUEST) {
                 _INFO("%s\n", "got a request");
                 handle_req(rawsock, buf);
 
-            } else if(arp_hdr_ptr->ar_op == ARPOP_REPLY) {
+            } else if(ntohs(arp_hdr_ptr->ar_op) == ARPOP_REPLY) {
                 /*todo: handle reply*/
                 _INFO("%s\n", "got a reply");
                 handle_rep(buf);
 
             } else {
-                _ERROR("Not sure what to do with arp_op: %d\n", arp_hdr_ptr->ar_op);
+                _ERROR("Not sure what to do with arp_op: %d\n", ntohs(arp_hdr_ptr->ar_op));
             }
 
         }
@@ -194,7 +194,7 @@ int main() {
                 memset(buf, 0, BUFSIZE);
                 memset(arp_buf, 0, sizeof(arp_buf));
                 arp_size = craft_arp(arp_buf, htons(ARP_ETH_PROTO), ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr.sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
-                craft_eth(buf, &raw_addr, mip_head->if_haddr, bcast_mac, mip_head->if_index);
+                craft_eth(buf, ARP_ETH_PROTO, &raw_addr, mip_head->if_haddr, bcast_mac, mip_head->if_index);
                 memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
 
                 arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
@@ -216,7 +216,7 @@ int main() {
 
                 printf("sending arp\n");
                 print_arp((struct arphdr*)(arp_buf+2));
-
+                _SPEC("sending proto: 0x%x , ours: 0x%x\n", ntohs(*(uint16_t*)(buf + sizeof(struct ethhdr))), ARP_ETH_PROTO);
                 raw_len = sizeof(raw_addr);
                 errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
                 if(errs < 0) {
@@ -307,7 +307,7 @@ void handle_req(int rawsock, char* buf) {
                 tmp_hwa_ip->if_haddr, (unsigned char *) &tmp_hwa_ip->ip_addr.sin_addr.s_addr, tmp_mac,
                 (unsigned char *) &tmp_ip);
 
-        craft_eth(buf, &raw_addr, tmp_hwa_ip->if_haddr, tmp_mac, tmp_hwa_ip->if_index);
+        craft_eth(buf, ARP_ETH_PROTO, &raw_addr, tmp_hwa_ip->if_haddr, tmp_mac, tmp_hwa_ip->if_index);
         memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
 
         printf("sending arp\n");
