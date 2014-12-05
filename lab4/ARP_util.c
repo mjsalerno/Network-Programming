@@ -42,27 +42,32 @@ void add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigne
 }
 
 void add_part_arp(struct arp_cache** arp_head, in_addr_t ip, int fd) {
+    #ifdef DEBUG
     struct in_addr ip_struc;
-
     ip_struc.s_addr = ip;
     _DEBUG("adding for ip: %s\n", inet_ntoa(ip_struc));
+    #endif
 
     add_arp(arp_head, ip, -1, 0, 6, NULL, NULL, fd);
 }
 
 struct arp_cache* get_arp(struct arp_cache* arp_head, in_addr_t ip) {
     struct arp_cache* ptr = arp_head;
-    struct in_addr ip_struc;
 
+    #ifdef DEBUG
+    struct in_addr ip_struc;
     ip_struc.s_addr = ip;
     _DEBUG("looking for ip: %s\n", inet_ntoa(ip_struc));
+    #endif
 
     for(; ptr != NULL; ptr = ptr->next) {
         if(ptr->ip == ip) {
             _DEBUG("%s\n", "FOUND MATCH!!");
             break;
         }
+        #ifdef DEBUG
         ip_struc.s_addr = ptr->ip;
+        #endif
         _DEBUG("not a match ip: %s\n", inet_ntoa(ip_struc));
     }
 
@@ -71,10 +76,12 @@ struct arp_cache* get_arp(struct arp_cache* arp_head, in_addr_t ip) {
 
 struct hwa_ip* is_my_ip(struct hwa_ip* head, in_addr_t ip) {
     struct hwa_ip* ptr = head;
-    struct in_addr ip_struc;
 
+    #ifdef DEBUG
+    struct in_addr ip_struc;
     ip_struc.s_addr = ip;
     _DEBUG("looking for: %s\n", inet_ntoa(ip_struc));
+    #endif
 
     for(; ptr != NULL; ptr = ptr->next) {
         if(head->ip_addr.sin_addr.s_addr == ip) {
@@ -139,3 +146,4 @@ void free_arp_cache(struct arp_cache* node) {
     }
 
 }
+
