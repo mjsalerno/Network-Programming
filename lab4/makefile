@@ -32,7 +32,7 @@ check: cov
 	$(CC) $(CFLAGS) $< -o $@
 
 common.o: common.c common.h api.o
-	$(CC) $(CFLAGS) api.o -c $<
+	$(CC) $(CFLAGS) -c $<
 
 test: test.o common.o ARP_util.o api.o
 	$(CC) $(CFLAGS) $< api.o common.o ARP_util.o -o $@

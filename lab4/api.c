@@ -80,6 +80,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
         tot_n += n;
     } while (n > 0 && tot_n < sizeof(struct hwaddr));
     _DEBUG("ARP sent me %d bytes.\n", (int)tot_n);
+    print_hwaddr(HWaddr);
     printf("areq found dst mac: ");
     print_hwa(HWaddr->dst_addr, HWaddr->dst_halen);
     printf("\n");
@@ -99,17 +100,17 @@ void print_hwaddr(struct hwaddr* addr) {
     unsigned char  src_halen;	  Length of address
     unsigned char  src_addr[8];	  Physical layer address
     */
-
-    printf("==============hwaddr=======\n");
-    printf("index: %d\n", addr->src_ifindex);
-    printf("dst_hatype: %hu\n", addr->dst_hatype);
-    printf("dst_halen: %d\n", addr->dst_halen);
-    printf("dst_addr: ");
+#ifdef DEBUG
+    printf("========= hwaddr from arp =========\n");
+    printf("index     : %2d\n", addr->src_sll_ifindex);
+    printf("dst_hatype: %2hu\n", addr->dst_sll_hatype);
+    printf("dst_halen : %2hhu\n", addr->dst_sll_halen);
+    printf("dst_addr  :  ");
     print_hwa(addr->dst_addr, addr->dst_halen);
-    printf("\nsrc_hatype: %hu\n", addr->src_hatype);
-    printf("src_halen: %d\n", addr->src_halen);
-    printf("src_addr: ");
+    printf("\nsrc_hatype: %2hu\n", addr->src_sll_hatype);
+    printf("src_halen : %2hhu\n", addr->src_sll_halen);
+    printf("src_addr  :  ");
     print_hwa(addr->dst_addr, addr->dst_halen);
-    printf("\n===========================\n");
-
+    printf("\n===================================\n");
+#endif
 }

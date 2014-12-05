@@ -66,6 +66,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    _DEBUG("%s\n", "Initializing sockets....");
     /* create the two ping_sender sockets and the tour (rt) socket */
     rtsock = socket(AF_INET, SOCK_RAW, IPPROTO_TOUR);
     if(rtsock < 0) {
@@ -219,6 +220,7 @@ int initiate_tour(int argc, char *argv[]) {
     if(argc <= 1) {
         return -1;
     }
+    _DEBUG("%s\n", "Initiating tour...");
     /* Else we are initiating a new tour. */
     /* We'll have (argc - 1) nodes in the tour, +1 for our own ip */
     trhdrlen = sizeof(struct tourhdr) + sizeof(struct in_addr) * argc;
