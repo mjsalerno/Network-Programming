@@ -3,7 +3,7 @@
 #include "common.h"
 #include "tour.h"
 
-void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char src_mac[ETH_ALEN], unsigned char dst_mac[ETH_ALEN], int ifindex) {
+void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char *src_mac, unsigned char *dst_mac, int ifindex) {
     struct ethhdr* et = eth_buf;
     if(raw_addr != NULL) {
         /*prepare sockaddr_ll*/

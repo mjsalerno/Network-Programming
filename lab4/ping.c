@@ -44,14 +44,13 @@ void *ping_sender(void *fd_addrp) {
             pthread_exit((void*)EXIT_FAILURE);
         }
         _DEBUG("%s", "Got a mac: ");
-        print_hwa(HWaddr.sll_addr, HWaddr.sll_halen);
+        print_hwa(HWaddr.dst_sll_addr, HWaddr.dst_sll_halen);
         printf("\n");
 
         craft_echo_reply(icmpp, icmpseq++, pingdata, sizeof(pingdata));
         ip_paylen = sizeof(struct icmp) + sizeof(pingdata);
         craft_ip(ip_pktp, IPPROTO_ICMP, PING_ICMP_ID, host_ip, dstaddr.sin_addr, ip_paylen);
-        /*fixme: (u_char*)HWaddr.src_addr*/
-        craft_eth(ethbuf, &dstaddrll, (u_char*)HWaddr.sll_addr, (u_char*)HWaddr.sll_addr, HWaddr.sll_ifindex);
+        craft_eth(ethbuf, &dstaddrll, HWaddr.src_sll_addr, HWaddr.dst_sll_addr, HWaddr.src_sll_ifindex);
         /*craft_eth(ethbuf, &dstaddrll, srcmac, dstmac, 2);*/
 
         errs = sendto(pgsender, ethbuf, (sizeof(struct ethhdr) + IP4_HDRLEN + ip_paylen), 0, (struct sockaddr*)&dstaddrll, sizeof(dstaddrll));
