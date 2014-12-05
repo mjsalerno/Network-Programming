@@ -33,8 +33,11 @@ int main() {
 
     hw_list = get_hw_addrs();
     keep_eth0(&hw_list, &mip_head);
+    #ifdef DEBUG
     print_hw_addrs(hw_list);
+    #endif
     free_hwa_info(hw_list);
+    printf("Found " IFACE_TO_KEEP "\n");
     print_hwa_list(mip_head);
 
     buf = malloc(BUFSIZE);
