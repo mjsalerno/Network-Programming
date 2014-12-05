@@ -64,6 +64,15 @@ void craft_ip(void* ip_pktbuf, uint8_t proto, u_short ip_id, struct in_addr src_
     /*memcpy(&(ip_pkt->ip_dst.s_addr), &dst_ip.s_addr, sizeof(in_addr_t));
     memcpy(&(ip_pkt->ip_src.s_addr), &src_ip.s_addr, sizeof(in_addr_t));*/
     ip_pkt->ip_sum = 0;
+    if(proto == IPPROTO_ICMP) {
+        /**
+        * MIS-LEADING: We csum here because when WE use IPPROTO_ICMP
+        *  we are sending over a PF_PACKET socket. We must provide
+        *  the normal function of the IPv4 layer here by calculating
+        *  the checksum ourselves.
+        */
+        ip_pkt->ip_sum = csum(ip_pkt, IP4_HDRLEN);
+    }
 }
 
 /*void print_ip(struct ip* ip_pkt) {
