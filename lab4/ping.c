@@ -89,6 +89,7 @@ void *ping_recver(void *pgrecverp) {
             _ERROR("%s: %m\n", "recvfrom()");
             pthread_exit((void*)EXIT_FAILURE);
         }
+        _SPEC("%s\n", "Got stuff from ping recv'er....");
         if((filter_ip_icmp(ip_pktp, (size_t)errs)) < 0 ) {
             continue;
         }

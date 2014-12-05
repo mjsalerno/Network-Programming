@@ -331,7 +331,7 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
         }
         if(erri == 0) {
             /* Timeout was reached (tvalp changed when recv'ing mcast msgs)*/
-            printf("Waited for all nodes to report. Ending the tour....\n");
+            _INFO("%s", "Waited for all nodes to report. Ending the tour....\n");
             return 0;
         }
         if(FD_ISSET(rtsock, &rset)) {
