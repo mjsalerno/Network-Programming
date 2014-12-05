@@ -104,26 +104,26 @@ int filter_ip_icmp(struct ip *ip_pktp, size_t n) {
     struct icmp *icmpp;
 
     if(ip_pktp->ip_p != IPPROTO_ICMP) {
-        _DEBUG("%s\n", "ip proto not IPPROTO_ICMP. Ignoring....");
+        _DEBUG("ip proto: 0x%x is not IPPROTO_ICMP. Ignoring....\n", ip_pktp->ip_p);
         return -1;
     }
     if(n < (IP4_HDRLEN + ICMP_HDRLEN)) {
-        _DEBUG("%s\n", "icmp msg too small. Ignoring....");
+        _DEBUG("icmp msg too small, len: 0x%x. Ignoring....\n", (u_int)n);
         return -1;
     }
     if(ntohs(ip_pktp->ip_id) != PING_ICMP_ID) {
-        _DEBUG("msg ip ID: %hhu, PING_ICMP_ID: %hhu. Don't match, ignoring....\n",
+        _DEBUG("msg ip ID: 0x%x, PING_ICMP_ID: 0x%x, don't match. Ignoring....\n",
                 ntohs(ip_pktp->ip_id), PING_ICMP_ID);
         return -1;
     }
     /* point past the ip header to the icmp header */
     icmpp = EXTRACT_ICMPHDRP(ip_pktp);
     if(icmpp->icmp_code != 0 || icmpp->icmp_type != ICMP_ECHOREPLY) {
-        _DEBUG("%s\n", "icmp msg not an Echo reply. Ignoring....");
+        _DEBUG("icmp msg not echo reply, code: 0x%x, type 0x%x. Ignoring....\n", icmpp->icmp_code, icmpp->icmp_type);
         return -1;
     }
     if(ntohs((uint16_t)icmpp->icmp_id) != PING_ICMP_ID) {
-        _DEBUG("icmp Echo reply has wrong ID: %hu. Ignoring....\n", ntohs((uint16_t)icmpp->icmp_id));
+        _DEBUG("icmp Echo reply has wrong ID: 0x%x. Ignoring....\n", ntohs((uint16_t)icmpp->icmp_id));
         return -1;
     }
     return 0;
