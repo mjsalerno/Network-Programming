@@ -17,7 +17,7 @@ void *ping_sender(void *fd_addrp) {
     ssize_t errs = 0;
     uint16_t icmpseq = 0;
     char ethbuf[ETH_FRAME_LEN];
-    char pingdata[] = "The 533 Grading TAs are soo cool!";
+    char pingdata[] = "533 Grading TAs are cool!";
     size_t ip_paylen;
     struct ip *ip_pktp = (struct ip*)(ethbuf + sizeof(struct ethhdr));
     /* fixme: ip->hl << 2 */
@@ -46,9 +46,6 @@ void *ping_sender(void *fd_addrp) {
         if (erri < 0) {
             pthread_exit((void*)EXIT_FAILURE);
         }
-        _DEBUG("%s", "Got a mac: ");
-        print_hwa(HWaddr.dst_addr, HWaddr.dst_halen);
-        printf("\n");
 
         craft_echo_reply(icmpp, icmpseq++, pingdata, sizeof(pingdata));
         ip_paylen = ICMP_MINLEN + sizeof(pingdata);
@@ -98,10 +95,9 @@ void *ping_recver(void *pgrecverp) {
             continue;
         }
         icmpp = EXTRACT_ICMPHDRP(ip_pktp);
-        printf("%d bytes from %s: id=0x%x seq=%hu, ttl=%d\n", (int)errs,
-                getvmname(srcaddr.sin_addr), ntohs(icmpp->icmp_id), ntohs(icmpp->icmp_seq), ip_pktp->ip_ttl);
-        printf("echo reply data from %s: %s\n", getvmname(srcaddr.sin_addr), ((char*)icmpp) + ICMP_MINLEN);
-
+        printf("%d bytes from %s: id=0x%x seq=%hu, ttl=%d, data: %s\n", (int)errs,
+                getvmname(srcaddr.sin_addr), ntohs(icmpp->icmp_id), ntohs(icmpp->icmp_seq),
+                ip_pktp->ip_ttl, (((char*)icmpp) + ICMP_MINLEN));
     }
 }
 

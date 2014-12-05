@@ -237,31 +237,6 @@ uint16_t csum(void*data, size_t len) {
     return ((uint16_t) ~sum);
 }
 
-/**
-* Write "n" bytes to a descriptor.
-* RETURN: "n", the of bytes written or -1 on error
-**/
-ssize_t write_n(int fd, void *buf, size_t n) {
-    ssize_t curr_n = 0;
-    size_t tot_n = 0;
-
-    while(0 < n){
-        curr_n = write(fd, buf, n);
-        if(curr_n <= 0){
-            if(errno == EINTR){
-                continue;
-            }
-            return -1;
-        }
-        else{
-            n -= curr_n;
-            tot_n += curr_n;
-            buf = ((char*)buf) + curr_n;
-        }
-    }
-    return tot_n;
-}
-
 void print_hwa(unsigned char* mac, char mac_len) {
     int n;
     char *fmt_first = "%02x", *fmt_rest = ":%02x";

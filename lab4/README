@@ -5,7 +5,7 @@
                || Michael Salerno  cse533-8   108512298 ||
               =============================================
 
-BUILDING IT!     makefile
+BUILDING IT!            makefile
 ==============================================================================
 For none of our debug printouts and no color, just type:
 $ make
@@ -22,6 +22,16 @@ $ make clean
 To look at ANSI color output that has been re-directed to a file:
 (only works when built with 'make debug')
 $ less -R fileWithANSIColor
+
+TESTING IT!             various tests
+==============================================================================
+Testing receiving/sending pinging the previous stop at the ping.
+Filters out all except valid ping recv'd printout.
+1. On all vmXX's run ARP.
+2. On all vmXX's EXCEPT vm8 run:
+./tour_cse533-11 | grep "bytes from"
+3. On vm8 run:
+./tour_cse533-11 vm9 vm8 vm10 vm8 vm6 vm8 vm7 vm8 vm4 vm8 vm5 vm8 vm1 vm8 vm2 vm8 vm3 vm8 | grep "bytes from"
 
 
 ==============================================================================

@@ -49,9 +49,6 @@ unsigned char* extract_sender_pa(struct arphdr* arp);
 size_t craft_arp(char* buf, uint16_t id, unsigned short int ar_op,  unsigned short int ar_pro, unsigned short int ar_hrd, unsigned char ar_sha[ETH_ALEN], unsigned char ar_sip[4], unsigned char ar_tha[ETH_ALEN], unsigned char ar_tip[4]);
 uint16_t csum(void* data, size_t len);
 
-/* Try to write n bytes of the buffer. Checks for EINTR */
-ssize_t write_n(int fd, void *buf, size_t n);
-
 /* Print generic hardware address of length len. */
 void print_hwa(unsigned char* mac, char mac_len);
 
