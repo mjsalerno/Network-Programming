@@ -21,7 +21,7 @@ color: all
 cov: CFLAGS=-g -pthread -Wall -Werror -Wextra --coverage -DDEBUG
 cov: all
 
-check: cov
+check: cov test
 	./test
 	lcov -c -d . -o out.info
 	genhtml out.info -o coverage
