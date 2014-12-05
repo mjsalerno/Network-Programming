@@ -173,8 +173,6 @@ int main() {
 
             if(tmp_arp != NULL) {
                 _DEBUG("%s\n", "found a matching ip");
-                /*todo: give them the answer*/
-                //_ERROR("%s\n", "TODO!!");
                 /*ans tour*/
                 arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
                 ans_tour(accepted_unix_sock, tmp_arp, arp_hdr_ptr);
@@ -245,6 +243,9 @@ void handle_rep(char* buf) {
         exit(EXIT_FAILURE);
     }
 
+    /*update partial entry*/
+    memcpy(arp_c->hw.dst_addr, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+
     /*ans tour*/
     ans_tour(-1, arp_c, arp_hdr_ptr);
 
@@ -303,12 +304,19 @@ void ans_tour(int sock, struct arp_cache* entry, struct arphdr* arp_hdr_ptr) {
     if(sock < 0)
         sock = entry->fd;
 
+    #ifdef DEBUG
+    _DEBUGY("sock: %d\n", sock);
+    print_arp(arp_hdr_ptr);
+    print_hwaddr(&entry->hw);
+    _DEBUGY("%s\n", "END");
+    #endif
+
     /*ans tour*/
     memcpy(&answer, &entry->hw, sizeof(struct hwaddr));
     answer.dst_halen = ETH_ALEN;
     answer.src_halen = ETH_ALEN;
     memcpy(answer.src_addr, mip_head->if_haddr, ETH_ALEN);
-    memcpy(answer.dst_addr, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+    memcpy(answer.dst_addr, entry->hw.dst_addr, ETH_ALEN);
     answer.src_ifindex = mip_head->if_index;
     print_hwaddr(&answer);
 
