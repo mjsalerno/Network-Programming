@@ -22,18 +22,24 @@ void add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigne
 
     ptr->next = NULL;
     if(sll_addr != NULL)
-        memcpy(ptr->hw.dst_sll_addr, sll_addr, 8);
+        memcpy(ptr->hw.dst_addr, sll_addr, 8);
     memcpy(&ptr->ip, &ip, sizeof(in_addr_t));
-    ptr->hw.dst_sll_halen = sll_halen;
-    ptr->hw.dst_sll_hatype = sll_hatype;
-    ptr->hw.src_sll_ifindex = sll_ifindex;
+    ptr->hw.dst_halen = sll_halen;
+    ptr->hw.dst_hatype = sll_hatype;
+    ptr->hw.src_ifindex = sll_ifindex;
     ptr->fd = fd;
 
-    if(iface != NULL)
-        memcpy(ptr->hw.src_sll_addr, iface->if_haddr, 6);
+    if(iface != NULL) {
+        memcpy(ptr->hw.src_addr, iface->if_haddr, ETH_ALEN);
+    }
 
-    ptr->hw.src_sll_halen = 6;
-    ptr->hw.src_sll_hatype = sll_hatype;
+    ptr->hw.src_halen = 6;
+    ptr->hw.src_hatype = sll_hatype;
+
+    #ifdef DEBUG
+    printf("Added this to arp_cache\n");
+    print_hwaddr(&ptr->hw);
+    #endif
 
 }
 

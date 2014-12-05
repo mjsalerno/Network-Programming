@@ -82,7 +82,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     _DEBUG("ARP sent me %d bytes.\n", (int)tot_n);
     print_hwaddr(HWaddr);
     printf("areq found dst mac: ");
-    print_hwa(HWaddr->dst_sll_addr, HWaddr->dst_sll_halen);
+    print_hwa(HWaddr->dst_addr, HWaddr->dst_halen);
     printf("\n");
 
     close(unixfd);
@@ -92,25 +92,25 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
 void print_hwaddr(struct hwaddr* addr) {
 
     /*
-    int            src_sll_ifindex;	  Interface number
-    unsigned short dst_sll_hatype;	  Hardware type
-    unsigned char  dst_sll_halen;	  Length of address
-    unsigned char  dst_sll_addr[8];	  Physical layer address
-    unsigned short src_sll_hatype;	  Hardware type
-    unsigned char  src_sll_halen;	  Length of address
-    unsigned char  src_sll_addr[8];	  Physical layer address
+    int            src_ifindex;	  Interface number
+    unsigned short dst_hatype;	  Hardware type
+    unsigned char  dst_halen;	  Length of address
+    unsigned char  dst_addr[8];	  Physical layer address
+    unsigned short src_hatype;	  Hardware type
+    unsigned char  src_halen;	  Length of address
+    unsigned char  src_addr[8];	  Physical layer address
     */
 #ifdef DEBUG
     printf("========= hwaddr from arp =========\n");
-    printf("index     : %2d\n", addr->src_sll_ifindex);
-    printf("dst_hatype: %2hu\n", addr->dst_sll_hatype);
-    printf("dst_halen : %2hhu\n", addr->dst_sll_halen);
+    printf("index     : %2d\n", addr->src_ifindex);
+    printf("dst_hatype: %2hu\n", addr->dst_hatype);
+    printf("dst_halen : %2hhu\n", addr->dst_halen);
     printf("dst_addr  :  ");
-    print_hwa(addr->dst_sll_addr, addr->dst_sll_halen);
-    printf("\nsrc_hatype: %2hu\n", addr->src_sll_hatype);
-    printf("src_halen : %2hhu\n", addr->src_sll_halen);
+    print_hwa(addr->dst_addr, addr->dst_halen);
+    printf("\nsrc_hatype: %2hu\n", addr->src_hatype);
+    printf("src_halen : %2hhu\n", addr->src_halen);
     printf("src_addr  :  ");
-    print_hwa(addr->src_sll_addr, addr->src_sll_halen);
+    print_hwa(addr->src_addr, addr->src_halen);
     printf("\n===================================\n");
 #endif
 }
