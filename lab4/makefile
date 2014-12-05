@@ -19,9 +19,9 @@ color: all
 
 # targets for code coverage using GNU gcovr
 cov: CFLAGS=-g -pthread -Wall -Werror -Wextra --coverage -DDEBUG
-cov: all
+cov: all test
 
-check: cov test
+check: cov
 	./test
 	lcov -c -d . -o out.info
 	genhtml out.info -o coverage
@@ -46,6 +46,6 @@ tour_cse533-11: tour.o common.o api.o ping.o api.o
 	$(CC) $(CFLAGS) $< ping.o api.o common.o -o $@
 
 clean:
-	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage *_cse533-11
+	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage test *_cse533-11
 
 .PHONY: all clean debug cov check
