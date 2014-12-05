@@ -133,12 +133,12 @@ uint16_t csum(void*data, size_t len) {
     /*subtract two each time since we are going by bytes*/
     for(; len > 1; ptr += 1) {
         sum += *ptr;
-        printf("new sum: %X\n", sum);
+        /*printf("new sum: %X\n", sum);*/
 
         /*if sums most sig bit set then wrap around, cuz 1's comp addition*/
         if(sum & 0x10000) {
             sum = (sum & 0xFFFF) + ((sum >> 16) & 0xFFFF);
-            printf("sum after wrap: %X\n", sum);
+            /*printf("sum after wrap: %X\n", sum);*/
         }
 
         /*dont update the len in forloop so we get an extra loop*/
@@ -162,7 +162,7 @@ uint16_t csum(void*data, size_t len) {
     }
 
     /*take ones comp and return it*/
-    printf("rtn sum before not: %X\n", sum);
+    /*printf("rtn sum before not: %X\n", sum);*/
     return ((uint16_t) ~sum);
 }
 

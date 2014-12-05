@@ -40,6 +40,7 @@ LIST_HEAD(tidhead, tident);
 
 struct tident {
     pthread_t tid;
+    struct in_addr dstaddr; /* ip addr to ping */
     LIST_ENTRY(tident) entries;
 };
 

@@ -4,7 +4,7 @@
 /* prototypes for private funcs */
 int initiate_tour(int argc, char *argv[]);
 int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled);
-int initiate_shutdown();
+int initiate_shutdown(void);
 int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
 int send_mcast(char *msg, size_t msglen);
@@ -13,6 +13,9 @@ void print_tourhdr(struct tourhdr *trhdrp);
 int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
 int validate_mcast(struct sockaddr_in *srcaddr);
 int create_ping_recver(void);
+int create_ping_sender(struct sockaddr_in *addr);
+int stop_pinging(void);
+int is_pinging(struct in_addr ipaddr);
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -349,7 +352,14 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
                 }
             }
             is_first_tourmsg = 0;
-            /* fixme: start pinging prev ip*/
+
+            if(!is_pinging(srcaddr.sin_addr)) {
+                /* start pinging prev ip*/
+                erri = create_ping_sender(&srcaddr);
+                if(erri < 0) {
+                    return -1;
+                }
+            }
 
             if(TOUR_IS_OVER(trhdrp)) {
                 erri = initiate_shutdown();
@@ -379,7 +389,11 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
             printf("Node %s. Received: %s\n", host_name, buf);
 
             if(is_first_mcast) {
-                /* fixme: immediately stop pinging */
+                erri = stop_pinging(); /* immediately stop pinging */
+                if(erri < 0) {
+                    return -1;
+                }
+
                 erri = snprintf(buf,  sizeof(buf), fmt, host_name);
                 if(erri < 0) {
                     _ERROR("%s: %m\n", "snprintf()");
@@ -405,7 +419,7 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
 * Waits 5 seconds then sends the shutdown multicast.
 * RETURNS: 0 if ok, -1 if failure
 */
-int initiate_shutdown() {
+int initiate_shutdown(void) {
     int erri;
     struct timeval tm;
     char *fmt = "<<<<< This is node %s. Tour has ended. Group members please identify yourselves. >>>>>";
@@ -563,26 +577,133 @@ void print_tourhdr(struct tourhdr *trhdrp) {
 }
 
 /**
-* Create thread for ping replies and add it to the
+* Create thread for ping replies and add it to the thread list.
 */
 int create_ping_recver(void) {
     int erri;
     struct tident *tidentp;
 
+    _NOTE("%s\n", "Creating the ping recver thread....");
     tidentp = malloc(sizeof(struct tident));
     if(tidentp == NULL) {
         _ERROR("%s: %m\n", "malloc()");
         return -1;
     }
-    /* Create the thread dor recving pings replies */
+    /* Create the thread for recving pings replies */
     erri = pthread_create(&tidentp->tid, NULL, &ping_recver, &pgrecver);
     if (0 > erri) {
         errno = erri;
         _ERROR("%s: %m\n", "pthread_create(ping_recver)");
+        free(tidentp);
+        return -1;
+    }
+
+    tidentp->dstaddr.s_addr = host_ip.s_addr;
+    LIST_INSERT_HEAD(&tidhead, tidentp, entries);
+
+    return 0;
+}
+
+/**
+* Create thread for ping requests and add it to the
+* The argument to the ping_sender func is a {pgsender socket, {dstaddr}}
+*/
+int create_ping_sender(struct sockaddr_in *addr) {
+    int erri;
+    struct tident *tidentp;
+    struct fd_addr *fd_addrp;
+
+    _NOTE("%s\n", "Creating a ping sender thread....");
+    tidentp = malloc(sizeof(struct tident));
+    if(tidentp == NULL) {
+        _ERROR("%s: %m\n", "malloc()");
+        return -1;
+    }
+    /* create the arg for ping_sender */
+    fd_addrp = malloc(sizeof(int) + sizeof(struct sockaddr_in));
+    if(fd_addrp == NULL) {
+        _ERROR("%s: %m\n", "malloc()");
+        free(tidentp);
+        return -1;
+    }
+    fd_addrp->sockfd = pgsender;
+    memcpy(&fd_addrp->addr, addr, sizeof(fd_addrp->addr));
+
+    /* the node we're pinging */
+    tidentp->dstaddr.s_addr = addr->sin_addr.s_addr;
+
+    /* Create the thread for sending pings requests */
+    erri = pthread_create(&tidentp->tid, NULL, &ping_sender, fd_addrp);
+    if(erri > 0) {
+        errno = erri;
+        _ERROR("%s: %m\n", "pthread_create(ping_recver)");
+        free(tidentp);
+        free(fd_addrp);
         return -1;
     }
 
     LIST_INSERT_HEAD(&tidhead, tidentp, entries);
 
+    return 0;
+}
+
+/**
+* Stops all ping activity (sends and recvs).
+* Cancel all threads. Join on all threads. Free the thread list.
+*/
+int stop_pinging(void) {
+    struct tident *tidentp;
+    void *retval;
+    int erri;
+
+    _NOTE("%s\n", "Cancelling all ping threads....");
+    LIST_FOREACH(tidentp, &tidhead, entries) {
+        erri = pthread_cancel(tidentp->tid);
+        if(erri > 0)  {
+            if(erri == ESRCH)
+                continue;
+            errno = erri;
+            _ERROR("%s: %m\n", "pthread_cancel()");
+            return -1;
+        }
+    }
+
+    _NOTE("%s\n", "Joining all ping threads....");
+    LIST_FOREACH(tidentp, &tidhead, entries) {
+        erri = pthread_join(tidentp->tid, &retval);
+        if(erri > 0) {
+            if(erri == ECANCELED)
+                continue;
+            errno = erri;
+            _ERROR("%s: %m\n", "pthread_join()");
+            return -1;
+        }
+        if(retval != PTHREAD_CANCELED) {
+            _SPEC("%s\n", "A thread failed before being canceled.");
+        }
+    }
+
+    /* free the whole list of thread ids */
+    _DEBUG("%s\n", "Freeing the pthread id list....");
+    while(tidhead.lh_first != NULL) {
+        tidentp = tidhead.lh_first;
+        LIST_REMOVE(tidentp, entries);
+        free(tidentp);
+    }
+    return 0;
+}
+
+/**
+* RETURNS: 1 if already pinging ipaddr, 0 otherwise
+*/
+int is_pinging(struct in_addr ipaddr) {
+    struct tident *tidentp;
+
+    _DEBUG("%s\n", "Searching if already prev node....");
+    LIST_FOREACH(tidentp, &tidhead, entries) {
+        if(tidentp->dstaddr.s_addr == ipaddr.s_addr) {
+            return 1;
+        }
+    }
     return 0;
 }
