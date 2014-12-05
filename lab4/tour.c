@@ -345,7 +345,7 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
                 continue; /* ignore invalid packets */
             }
             trhdrp = EXTRACT_TOURHDRP(ip_pktbuf);
-            print_tourhdr(trhdrp);
+            /*print_tourhdr(trhdrp);*/
             if(is_first_tourmsg && !mcast_is_enabled) {
                 /* only init the mulitcast socket once */
                 erri = init_multicast_sock(trhdrp);
@@ -427,7 +427,7 @@ int initiate_shutdown(void) {
     char *fmt = "<<<<< This is node %s. Tour has ended. Group members please identify yourselves. >>>>>";
     char msg[BUFSIZE];
     tm.tv_sec = 5;
-    tm.tv_usec = 200000;
+    tm.tv_usec = 0;
 
     _NOTE("%s\n", "Initiating tour shutdown.");
 
@@ -540,7 +540,7 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
     if(TOUR_CURR(trhdrp)->s_addr != host_ip.s_addr) {
         _ERROR("CURR hostname from msg (%s) != ", getvmname(*TOUR_CURR(trhdrp)));
         printf("MY name (%s). Ignoring....\n", getvmname(host_ip));
-        exit(EXIT_FAILURE);
+        return -1;
     }
     tm = time(NULL);
     printf("%.24s received source routing packet from %s.\n", ctime(&tm), getvmname(prev_ip));

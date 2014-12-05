@@ -80,7 +80,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
         tot_n += n;
     } while (n > 0 && tot_n < sizeof(struct hwaddr));
     _DEBUG("ARP sent me %d bytes.\n", (int)tot_n);
-    print_hwaddr(HWaddr);
+    /*print_hwaddr(HWaddr);*/
     printf("areq found dst mac: ");
     print_hwa(HWaddr->dst_addr, HWaddr->dst_halen);
     printf("\n");

@@ -17,10 +17,13 @@ void *ping_sender(void *fd_addrp) {
     ssize_t errs = 0;
     uint16_t icmpseq = 0;
     char ethbuf[ETH_FRAME_LEN];
-    char pingdata[] = "ping";
+    char pingdata[] = "The 533 Grading TAs are soo cool!";
     size_t ip_paylen;
     struct ip *ip_pktp = (struct ip*)(ethbuf + sizeof(struct ethhdr));
+    /* fixme: ip->hl << 2 */
     struct icmp *icmpp = (struct icmp*)(ethbuf + sizeof(struct ethhdr) + sizeof(struct ip));
+
+    memset(ethbuf, 0, sizeof(ethbuf));
 
     /* copy out the socket fd and the dst addr from the malloc'd arg space */
     pgsender = fdaddr->sockfd;
@@ -48,11 +51,11 @@ void *ping_sender(void *fd_addrp) {
         printf("\n");
 
         craft_echo_reply(icmpp, icmpseq++, pingdata, sizeof(pingdata));
-        ip_paylen = sizeof(struct icmp) + sizeof(pingdata);
+        ip_paylen = ICMP_MINLEN + sizeof(pingdata);
         craft_ip(ip_pktp, IPPROTO_ICMP, PING_ICMP_ID, host_ip, dstaddr.sin_addr, ip_paylen);
         craft_eth(ethbuf, ETH_P_IP, &dstaddrll, HWaddr.src_addr, HWaddr.dst_addr, HWaddr.src_ifindex);
         /*craft_eth(ethbuf, &dstaddrll, srcmac, dstmac, 2);*/
-        _DEBUGY("%s\n", "Sending an icmp ping....");
+        _DEBUGY("Sending an icmp ping, ip_paylen: %u, total len: %u\n", (u_int)ip_paylen, (u_int)(sizeof(struct ethhdr) + IP4_HDRLEN + ip_paylen));
         errs = sendto(pgsender, ethbuf, (sizeof(struct ethhdr) + IP4_HDRLEN + ip_paylen), 0, (struct sockaddr*)&dstaddrll, sizeof(dstaddrll));
         if(errs < 0) {
             _ERROR("%s: %m\n", "sendto()");
@@ -89,13 +92,15 @@ void *ping_recver(void *pgrecverp) {
             _ERROR("%s: %m\n", "recvfrom()");
             pthread_exit((void*)EXIT_FAILURE);
         }
+        buf[errs] = 0;
         _SPEC("%s\n", "Got stuff from ping recv'er....");
         if((filter_ip_icmp(ip_pktp, (size_t)errs)) < 0 ) {
             continue;
         }
         icmpp = EXTRACT_ICMPHDRP(ip_pktp);
-        printf("%d bytes from %s: seq=%u, ttl=%d\n", (int)errs,
-                getvmname(srcaddr.sin_addr), icmpp->icmp_seq, ip_pktp->ip_ttl);
+        printf("%d bytes from %s: id=0x%x seq=%hu, ttl=%d\n", (int)errs,
+                getvmname(srcaddr.sin_addr), ntohs(icmpp->icmp_id), ntohs(icmpp->icmp_seq), ip_pktp->ip_ttl);
+        printf("echo reply data: %s\n", ((char*)icmpp) + ICMP_MINLEN);
 
     }
 }
@@ -107,23 +112,22 @@ int filter_ip_icmp(struct ip *ip_pktp, size_t n) {
         _DEBUG("ip proto: 0x%x is not IPPROTO_ICMP. Ignoring....\n", ip_pktp->ip_p);
         return -1;
     }
-    if(n < (IP4_HDRLEN + ICMP_HDRLEN)) {
-        _DEBUG("icmp msg too small, len: 0x%x. Ignoring....\n", (u_int)n);
+    if(n < (IP4_HDRLEN + ICMP_MINLEN)) {
+        _DEBUG("icmp msg too small, len: %u bytes. Ignoring....\n", (u_int)n);
         return -1;
     }
-    if(ntohs(ip_pktp->ip_id) != PING_ICMP_ID) {
-        _DEBUG("msg ip ID: 0x%x, PING_ICMP_ID: 0x%x, don't match. Ignoring....\n",
-                ntohs(ip_pktp->ip_id), PING_ICMP_ID);
-        return -1;
-    }
+    /*if(ntohs(ip_pktp->ip_id) != PING_ICMP_ID) {*/
+    _DEBUG("msg IP.id: 0x%x, PING_ICMP_ID: 0x%x\n", ntohs(ip_pktp->ip_id), PING_ICMP_ID);
+    /*}*/
+
     /* point past the ip header to the icmp header */
     icmpp = EXTRACT_ICMPHDRP(ip_pktp);
     if(icmpp->icmp_code != 0 || icmpp->icmp_type != ICMP_ECHOREPLY) {
-        _DEBUG("icmp msg not echo reply, code: 0x%x, type 0x%x. Ignoring....\n", icmpp->icmp_code, icmpp->icmp_type);
+        _DEBUG("icmp msg not echo reply, type 0x%x, code: 0x%x. Ignoring....\n", icmpp->icmp_type, icmpp->icmp_code);
         return -1;
     }
     if(ntohs((uint16_t)icmpp->icmp_id) != PING_ICMP_ID) {
-        _DEBUG("icmp Echo reply has wrong ID: 0x%x. Ignoring....\n", ntohs((uint16_t)icmpp->icmp_id));
+        _DEBUG("icmp echo reply has wrong ID: 0x%x. Ignoring....\n", ntohs((uint16_t)icmpp->icmp_id));
         return -1;
     }
     return 0;
@@ -139,6 +143,6 @@ void craft_echo_reply(void *icmp_buf, uint16_t seq, void *data, size_t data_len)
     icmp_pkt->icmp_id = htons(PING_ICMP_ID);
     icmp_pkt->icmp_seq = htons(seq);
     icmp_pkt->icmp_cksum = 0;
-    memcpy(icmp_pkt + 1, data, data_len);
-    icmp_pkt->icmp_cksum = csum(icmp_pkt, sizeof(struct icmp) + data_len);
+    memcpy(icmp_buf + ICMP_MINLEN, data, data_len);
+    icmp_pkt->icmp_cksum = csum(icmp_pkt, ICMP_MINLEN + data_len);
 }
