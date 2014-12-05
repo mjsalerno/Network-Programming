@@ -110,7 +110,7 @@ void print_hwaddr(struct hwaddr* addr) {
     printf("\nsrc_hatype: %2hu\n", addr->src_sll_hatype);
     printf("src_halen : %2hhu\n", addr->src_sll_halen);
     printf("src_addr  :  ");
-    print_hwa(addr->dst_sll_addr, addr->dst_sll_halen);
+    print_hwa(addr->src_sll_addr, addr->src_sll_halen);
     printf("\n===================================\n");
 #endif
 }
