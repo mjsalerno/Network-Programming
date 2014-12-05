@@ -80,7 +80,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     } while (n > 0);
 
     printf("areq found: ");
-    print_hwa(HWaddr->sll_addr, 6);
+    print_hwa(HWaddr->dst_sll_addr, 6);
     printf("\n");
 
     close(unixfd);

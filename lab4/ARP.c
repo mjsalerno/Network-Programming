@@ -12,8 +12,8 @@ void handle_sigint(int sign) {
     _Exit(EXIT_FAILURE);
 }
 
-void handle_rep(/*int rawsock, char* buf, ssize_t size*/);
-void handle_req(int rawsock, char* buf, ssize_t size);
+void handle_rep(char* buf);
+void handle_req(int rawsock, char* buf);
 
 static struct hwa_info* hw_list = NULL;
 static struct hwa_ip * mip_head = NULL;
@@ -143,12 +143,12 @@ int main() {
 
             if(arp_hdr_ptr->ar_op == ARPOP_REQUEST) {
                 _INFO("%s\n", "got a request");
-                handle_req(rawsock, buf, errs);
+                handle_req(rawsock, buf);
 
             } else if(arp_hdr_ptr->ar_op == ARPOP_REPLY) {
                 /*todo: handle reply*/
                 _INFO("%s\n", "got a reply");
-                handle_rep(rawsock, buf, errs);
+                handle_rep(buf);
 
             } else {
                 _ERROR("Not sure what to do with arp_op: %d\n", arp_hdr_ptr->ar_op);
@@ -178,8 +178,14 @@ int main() {
 
             if(tmp_arp != NULL) {
                 _DEBUG("%s\n", "found a matching ip");
+                /*todo: give them the answer*/
+                _ERROR("%s\n", "TODO!!");
             } else {
                 _DEBUG("%s\n", "did not find a matching ip, need to ask");
+
+                /*make partial entry*/
+                add_part_arp(&arp_lst, tmp_ip.s_addr, listening_unix_sock);
+
                 memset(buf, 0, BUFSIZE);
                 memset(arp_buf, 0, sizeof(arp_buf));
                 arp_size = craft_arp(arp_buf, ARP_ETH_PROTO, ARPOP_REQUEST, ETHERTYPE_IP, ARPHRD_ETHER, mip_head->if_haddr, (unsigned char*)&mip_head->ip_addr.sin_addr.s_addr, NULL, (unsigned char*)&tmp_ip);
@@ -224,11 +230,45 @@ int main() {
 }
 
 
-void handle_rep(/*int rawsock, char* buf, ssize_t size*/) {
+void handle_rep(char* buf) {
+    struct arphdr* arp_hdr_ptr;
+    struct arp_cache* arp_c;
+    struct hwaddr answer;
+    ssize_t errs;
+
+    arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+
+    arp_c = get_arp(arp_lst, *(in_addr_t*)extract_sender_pa(arp_hdr_ptr));
+    if(arp_c == NULL || arp_c->fd < 0) {
+        _ERROR("%s\n", "got a reply for somthing I never asked for");
+        if(arp_c == NULL) {
+            _ERROR("%s\n", "arp_c was NULL");
+        } else {
+            _ERROR("fd: %d\n", arp_c->fd);
+        }
+        exit(EXIT_FAILURE);
+    }
+
+    /*ans tour*/
+    memcpy(&answer, &arp_c->hw, sizeof(struct hwaddr));
+
+    errs = send(arp_c->fd, &answer, sizeof(struct hwaddr), 0);
+    if(errs < 0) {
+        _ERROR("%s %m\n", "send:");
+    }
+
+    if( close(arp_c->fd) ) {
+        _ERROR("%s %m\n", "close:");
+        exit(EXIT_FAILURE);
+    }
+
+    _DEBUG("%s\n", "sent the answer to tour");
+
+    arp_c->fd = -1;
 
 }
 
-void handle_req(int rawsock, char* buf, ssize_t size) {
+void handle_req(int rawsock, char* buf) {
 
     struct sockaddr_ll raw_addr;
     struct in_addr tmp_ip;
@@ -240,7 +280,6 @@ void handle_req(int rawsock, char* buf, ssize_t size) {
     ssize_t errs;
     size_t arp_size;
 
-    size++;
     arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
 
     tmp_hwa_ip = is_my_ip(mip_head, *((in_addr_t *) extract_target_pa(arp_hdr_ptr)));
