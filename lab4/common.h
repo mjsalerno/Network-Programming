@@ -27,8 +27,6 @@
 #define ARP_ETH_PROTO 0x2691
 /* should be 20 bytes */
 #define IP4_HDRLEN (sizeof(struct ip))
-/* should be 8 bytes */
-#define ICMP_HDRLEN (sizeof(struct icmp))
 #define BUFSIZE 512
 #define ARP_PATH "/tmp/cse533-11_arp"
 #define TOUR_GRP_IP "236.236.236.236"

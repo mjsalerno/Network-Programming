@@ -10,7 +10,7 @@
 
 #ifdef DEBUG
 # define _DEBUG(fmt, args...) printf("DEBUG: %s:%s:%d: "fmt, __FILE__, __FUNCTION__, __LINE__, args)
-# define _DEBUGY(fmt, args...) printf(_YELLOW "DEBUG: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
+# define _DEBUGY(fmt, args...) printf(_YELLOW "DEBUGY: %s:%s:%d: "fmt _RESET, __FILE__, __FUNCTION__, __LINE__, args)
 #else
 # define _DEBUG(fmt, args...)
 # define _DEBUGY(fmt, args...)
