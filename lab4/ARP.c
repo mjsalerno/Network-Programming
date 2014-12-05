@@ -251,6 +251,7 @@ void handle_rep(char* buf) {
 
     /*ans tour*/
     memcpy(&answer, &arp_c->hw, sizeof(struct hwaddr));
+    print_hwaddr(&answer);
 
     errs = send(arp_c->fd, &answer, sizeof(struct hwaddr), 0);
     if(errs < 0) {
