@@ -20,7 +20,8 @@ set(TEST_SRC_FILES
 set(COMMON_SRC_FILES
     common.c
     common.h
-    debug.h)
+    debug.h
+    api.h)
 
 set(ARP_SRC_FILES
     ARP.c

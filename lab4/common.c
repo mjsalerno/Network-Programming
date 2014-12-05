@@ -2,6 +2,7 @@
 #include <net/if.h>
 #include "common.h"
 #include "tour.h"
+#include "api.h"
 
 void craft_eth(void* eth_buf, struct sockaddr_ll* raw_addr, unsigned char *src_mac, unsigned char *dst_mac, int ifindex) {
     struct ethhdr* et = eth_buf;

@@ -20,6 +20,7 @@
 #include <signal.h>
 
 #include "debug.h"
+#include "api.h"
 
 
 #define EVER ;;

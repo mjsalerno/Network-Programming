@@ -14,5 +14,6 @@ struct hwaddr {
 };
 
 int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr);
+void print_hwaddr(struct hwaddr* addr);
 
 #endif /* ARP_API_H */

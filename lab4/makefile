@@ -31,8 +31,11 @@ check: cov
 %: %.o
 	$(CC) $(CFLAGS) $< -o $@
 
-test: test.o common.o ARP_util.o
-	$(CC) $(CFLAGS) $< common.o ARP_util.o -o $@
+common.o: common.c common.h api.o
+	$(CC) $(CFLAGS) api.o -c $<
+
+test: test.o common.o ARP_util.o api.o
+	$(CC) $(CFLAGS) $< api.o common.o ARP_util.o -o $@
 
 ARP: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
 	$(CC) $(CFLAGS) $^ -o $@_cse533-11
