@@ -36,10 +36,8 @@ void add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigne
     ptr->hw.src_halen = 6;
     ptr->hw.src_hatype = sll_hatype;
 
-    #ifdef DEBUG
-    printf("Added this to arp_cache\n");
-    print_hwaddr(&ptr->hw);
-    #endif
+    _DEBUG("%s", "Added this to arp_cache\n");
+    print_hwaddr(&ptr->hw);\
 
 }
 

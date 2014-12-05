@@ -66,7 +66,8 @@ add_executable(ARP
     ${ARP_SRC_FILES}
     $<TARGET_OBJECTS:hwa_lib>
     $<TARGET_OBJECTS:common_lib>
-    $<TARGET_OBJECTS:arp_util_lib>)
+    $<TARGET_OBJECTS:arp_util_lib>
+    $<TARGET_OBJECTS:api_lib>)
 
 target_link_libraries(test ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(tour ${CMAKE_THREAD_LIBS_INIT})

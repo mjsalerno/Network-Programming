@@ -112,5 +112,7 @@ void print_hwaddr(struct hwaddr* addr) {
     printf("src_addr  :  ");
     print_hwa(addr->src_addr, addr->src_halen);
     printf("\n===================================\n");
+#else
+    addr++; /* for -Wall -Wextra -Werror */
 #endif
 }

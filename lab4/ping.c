@@ -111,7 +111,7 @@ int filter_ip_icmp(struct ip *ip_pktp, size_t n) {
         return -1;
     }
     if(ntohs(ip_pktp->ip_id) != PING_ICMP_ID) {
-        _DEBUG("msg ip ID: %hhu, PING_ICMP_ID: %hhu. Don't match, ignoring....",
+        _DEBUG("msg ip ID: %hhu, PING_ICMP_ID: %hhu. Don't match, ignoring....\n",
                 ntohs(ip_pktp->ip_id), PING_ICMP_ID);
         return -1;
     }
