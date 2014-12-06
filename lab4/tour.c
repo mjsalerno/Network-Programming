@@ -499,7 +499,7 @@ int recv_mcast_msg(struct sockaddr_in *srcaddr, socklen_t slen, char *buf, size_
         free(cmsgp);
         return -1;
     }
-    if(msg.msg_controllen == 0) {
+    if(msg.msg_controllen < sizeof(struct cmsghdr)) {
         _ERROR("%s", "Kernel didn't fill in control data, IP_RECVORIGDSTADDR didn't work?\n");
         free(cmsgp);
         return -1;
@@ -602,28 +602,32 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
 int validate_mcast(struct msghdr *msgp) {
     struct cmsghdr *cmsgp;
     struct in_addr *origdstaddr;
-    for(cmsgp = CMSG_FIRSTHDR(msgp); cmsgp != NULL; cmsgp = CMSG_NXTHDR(msgp, cmsgp)) {
-        _DEBUG("%s", "Looking at a cmsghdr.\n");
-        if (cmsgp->cmsg_level != IPPROTO_IP || cmsgp->cmsg_type != IP_RECVORIGDSTADDR) {
-            _DEBUG("%s\n", "cmsghdr not IPPROTO_IP or IP_RECVORIGDSTADDR. Ignoring....");
-            continue;
-        }
-        origdstaddr = (struct in_addr *) CMSG_DATA(cmsgp);
-        if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
-            _DEBUG("msg from CMSG_DATA multicast address was from %s.\n", inet_ntoa(*origdstaddr));
-            return 0;
-        }
-        /** NOTE: for some reason the above doesn't work, even though it is
-        * using the CMSG_DATA() system macro. My work around is the below.
-        */
-        origdstaddr = (struct in_addr*)(cmsgp+1) + 1;
-        if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
-            _DEBUG("msg from MY multicast address was from %s.\n", inet_ntoa(*origdstaddr));
-            return 0;
-        }
+    cmsgp = msgp->msg_control;
+
+    /* BE CAREFUL: CMSG_XXXX macros *may* be broke on 64-bit systems. */
+    /*for(cmsgp = CMSG_FIRSTHDR(msgp); cmsgp != NULL; cmsgp = CMSG_NXTHDR(msgp, cmsgp)) {*/
+    _DEBUG("%s", "Looking at a cmsghdr.\n");
+    if (cmsgp->cmsg_level != IPPROTO_IP || cmsgp->cmsg_type != IP_RECVORIGDSTADDR) {
+        _DEBUG("%s\n", "cmsghdr not IPPROTO_IP or IP_RECVORIGDSTADDR. Ignoring....");
+        /*continue;*/
         return -1;
     }
+    origdstaddr = (struct in_addr *) CMSG_DATA(cmsgp);
+    if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
+        _DEBUG("msg from CMSG_DATA multicast address was from %s.\n", inet_ntoa(*origdstaddr));
+        return 0;
+    }
+    /** NOTE: for some reason the above doesn't work, even though it is
+    * using the CMSG_DATA() system macro. My work around is the below.
+    */
+    origdstaddr = (struct in_addr*)(cmsgp+1) + 1;
+    if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
+        _DEBUG("msg from MY multicast address was from %s.\n", inet_ntoa(*origdstaddr));
+        return 0;
+    }
     return -1;
+    /*}
+    return -1;*/
 }
 
 
