@@ -74,7 +74,7 @@ Handling ICMP pinging using threads:
       SOCK_RAW socket (all threads share the one socket).
 
     * When the main thread wants to shutdown the tour it must go through all
-      of its pthread_id's and issue a cancelation request on each (using
+      of its pthread_id's and issue a cancellation request on each (using
       pthread_cancel()). Then it must wait to clean up all of its threads
       (using pthread_join()).
 
@@ -104,12 +104,30 @@ The macros in tour.h : TOUR_PREV, TOUR_CURR, and TOUR_NEXT return a pointer
 ==============================================================================
 ==================================== ARP =====================================
 ==============================================================================
+Getting an AREQ
+      * if the dst_mac is the same as my mac then send out an arep
+      * if the dst_mac does not match then ignore it and do nothing
 
+Replying to AREQ from my tour
+      * look through my arp_cache
+          if I find a matching IP then
+            send tour the corresponding mac
+          else
+            add a partial entry to the cache and wait for an arep
+
+Getting an AREP
+      * look through arp_cache for partial entry
+          if one exists then
+            use the fd to tell tour what the mac address is
+            update the partial arp_cache entry to a full one
+            close the fd
+          else
+            I did not ask for this mac so something went wrong
 
 ==============================================================================
 ========================= API (the areq function) ============================
 ==============================================================================
 Defined in api.c and api.h
-Nothing fancy about it, follows the write up with the addtition of sending
+Nothing fancy about it, follows the write up with the addition of sending
 your source hardware address, type and length back to the api. Not just
 the destination hardware address, type and length.

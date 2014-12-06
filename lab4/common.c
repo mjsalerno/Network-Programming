@@ -145,7 +145,7 @@ size_t craft_arp(char* buf, uint16_t id, unsigned short int ar_op,  unsigned sho
     if(ar_tha != NULL) {
         memcpy(ptr, ar_tha, arp->ar_hln);
     } else {
-        _INFO("%s\n", "the ar_tha was null, skipping");
+        _DEBUGY("%s\n", "the ar_tha was null, skipping");
     }
     ptr += arp->ar_hln;
     memcpy(ptr, ar_tip, add_len);

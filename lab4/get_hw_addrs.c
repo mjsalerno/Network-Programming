@@ -223,8 +223,8 @@ void print_hwa_list(struct hwa_ip* head) {
 }
 
 void print_hwa_ip(struct hwa_ip* node) {
-	printf("IP: %s\nMAC: ", inet_ntoa(node->ip_addr.sin_addr));
-	print_hwa((unsigned char*)node->if_haddr, 6);
+	printf("IP : %s\nMAC: ", inet_ntoa(node->ip_addr.sin_addr));
+	print_hwa(node->if_haddr, 6);
 	printf("\n");
 }
 
