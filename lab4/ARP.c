@@ -279,6 +279,28 @@ void handle_req(int rawsock, char* buf) {
     if (tmp_hwa_ip != NULL) {
         printf("somone is asking for my mac, sending arp\n");
 
+
+        tmp_cache = get_arp(arp_lst, *(in_addr_t*)extract_target_pa(arp_hdr_ptr));
+        if(tmp_cache == NULL) {
+            _DEBUG("%s\n", "never knew who they were so adding them...");
+            add_arp(&arp_lst, *(in_addr_t*)extract_sender_pa(arp_hdr_ptr), mip_head->if_index, 0, ETH_ALEN, extract_sender_hwa(arp_hdr_ptr), NULL, -1);
+            tmp_cache = get_arp(arp_lst, *(in_addr_t*)extract_sender_pa(arp_hdr_ptr));
+            if(tmp_cache == NULL) {
+                _ERROR("%s\n", "tried to add an entry but failed");
+                exit(EXIT_FAILURE);
+            }
+
+            tmp_cache->hw.dst_halen = ETH_ALEN;
+            tmp_cache->hw.src_halen = ETH_ALEN;
+            memcpy(tmp_cache->hw.src_addr, mip_head->if_haddr, ETH_ALEN);
+            memcpy(tmp_cache->hw.dst_addr,  extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+            tmp_cache->hw.src_ifindex = mip_head->if_index;
+
+            _DEBUGY("%s\n", "just added this cuz");
+            print_hwaddr(&tmp_cache->hw);
+            _DEBUGY("%s\n", "DONE added this cuz");
+        }
+
         /*saving the senders mac*/
         memcpy(tmp_mac, extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
         memcpy(&tmp_ip, extract_sender_pa(arp_hdr_ptr), arp_hdr_ptr->ar_pln);
@@ -303,25 +325,8 @@ void handle_req(int rawsock, char* buf) {
             exit(EXIT_FAILURE);
         }
 
-        tmp_cache = get_arp(arp_lst, *(in_addr_t*)extract_target_pa(arp_hdr_ptr));
-        if(tmp_cache == NULL) {
-            _DEBUG("%s\n", "never knew who they were so adding them...");
-            add_arp(&arp_lst, *(in_addr_t*)extract_target_pa(arp_hdr_ptr), mip_head->if_index, 0, ETH_ALEN, extract_sender_hwa(arp_hdr_ptr), NULL, -1);
-            tmp_cache = get_arp(arp_lst, *(in_addr_t*)extract_target_pa(arp_hdr_ptr));
-            if(tmp_cache == NULL) {
-                _ERROR("%s\n", "tried to add an entry but failed");
-                exit(EXIT_FAILURE);
-            }
-
-            tmp_cache->hw.dst_halen = ETH_ALEN;
-            tmp_cache->hw.src_halen = ETH_ALEN;
-            memcpy(tmp_cache->hw.src_addr, mip_head->if_haddr, ETH_ALEN);
-            memcpy(tmp_cache->hw.dst_addr,  extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
-            tmp_cache->hw.src_ifindex = mip_head->if_index;
-        }
-
     } else {
-        _DEBUG("%s\n", "not my mac");
+        _DEBUG("%s\n", "not my ip");
     }
 }
 
@@ -346,6 +351,11 @@ void ans_tour(int sock, struct arp_cache* entry) {
     memcpy(answer.dst_addr, entry->hw.dst_addr, ETH_ALEN);
     answer.src_ifindex = mip_head->if_index;
     print_hwaddr(&answer);
+
+    if(memcmp(answer.src_addr, answer.dst_addr, ETH_ALEN) == 0) {
+        _ERROR("%s\n", "telling tour wrong thing");
+        exit(EXIT_FAILURE);
+    }
 
     errs = send(sock, &answer, sizeof(struct hwaddr), 0);
     if(errs < 0) {
