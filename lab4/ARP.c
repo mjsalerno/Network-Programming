@@ -142,6 +142,9 @@ int main() {
             print_arp(arp_hdr_ptr);
             #endif
 
+            printf("receved\n");
+            printouts(buf);
+
             if(ntohs(arp_hdr_ptr->ar_op) == ARPOP_REQUEST) {
                 tmp_ip.s_addr = *(in_addr_t*) extract_target_pa(arp_hdr_ptr);
                 _INFO("got a request for IP: %s\n", inet_ntoa(tmp_ip));
@@ -314,7 +317,7 @@ void handle_req(int rawsock, char* buf) {
 
         craft_eth(buf, ARP_ETH_PROTO, &raw_addr, tmp_hwa_ip->if_haddr, tmp_mac, tmp_hwa_ip->if_index);
         memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
-        
+
         printouts(buf);
         raw_len = sizeof(raw_addr);
         errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
