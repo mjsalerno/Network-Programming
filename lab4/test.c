@@ -87,21 +87,32 @@ void testrawip() {
 void test_add_arp() {
     int err;
     struct arp_cache* arp_head = NULL;
-    struct in_addr sin_addr;
+    struct in_addr sin_addr1;
+    struct in_addr sin_addr2;
     struct hwa_ip hwaip;
+    struct arp_cache* a;
+    struct arp_cache* b;
 
     unsigned char mac1[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00};
 
-    err = inet_aton("123.234.213.9", &sin_addr);
+    err = inet_aton("123.234.213.9", &sin_addr1);
     assert(err != 0);
 
     assert(arp_head == NULL);
-    add_arp(&arp_head, sin_addr.s_addr, 1, 0XF, 6, mac1, &hwaip, 0);
+    a = add_arp(&arp_head, sin_addr1.s_addr, 1, 0XF, 6, mac1, &hwaip, 0);
     assert(arp_head != NULL);
     assert(arp_head->next == NULL);
 
-    add_part_arp(&arp_head, sin_addr.s_addr, -1);
+    err = inet_aton("223.234.213.9", &sin_addr2);
+    assert(err != 0);
+
+    b = add_part_arp(&arp_head, sin_addr2.s_addr, -1);
     assert(arp_head->next->next == NULL);
 
-    free_arp_cache(arp_head);
+    assert(a == get_arp(arp_head, sin_addr1.s_addr));
+    assert(b == get_arp(arp_head, sin_addr2.s_addr));
+
+    free_arp_cache(&arp_head);
+    assert(arp_head == NULL);
+    free_arp_cache(NULL);
 }

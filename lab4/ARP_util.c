@@ -128,9 +128,13 @@ void print_arp(struct arphdr* arp) {
 
 }
 
-void free_arp_cache(struct arp_cache* node) {
+void free_arp_cache(struct arp_cache** head) {
 
-    struct arp_cache* prev = node;
+    if(head == NULL)
+        return;
+
+    struct arp_cache* prev = *head;
+    struct arp_cache* node = *head;
 
     if(node != NULL)
         node = node->next;
@@ -139,6 +143,7 @@ void free_arp_cache(struct arp_cache* node) {
 
     if(node == NULL) {
         free(prev);
+        *head = NULL;
         return;
     }
 
@@ -149,5 +154,7 @@ void free_arp_cache(struct arp_cache* node) {
     if(prev != NULL) {
         free(prev);
     }
+
+    *head = NULL;
 }
 

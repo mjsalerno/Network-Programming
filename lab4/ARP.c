@@ -354,7 +354,7 @@ void handle_sigint(int sign) {
     sign++; /* for -Wall -Wextra -Werror */
     free(buf);
     free_hwa_ip(mip_head);
-    free_arp_cache(arp_lst);
+    free_arp_cache(&arp_lst);
     unlink(ARP_PATH);
     _Exit(EXIT_FAILURE);
 }

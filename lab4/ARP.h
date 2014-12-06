@@ -19,5 +19,5 @@ struct arp_cache*  add_part_arp(struct arp_cache** arp_head, in_addr_t ip, int f
 struct arp_cache* get_arp(struct arp_cache* arp_head, in_addr_t ip);
 struct hwa_ip* is_my_ip(struct hwa_ip* head, in_addr_t ip);
 void print_arp(struct arphdr* arp);
-void free_arp_cache(struct arp_cache* node);
+void free_arp_cache(struct arp_cache** head);
 #endif
