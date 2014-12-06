@@ -7,13 +7,17 @@
 void testrawip();
 void test_csum ();
 void test_add_arp();
+void test_CMSG_MACROS();
 
-struct in_addr host_ip;
+//static struct in_addr host_ip;
+static struct sockaddr_in mcast_addr;
+static int mcaster;
 
 int main() {
     //testrawip();
     test_csum();
     test_add_arp();
+    test_CMSG_MACROS();
     return 0;
 }
 
@@ -115,4 +119,158 @@ void test_add_arp() {
     free_arp_cache(&arp_head);
     assert(arp_head == NULL);
     free_arp_cache(NULL);
+}
+
+int validate_mcast(struct msghdr *msgp) {
+    struct cmsghdr *cmsgp;
+    struct in_addr *origdstaddr;
+    cmsgp = msgp->msg_control;
+
+    /* BE CAREFUL: CMSG_XXXX macros *may* be broke on 64-bit systems. */
+    /*for(cmsgp = CMSG_FIRSTHDR(msgp); cmsgp != NULL; cmsgp = CMSG_NXTHDR(msgp, cmsgp)) {*/
+    printf("%s", "Looking at a cmsghdr.\n");
+    if (cmsgp->cmsg_level != IPPROTO_IP || cmsgp->cmsg_type != IP_RECVORIGDSTADDR) {
+        printf("%s\n", "cmsghdr not IPPROTO_IP or IP_RECVORIGDSTADDR. Ignoring....");
+        /*continue;*/
+        return -1;
+    }
+    origdstaddr = (struct in_addr *) CMSG_DATA(cmsgp);
+    if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
+        printf("msg from CMSG_DATA multicast address was from %s.\n", inet_ntoa(*origdstaddr));
+        return 0;
+    }
+    /** NOTE: for some reason the above doesn't work, even though it is
+    * using the CMSG_DATA() system macro. My work around is the below.
+    */
+    origdstaddr = (struct in_addr*)(cmsgp+1) + 1;
+    if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
+        printf("msg from MY multicast address was from %s.\n", inet_ntoa(*origdstaddr));
+        return 0;
+    }
+    return -1;
+    /*}
+    return -1;*/
+}
+
+int recv_mcast_msg(struct sockaddr_in *srcaddr, socklen_t slen, char *buf, size_t buflen) {
+    ssize_t errs;
+    struct msghdr msg;
+    struct iovec iov;
+    struct cmsghdr *cmsgp = malloc(100);
+    if(cmsgp == NULL) {
+        printf("%s: %m\n", "malloc()");
+        return -1;
+    }
+
+    iov.iov_base = buf; /* buffer for recv'd UDP data */
+    iov.iov_len = buflen;
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    msg.msg_name = srcaddr; /* the src of this UDP datagram */
+    msg.msg_namelen = slen;
+
+    msg.msg_control = cmsgp; /* for IP_RECVDSTADDR */
+    msg.msg_controllen = 100;
+
+    msg.msg_flags = 0;
+
+    printf("%s\n", "Waiting for msg...");
+    errs = recvmsg(mcaster, &msg, 0);
+    if(errs < 0) {
+        printf("%s: %m\n", "recvmsg()");
+        free(cmsgp);
+        return -1;
+    }
+    printf("control data len: %lu\n", (u_long)msg.msg_controllen);
+    if(msg.msg_controllen < sizeof(struct cmsghdr)) {
+        printf("%s", "Kernel didn't fill in control data, IP_RECVORIGDSTADDR didn't work?\n");
+        free(cmsgp);
+        return -1;
+    }
+
+    if((validate_mcast(&msg)) < 0) {
+        free(cmsgp);
+        return -2; /* ignore invalid packets */
+    }
+
+    free(cmsgp);
+    return (int)errs;
+}
+
+void test_CMSG_MACROS() {
+    const int on = 1, ttl = 1;
+    int erri;
+    struct sockaddr_in bindaddr;
+    struct sockaddr_in srcaddr;
+    struct group_req greq;
+    char buf[1600];
+    ssize_t errs;
+
+    memset(&mcast_addr, 0, sizeof(mcast_addr));
+    memset(&srcaddr, 0, sizeof(srcaddr));
+
+    mcaster = socket(AF_INET, SOCK_DGRAM, 0);
+    if(mcaster < 0) {
+        printf("%s: %m\n", "socket(AF_INET, SOCK_DGRAM, 0)");
+        exit(EXIT_FAILURE);
+    }
+    /* we want to use recvmsg() to get the orig dst addr of multicasts */
+    erri = setsockopt(mcaster, IPPROTO_IP, IP_RECVORIGDSTADDR, &on, sizeof(on));
+    if(erri < 0) {
+        printf("%s: %m\n", "setsockopt(IP_RECVORIGDSTADDR)");
+        close(mcaster);
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&mcast_addr, 0, sizeof(mcast_addr));
+    mcast_addr.sin_family = AF_INET;
+    inet_pton(AF_INET, "235.235.235.235", &mcast_addr.sin_addr);
+    mcast_addr.sin_port = htons(55555);
+    printf("multicast address is %s.\n", inet_ntoa(mcast_addr.sin_addr));
+
+    /* bind to INADDR_ANY, fine as long as we validate incoming pkts */
+    memset(&bindaddr, 0, sizeof(bindaddr));
+    bindaddr.sin_family = AF_INET;
+    bindaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    bindaddr.sin_port = mcast_addr.sin_port;
+    printf("%s\n", "Binding mcast socket...");
+    erri = bind(mcaster, (struct sockaddr*)&bindaddr, sizeof(bindaddr));
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "bind()");
+        exit(EXIT_FAILURE);
+    }
+
+    /* let the kernel pick the interface index */
+    memset(&greq, 0, sizeof(greq));
+    greq.gr_interface = 0;
+    memcpy(&greq.gr_group, &mcast_addr, sizeof(mcast_addr));
+    printf("%s\n", "Joining the mcast group...");
+    erri = setsockopt(mcaster, IPPROTO_IP, MCAST_JOIN_GROUP, &greq, sizeof(greq));
+    if(erri < 0) {
+        printf("%s: %m\n", "setsockopt(MCAST_JOIN_GROUP)");
+        exit(EXIT_FAILURE);
+    }
+    printf("%s\n", "Setting the mcast TTL to 1...");
+    erri = setsockopt(mcaster, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+    if(erri < 0) {
+        printf("%s: %m\n", "setsockopt(IP_MULTICAST_TTL)");
+        exit(EXIT_FAILURE);
+    }
+    printf("%s\n", "Enabling loopback...");
+    erri = setsockopt(mcaster, IPPROTO_IP, IP_MULTICAST_LOOP, &on, sizeof(on));
+    if(erri < 0) {
+        printf("%s: %m\n", "setsockopt(IP_MULTICAST_LOOP)");
+        exit(EXIT_FAILURE);
+    }
+
+
+    printf("%s\n", "Sending mcast socket...");
+    errs = sendto(mcaster, "I'm a multicast.", 17, 0, (struct sockaddr*)&mcast_addr, sizeof(mcast_addr));
+    if(errs < 0) {
+        printf("%s: %m\n", "sendto(mcaster)");
+        exit(EXIT_FAILURE);
+    }
+
+    recv_mcast_msg(&srcaddr, sizeof(srcaddr), buf, sizeof(buf));
 }
