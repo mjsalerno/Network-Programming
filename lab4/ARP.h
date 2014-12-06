@@ -13,7 +13,6 @@ struct arp_cache {
     struct arp_cache* next;
 };
 
-/*todo: make the actually arp thing*/
 struct arp_cache*  add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigned short sll_hatype, unsigned char sll_halen, unsigned char   sll_addr[8], struct hwa_ip* iface, int fd);
 struct arp_cache*  add_part_arp(struct arp_cache** arp_head, in_addr_t ip, int fd);
 struct arp_cache* get_arp(struct arp_cache* arp_head, in_addr_t ip);

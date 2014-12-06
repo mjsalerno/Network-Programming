@@ -68,7 +68,6 @@ void *ping_recver(void *pgrecverp) {
     char buf[IP_MAXPACKET];
     struct ip *ip_pktp = (struct ip*)buf;
     struct icmp *icmpp;
-    /* fixme: ip->hl << 2 */
 
     for(EVER) {
         slen = sizeof(srcaddr);

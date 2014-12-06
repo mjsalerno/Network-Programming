@@ -502,7 +502,7 @@ int recv_mcast_msg(struct sockaddr_in *srcaddr, socklen_t slen, char *buf, size_
     if(msg.msg_controllen == 0) {
         _ERROR("%s", "Kernel didn't fill in control data, IP_RECVORIGDSTADDR didn't work?\n");
         free(cmsgp);
-        exit(EXIT_FAILURE);/* fixme: remove*/
+        return -1;
     }
 
     if((validate_mcast(&msg)) < 0) {
@@ -530,8 +530,7 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
     mcast_addr.sin_family = AF_INET;
     mcast_addr.sin_addr.s_addr = firstmsg->g_ip.s_addr;
     mcast_addr.sin_port = firstmsg->g_port;
-    /* fixme: remove*/
-    _INFO("multicast address is %s.\n", inet_ntoa(mcast_addr.sin_addr));
+    _DEBUG("multicast address is %s.\n", inet_ntoa(mcast_addr.sin_addr));
     /* bind to INADDR_ANY, fine as long as we validate incoming pkts */
     memset(&bindaddr, 0, sizeof(bindaddr));
     bindaddr.sin_family = AF_INET;
@@ -545,7 +544,6 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
     }
 
     /* let the kernel pick the interface index */
-    /* todo: if needed setsockopt(IP_MULTICAST_IF, eth0) */
     memset(&greq, 0, sizeof(greq));
     greq.gr_interface = 0;
     memcpy(&greq.gr_group, &mcast_addr, sizeof(mcast_addr));

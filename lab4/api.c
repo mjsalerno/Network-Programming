@@ -42,7 +42,6 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
         return -1;
     }
 
-    /* todo: create the request to send to ARP */
     errs = send(unixfd, &((struct sockaddr_in*)IPaddr)->sin_addr, sizeof(struct in_addr), 0);
     if(errs < 0) {
         _ERROR("%s: %m\n", "write()");
@@ -65,7 +64,6 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
         return -1;
     }
     do {
-        /* todo: maybe need to change the read? */
         n = read(unixfd, (tot_n + HWaddr), (sizeof(struct hwaddr) - tot_n));
         if(n < 0) {
             if(errno == EINTR)
