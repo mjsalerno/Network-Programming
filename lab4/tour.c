@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
     }
     /* create the multicast socket (will be binded/joined later) */
     mcaster = socket(AF_INET, SOCK_DGRAM, 0);
-    if(pgrecver < 0) {
+    if(mcaster < 0) {
         _ERROR("%s: %m\n", "socket(AF_INET, SOCK_DGRAM, 0)");
         close(rtsock);
         close(pgsender);

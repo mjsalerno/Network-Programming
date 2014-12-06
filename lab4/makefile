@@ -37,7 +37,7 @@ common.o: common.c common.h api.o
 	$(CC) $(CFLAGS) -c $<
 
 test: test.o common.o ARP_util.o api.o
-	$(CC) $(CFLAGS) $< api.o common.o ARP_util.o -o $@
+	$(CC) $(CFLAGS) $^ -o $@
 
 ARP_cse533-11: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
 	$(CC) $(CFLAGS) $^ -o $@
