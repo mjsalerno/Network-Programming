@@ -9,7 +9,7 @@ void test_csum ();
 void test_add_arp();
 void test_CMSG_MACROS();
 
-//static struct in_addr host_ip;
+struct in_addr host_ip;
 static struct sockaddr_in mcast_addr;
 static int mcaster;
 
