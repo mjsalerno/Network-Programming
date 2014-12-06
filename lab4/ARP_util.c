@@ -1,6 +1,6 @@
 #include "ARP.h"
 
-void add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigned short sll_hatype, unsigned char sll_halen, unsigned char   sll_addr[8], struct hwa_ip* iface, int fd) {
+struct arp_cache* add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigned short sll_hatype, unsigned char sll_halen, unsigned char   sll_addr[8], struct hwa_ip* iface, int fd) {
     struct arp_cache* ptr = *arp_head;
     struct arp_cache* prev = ptr;
 
@@ -37,18 +37,19 @@ void add_arp(struct arp_cache** arp_head, in_addr_t ip, int sll_ifindex, unsigne
     ptr->hw.src_hatype = sll_hatype;
 
     _DEBUG("%s", "Added this to arp_cache\n");
-    print_hwaddr(&ptr->hw);\
+    print_hwaddr(&ptr->hw);
 
+    return ptr;
 }
 
-void add_part_arp(struct arp_cache** arp_head, in_addr_t ip, int fd) {
+struct arp_cache* add_part_arp(struct arp_cache** arp_head, in_addr_t ip, int fd) {
     #ifdef DEBUG
     struct in_addr ip_struc;
     ip_struc.s_addr = ip;
     _DEBUG("adding for ip: %s\n", inet_ntoa(ip_struc));
     #endif
 
-    add_arp(arp_head, ip, -1, 0, 6, NULL, NULL, fd);
+    return add_arp(arp_head, ip, -1, 0, 6, NULL, NULL, fd);
 }
 
 struct arp_cache* get_arp(struct arp_cache* arp_head, in_addr_t ip) {
@@ -145,5 +146,8 @@ void free_arp_cache(struct arp_cache* node) {
         free(prev);
     }
 
+    if(prev != NULL) {
+        free(prev);
+    }
 }
 

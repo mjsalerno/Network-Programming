@@ -83,6 +83,7 @@ void testrawip() {
         exit(EXIT_FAILURE);
     }
 }
+
 void test_add_arp() {
     int err;
     struct arp_cache* arp_head = NULL;
@@ -99,6 +100,8 @@ void test_add_arp() {
     assert(arp_head != NULL);
     assert(arp_head->next == NULL);
 
-    add_arp(&arp_head, sin_addr.s_addr, 1, 0XF, 6, mac1, &hwaip, 0);
+    add_part_arp(&arp_head, sin_addr.s_addr, -1);
     assert(arp_head->next->next == NULL);
+
+    free_arp_cache(arp_head);
 }
