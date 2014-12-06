@@ -14,7 +14,7 @@ all: $(BINS)
 debug: CFLAGS=-g -pthread -Wall -Werror -Wextra -DDEBUG
 debug: all
 
-color: FLAGS=-g -Wall -Werror -Wextra
+color: CFLAGS=-g -Wall -Werror -Wextra
 color: all
 
 # targets for code coverage using GNU gcovr
