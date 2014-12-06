@@ -271,6 +271,7 @@ void handle_req(int rawsock, char* buf) {
     char arp_buf[BUFSIZE];
     ssize_t errs;
     size_t arp_size;
+    struct arp_cache* tmp_cache;
 
     arp_hdr_ptr = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
 
@@ -300,6 +301,23 @@ void handle_req(int rawsock, char* buf) {
         if(errs < 0) {
             perror("sendto(arpr)");
             exit(EXIT_FAILURE);
+        }
+
+        tmp_cache = get_arp(arp_lst, *(in_addr_t*)extract_target_pa(arp_hdr_ptr));
+        if(tmp_cache == NULL) {
+            _DEBUG("%s\n", "never knew who they were so adding them...");
+            add_arp(&arp_lst, *(in_addr_t*)extract_target_pa(arp_hdr_ptr), mip_head->if_index, 0, ETH_ALEN, extract_sender_hwa(arp_hdr_ptr), NULL, -1);
+            tmp_cache = get_arp(arp_lst, *(in_addr_t*)extract_target_pa(arp_hdr_ptr));
+            if(tmp_cache == NULL) {
+                _ERROR("%s\n", "tried to add an entry but failed");
+                exit(EXIT_FAILURE);
+            }
+
+            tmp_cache->hw.dst_halen = ETH_ALEN;
+            tmp_cache->hw.src_halen = ETH_ALEN;
+            memcpy(tmp_cache->hw.src_addr, mip_head->if_haddr, ETH_ALEN);
+            memcpy(tmp_cache->hw.dst_addr,  extract_sender_hwa(arp_hdr_ptr), ETH_ALEN);
+            tmp_cache->hw.src_ifindex = mip_head->if_index;
         }
 
     } else {
