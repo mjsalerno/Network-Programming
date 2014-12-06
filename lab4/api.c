@@ -51,7 +51,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
 
     FD_ZERO(&rset);
     FD_SET(unixfd, &rset);
-    tm.tv_sec = 1;
+    tm.tv_sec = 1; /* timeout for API */
     tm.tv_usec = 0;
 
     erri = select(unixfd + 1, &rset, NULL, NULL, &tm);
@@ -84,6 +84,7 @@ int areq(struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr) 
     printf("areq found dst mac: ");
     print_hwa(HWaddr->dst_addr, HWaddr->dst_halen);
     printf("\n");
+
 
     close(unixfd);
     return 0;

@@ -5,17 +5,18 @@
 int initiate_tour(int argc, char *argv[]);
 int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled);
 int initiate_shutdown(void);
-int shutdown_tour(void);
 ssize_t send_tourmsg(void *ip_pktbuf, size_t ip_pktlen);
 int send_mcast(char *msg, size_t msglen);
 int init_multicast_sock(struct tourhdr *firstmsg);
 void print_tourhdr(struct tourhdr *trhdrp);
 int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr);
-int validate_mcast(struct sockaddr_in *srcaddr);
+int validate_mcast(struct msghdr *cmsgp);
 int create_ping_recver(void);
 int create_ping_sender(struct sockaddr_in *addr);
 int stop_pinging(void);
 int is_pinging(struct in_addr ipaddr);
+int recv_mcast_msg(struct sockaddr_in *srcaddr, socklen_t slen, char *buf, size_t buflen);
+#define MSG_NOTVALID -2
 
 /* sockets */
 static int pgrecver; /* PF_INET RAW -- receiving pings replies */
@@ -23,7 +24,6 @@ static int pgsender; /* PF_PACKET RAW -- sending ping_sender echo requests */
 /* PF_INET RAW HDR_INCLD -- "route traversal" recv/sending tour messages */
 static int rtsock;
 static int mcaster; /* multicast -- recv/sending group messages */
-/* fixme: no INADDR_ANY !!!! , need 2 mcast sockets */
 
 static struct sockaddr_in mcast_addr;
 
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     const int on = 1;
     int erri;
     int send_initial_msg = 0;
-    char ipbuf[IP_MAXPACKET]; /* fixme: too big or just right? */
+    char ipbuf[IP_MAXPACKET];
     struct sigaction sigact;
 
     if(argc > 1) {
@@ -65,6 +65,8 @@ int main(int argc, char *argv[]) {
     if(erri < 0) {
         exit(EXIT_FAILURE);
     }
+
+    memset(&mcast_addr, 0, sizeof(mcast_addr));
 
     _DEBUG("%s\n", "Initializing sockets....");
     /* create the two ping_sender sockets and the tour (rt) socket */
@@ -100,6 +102,12 @@ int main(int argc, char *argv[]) {
         close(pgrecver);
         exit(EXIT_FAILURE);
     }
+    /* we want to use recvmsg() to get the orig dst addr of multicasts */
+    erri = setsockopt(mcaster, IPPROTO_IP, IP_RECVORIGDSTADDR, &on, sizeof(on));
+    if(erri < 0) {
+        _ERROR("%s: %m\n", "setsockopt(IP_RECVORIGDSTADDR)");
+        goto cleanup;
+    }
 
     /* set up the signal handler for SIGINT ^C */
     sigact.sa_handler = &handle_sigint;
@@ -108,7 +116,7 @@ int main(int argc, char *argv[]) {
     erri = sigaction(SIGINT, &sigact, NULL);
     if(erri < 0) {
         _ERROR("%s: %m\n", "sigaction(SIGINT)");
-        exit(EXIT_FAILURE);
+        goto cleanup;
     }
 
     LIST_INIT(&tidhead); /* init the thread id list */
@@ -178,10 +186,10 @@ int initial_tour_msg(void *tourhdrbuf, char *vms[], int n) {
 
     for(i = 0; i < n; i++, curr_ipp++) {
         /* check it's a "vmXX", then call gethostbyname() */
-        /*if(vms[i][0] != 'v' || vms[i][1] != 'm') {
+        if(vms[i][0] != 'v' || vms[i][1] != 'm') {
             errno = EINVAL;
             return -1;
-        }*/
+        }
         he = gethostbyname(vms[i]);
         if(he == NULL) {
             herror("ERROR: gethostbyname()");
@@ -311,13 +319,12 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
     char *fmt = "<<<<< Node %s. I am a member of the group. >>>>>";
     char buf[BUFSIZE];
 
-    slen = sizeof(srcaddr);
-    memset(&srcaddr, 0, slen);
     tval.tv_sec = 5;
     tval.tv_usec = 0;
     FD_ZERO(&rset);
     maxfpd1 = MAX(rtsock, mcaster) + 1;
     for(EVER) {
+        memset(&srcaddr, 0, sizeof(srcaddr));
         FD_SET(rtsock, &rset);
         FD_SET(mcaster, &rset);
         _DEBUG("%s\n", "Waiting to recv tour or multicast msgs...");
@@ -336,6 +343,7 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
         }
         if(FD_ISSET(rtsock, &rset)) {
             _DEBUG("%s\n", "Recv'ing on rtsock...");
+            slen = sizeof(srcaddr);
             errs = recvfrom(rtsock, ip_pktbuf, ip_pktlen, 0, (struct sockaddr*)&srcaddr, &slen);
             if(errs < 0) {
                 _ERROR("%s: %m\n", "recvfrom()");
@@ -380,14 +388,14 @@ int process_tour(struct ip *ip_pktbuf, size_t ip_pktlen, int mcast_is_enabled) {
         }
         if(FD_ISSET(mcaster, &rset)) {
             _DEBUG("%s\n", "Recv'ing on multicast socket...");
-            errs = recvfrom(mcaster, buf, sizeof(buf), 0, (struct sockaddr*)&srcaddr, &slen);
-            if(errs < 0) {
-                _ERROR("%s: %m\n", "recvfrom()");
+            slen = sizeof(srcaddr);
+            erri = recv_mcast_msg( &srcaddr, slen, buf, sizeof(buf));
+            if(erri == -1) {
                 return -1;
+            } else if(erri == MSG_NOTVALID){
+                continue;
             }
-            if((validate_mcast(&srcaddr)) < 0) {
-                continue; /* ignore invalid packets */
-            }
+            buf[erri] = '\0';
             printf("Node %s. Received: %s\n", host_name, buf);
 
             if(is_first_mcast) {
@@ -458,9 +466,52 @@ int send_mcast(char *msg, size_t msglen) {
 }
 
 /**
+* Uses recvmsg() with IP_RECVORIGDSTADDR in order to check if the dst addr
+* equals our multicast address.
+* RETURNS: -1 if error, MSG_NOTVALID if msg invalid, or num bytes recv'd
 */
-int shutdown_tour(void) {
-    return 0;
+int recv_mcast_msg(struct sockaddr_in *srcaddr, socklen_t slen, char *buf, size_t buflen) {
+    ssize_t errs;
+    struct msghdr msg;
+    struct iovec iov;
+    struct cmsghdr *cmsgp = malloc(100);
+    if(cmsgp == NULL) {
+        _ERROR("%s: %m\n", "malloc()");
+        return -1;
+    }
+
+    iov.iov_base = buf; /* buffer for recv'd UDP data */
+    iov.iov_len = buflen;
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    msg.msg_name = srcaddr; /* the src of this UDP datagram */
+    msg.msg_namelen = slen;
+
+    msg.msg_control = cmsgp; /* for IP_RECVDSTADDR */
+    msg.msg_controllen = 100;
+
+    msg.msg_flags = 0;
+
+    errs = recvmsg(mcaster, &msg, 0);
+    if(errs < 0) {
+        _ERROR("%s: %m\n", "recvmsg()");
+        free(cmsgp);
+        return -1;
+    }
+    if(msg.msg_controllen == 0) {
+        _ERROR("%s", "Kernel didn't fill in control data, IP_RECVORIGDSTADDR didn't work?\n");
+        free(cmsgp);
+        exit(EXIT_FAILURE);/* fixme: remove*/
+    }
+
+    if((validate_mcast(&msg)) < 0) {
+        free(cmsgp);
+        return MSG_NOTVALID; /* ignore invalid packets */
+    }
+
+    free(cmsgp);
+    return (int)errs;
 }
 
 /**
@@ -479,6 +530,8 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
     mcast_addr.sin_family = AF_INET;
     mcast_addr.sin_addr.s_addr = firstmsg->g_ip.s_addr;
     mcast_addr.sin_port = firstmsg->g_port;
+    /* fixme: remove*/
+    _INFO("multicast address is %s.\n", inet_ntoa(mcast_addr.sin_addr));
     /* bind to INADDR_ANY, fine as long as we validate incoming pkts */
     memset(&bindaddr, 0, sizeof(bindaddr));
     bindaddr.sin_family = AF_INET;
@@ -494,7 +547,7 @@ int init_multicast_sock(struct tourhdr *firstmsg) {
     /* let the kernel pick the interface index */
     /* todo: if needed setsockopt(IP_MULTICAST_IF, eth0) */
     memset(&greq, 0, sizeof(greq));
-    greq.gr_interface = 0; /* fixme: not zero */
+    greq.gr_interface = 0;
     memcpy(&greq.gr_group, &mcast_addr, sizeof(mcast_addr));
     _DEBUG("%s\n", "Joining the mcast group...");
     erri = setsockopt(mcaster, IPPROTO_IP, MCAST_JOIN_GROUP, &greq, sizeof(greq));
@@ -548,14 +601,31 @@ int validate_ip_tour(struct ip *ip_pktp, size_t n, struct sockaddr_in *srcaddr) 
     return 0;
 }
 
-int validate_mcast(struct sockaddr_in *srcaddr) {
-    /*if(srcaddr->sin_addr.s_addr != mcast_addr.sin_addr.s_addr) {
-        _DEBUG("%s\n", "msg not from the multicast address. Ignoring....");
+int validate_mcast(struct msghdr *msgp) {
+    struct cmsghdr *cmsgp;
+    struct in_addr *origdstaddr;
+    for(cmsgp = CMSG_FIRSTHDR(msgp); cmsgp != NULL; cmsgp = CMSG_NXTHDR(msgp, cmsgp)) {
+        _DEBUG("%s", "Looking at a cmsghdr.\n");
+        if (cmsgp->cmsg_level != IPPROTO_IP || cmsgp->cmsg_type != IP_RECVORIGDSTADDR) {
+            _DEBUG("%s\n", "cmsghdr not IPPROTO_IP or IP_RECVORIGDSTADDR. Ignoring....");
+            continue;
+        }
+        origdstaddr = (struct in_addr *) CMSG_DATA(cmsgp);
+        if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
+            _DEBUG("msg from CMSG_DATA multicast address was from %s.\n", inet_ntoa(*origdstaddr));
+            return 0;
+        }
+        /** NOTE: for some reason the above doesn't work, even though it is
+        * using the CMSG_DATA() system macro. My work around is the below.
+        */
+        origdstaddr = (struct in_addr*)(cmsgp+1) + 1;
+        if (origdstaddr->s_addr == mcast_addr.sin_addr.s_addr) {
+            _DEBUG("msg from MY multicast address was from %s.\n", inet_ntoa(*origdstaddr));
+            return 0;
+        }
         return -1;
-    }*/
-    /* fixme: use two socks? To ensure only mcast addr dst addresses are delivered? */
-    srcaddr++;
-    return 0;
+    }
+    return -1;
 }
 
 

@@ -101,9 +101,7 @@ int filter_ip_icmp(struct ip *ip_pktp, size_t n) {
         _DEBUG("icmp msg too small, len: %u bytes. Ignoring....\n", (u_int)n);
         return -1;
     }
-    /*if(ntohs(ip_pktp->ip_id) != PING_ICMP_ID) {*/
     _DEBUG("msg IP.id: 0x%x, PING_ICMP_ID: 0x%x\n", ntohs(ip_pktp->ip_id), PING_ICMP_ID);
-    /*}*/
 
     /* point past the ip header to the icmp header */
     icmpp = EXTRACT_ICMPHDRP(ip_pktp);

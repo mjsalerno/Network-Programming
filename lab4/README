@@ -88,7 +88,7 @@ Handling Multicast UDP messages:
       init_multicast_sock() func in tour.c).
 
     * We use the recv_msg() and msg struct to obtain the original destination
-      address of the UDP datagram.
+      address (using IP_RECVORIGDSTADDR) of the UDP datagram
 
 
           Misc. notes about tour

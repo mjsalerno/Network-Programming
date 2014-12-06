@@ -43,7 +43,7 @@ ARP_cse533-11: ARP.o common.o get_hw_addrs.o ARP_util.o api.o
 	$(CC) $(CFLAGS) $^ -o $@
 
 tour_cse533-11: tour.o common.o api.o ping.o api.o
-	$(CC) $(CFLAGS) $< ping.o api.o common.o -o $@
+	$(CC) $(CFLAGS) $< ping.o api.o common.o -lpthread -o $@
 
 clean:
 	rm -fr $(BINS) *.o *core* *.gcno *.gcda *.info *.xml coverage test *_cse533-11
