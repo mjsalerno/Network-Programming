@@ -4,6 +4,7 @@ void handle_rep(char* buf);
 void handle_req(int rawsock, char* buf);
 void ans_tour(int sock, struct arp_cache* entry);
 void handle_sigint(int sign);
+void printouts(char* buf);
 
 static struct hwa_info* hw_list = NULL;
 static struct hwa_ip * mip_head = NULL;
@@ -213,10 +214,10 @@ int main() {
                 printf("\n");
 
                 printf("sending arp\n");
-                print_arp((struct arphdr*)(arp_buf+2));
                 _SPEC("sending proto: 0x%x , ours: 0x%x\n", ntohs(*(uint16_t*)(buf + sizeof(struct ethhdr))), ARP_ETH_PROTO);
                 #endif
                 printf("sending out areq\n");
+                printouts(buf);
                 raw_len = sizeof(raw_addr);
                 errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
                 if(errs < 0) {
@@ -313,11 +314,8 @@ void handle_req(int rawsock, char* buf) {
 
         craft_eth(buf, ARP_ETH_PROTO, &raw_addr, tmp_hwa_ip->if_haddr, tmp_mac, tmp_hwa_ip->if_index);
         memcpy(buf + sizeof(struct ethhdr), arp_buf, arp_size);
-
-        #ifdef DEBUG
-        print_arp((struct arphdr*)(arp_buf+2));
-        #endif
-
+        
+        printouts(buf);
         raw_len = sizeof(raw_addr);
         errs = sendto(rawsock, buf, sizeof(struct ethhdr) + arp_size + 2, 0, (struct sockaddr const *)&raw_addr, raw_len);
         if(errs < 0) {
@@ -385,4 +383,19 @@ void handle_sigint(int sign) {
     free_arp_cache(&arp_lst);
     unlink(ARP_PATH);
     _Exit(EXIT_FAILURE);
+}
+
+void printouts(char* buf) {
+
+    struct ethhdr* eth = (struct ethhdr*)buf;
+    struct arphdr* arp = (struct arphdr*)(buf + sizeof(struct ethhdr) + 2);
+
+    printf("============ETH============\n");
+    printf("eth_dst: ");
+    print_hwa(eth->h_dest, ETH_ALEN);
+    printf("\neth_src: ");
+    print_hwa(eth->h_source, ETH_ALEN);
+    printf("\n");
+    print_arp(arp);
+
 }
